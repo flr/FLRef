@@ -133,14 +133,12 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
               
               # ADD refpts labels and text
               if(length(refpts) > 0 & is.character(refpts)){
-                
                 rpdat <- rpdat[rpdat$refpt %in% refpts,]
                 
                 # CALCULATE limits of lines
                 rpdat$yend <- rpdat$y * 0.99
                 rpdat$ymax <- ave(rpdat$y, rpdat$pos, FUN=max)
                 rpdat$ystart <- rpdat$ymin + (rpdat$ymax * 0.05)
-                
                 rpdat$ymin <- 0
                 rpdat$ystart <- 0
                 
@@ -160,3 +158,49 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
             return(p)
           }
  # }}}
+
+#{{{
+#' plotFsim()
+#
+#' Plots stochastic stock dynamics against refpts for constant Fsim()
+#'
+#' @param stock simulated `FLStock` object from Fsim() 
+#' @param brp output `FLBRP` object from computeFbrp()     
+#' @param worms option to show individual iterations
+#' @param thinning thinning rate of iterations shows, e.g. 10 shows every 10th
+#' @param probs determine credibility intervals, default 80th, 90%   
+#' @param colour color of CIs
+#' @param yrs.eval last years to be used evaluation period, default nyears/2
+#' @param ncol number of plot panel columns
+#' @return ggplot  
+#' @export
+ 
+plotFsim <- function(stock,brp="missing",worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=2,yrs.eval=NULL){
+nyears=dim(stock)[2]
+if(is.null(yrs.eval)) yrs.eval=ceiling(nyears/2)
+iters = dims(stock)$iter
+if(!worms){  
+p <- plot(stock)+theme_bw()+xlab("Year")+theme(legend.position = "none")
+} else {
+p <- plot(stock,iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
+  theme_bw()+xlab("Year")+theme(legend.position = "none")
+}  
+
+p = p +geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.4) +
+  geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.5)+
+  facet_wrap(~qname, scales="free",ncol=ncol)
+
+
+if(!missing(brp)){   
+p = p + geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)["Fbrp","ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+                         F    =FLPar(Fbrp = refpts(brp)["Fbrp","harvest"],Flim = refpts(brp)["Blim","harvest"]),
+                         Catch    =FLPar(Yeq = refpts(brp)["Fbrp","yield"]),
+                         Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
+             x=c(0.2*nyears),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))+
+  geom_vline(xintercept = nyears-yrs.eval+0.5,linetype="dashed")
+  
+}
+return(p)
+}
+# }}}
+

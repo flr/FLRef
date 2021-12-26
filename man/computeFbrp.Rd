@@ -12,7 +12,7 @@ computeFbrp(
   x = 40,
   blim = 0.1,
   type = c("b0", "btrg", "value"),
-  btri = "missing",
+  btri = NULL,
   verbose = T
 )
 }
@@ -36,7 +36,7 @@ computeFbrp(
 
 \item{verbose}{}
 
-\item{proxies}{choice of plots 1:4
+\item{proxies}{choice of Fmsy proxies
 \itemize{
   \item sprx  spawning potential ratio spr/spr0 with basis x 
   \item bx SSB as fraction xSSB0

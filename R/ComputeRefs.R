@@ -6,7 +6,7 @@
 #'
 #' @param stock object of class FLStock 
 #' @param sr stock recruitment model of class FLSR
-#' @param proxies choice of plots 1:4
+#' @param proxies choice of Fmsy proxies
 #' \itemize{
 #'   \item sprx  spawning potential ratio spr/spr0 with basis x 
 #'   \item bx SSB as fraction xSSB0
@@ -26,7 +26,7 @@
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri="missing",verbose=T){
+computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri=NULL,verbose=T){
  
   # use geomean sr if sr = NULL (only growth overfishing)
   if(is.null(sr)){
@@ -78,11 +78,11 @@ computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bli
   }
   
   refs = FLPar(Fbrp=Fbrp,Blim=Blim,B0=B0)
-  if(!missing(btri)){
+  if(!is.null(btri)){
     refs= rbind(refs,FLPar(Btri=btri*an(refpts(brpf)["Fbrp","ssb"])))
   }
   
-  brp = brp(brp+refs)
+  brp = brp+refs
   
   return(brp)
 }
@@ -109,7 +109,7 @@ Fbrp <- function(brp){
     out = rbind(out,FLPar(Fp.05=rpt["Fp.05","harvest"]))
   }
   if("Btri"%in%rownames(rpt)){
-    out = rbind(out,FLPar(Fp.05=rpt["Btri","ssb"]))
+    out = rbind(out,FLPar(Btri=rpt["Btri","ssb"]))
   }
   
   return(out)
