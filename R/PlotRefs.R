@@ -127,7 +127,7 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
               
               # ADD rps points
               p <- p + geom_point(data=rpdat, size=2.5,
-                                  aes_(x=~data, y=~y, group=~refpt, fill=~refpt, shape=~refpt)) +
+                                  aes_(x=~data, y=~y, group=~refpt, fill=~refpt, shape=~refpt),alpha=0.7) +
                 scale_shape_manual(values=shapes) +
                 scale_fill_manual(values=colours) 
               
@@ -157,9 +157,6 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
                 }
               }
             }
-            
-            
-            
             return(p)
           }
  # }}}

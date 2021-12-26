@@ -1,13 +1,4 @@
 
-
-
-stk = stks$cod.27.5b1
-
-# FIT SRR
-sr <- srrTMB(as.FLSR(stk, model=bevholtSV), spr0=spr0y(stk))
-hs = srrTMB(as.FLSR(stk, model=segreg), spr0=spr0y(stk),nyears = 3,plim=0.1,pmax=0.5) # Blim
-blim = params(hs)[[2]]
-
 #{{{
 #' computeFbrp()
 #
@@ -125,19 +116,3 @@ Fbrp <- function(brp){
 }
 #}}}
 
-
-brp = computeFbrp(stk,sr,btri = 0.8)
-
-
-
-Fbrp(brp)
-
-
-
-
-
-test = FLPar(Ftrg=Ftrg,Blim=blim)
-
-rbind(test,FLPar(Test=5))
-
-simFtrg()
