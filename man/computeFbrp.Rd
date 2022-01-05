@@ -27,9 +27,9 @@ computeFbrp(
 
 \item{type}{type of blim input, values < 1 are
 \itemize{
-  \item b0  fraction to B0  
-  \item btrg fraction to Btarget    
-  \item value absolute value
+  \item "b0" fraction to B0  
+  \item "btrg" fraction to Btarget    
+  \item "value" absolute value
 }}
 
 \item{btri}{Btrigger can specified as ratio to Btrg}
@@ -38,10 +38,10 @@ computeFbrp(
 
 \item{proxies}{choice of Fmsy proxies
 \itemize{
-  \item sprx  spawning potential ratio spr/spr0 with basis x 
-  \item bx SSB as fraction xSSB0
-  \item f0.1 10% slope of yield-per-recruit curve
-  \item msy  maximum surplus production (not defined for segreg)
+  \item "sprx"  spawning potential ratio spr/spr0 with basis x 
+  \item "bx" SSB as fraction xSSB0
+  \item "f0.1" 10% slope of yield-per-recruit curve
+  \item "msy"  maximum surplus production (not defined for segreg)
 }}
 }
 \value{

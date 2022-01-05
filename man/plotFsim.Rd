@@ -2,30 +2,30 @@
 % Please edit documentation in R/PlotRefs.R
 \name{plotFsim}
 \alias{plotFsim}
-\title{plotFsim()
+\title{plotFsim
 Plots stochastic stock dynamics against refpts for constant Fsim()}
 \usage{
 plotFsim(
-  stock,
-  brp = "missing",
+  object,
   worms = TRUE,
   thinning = 10,
   probs = c(0.05, 0.2, 0.5, 0.8, 0.95),
+  plotrefs = TRUE,
   colour = "dodgerblue",
   ncol = 2,
   yrs.eval = NULL
 )
 }
 \arguments{
-\item{stock}{simulated `FLStock` object from Fsim()}
-
-\item{brp}{output `FLBRP` object from computeFbrp()}
+\item{object}{output object from Fsim()}
 
 \item{worms}{option to show individual iterations}
 
 \item{thinning}{thinning rate of iterations shows, e.g. 10 shows every 10th}
 
 \item{probs}{determine credibility intervals, default 80th, 90%}
+
+\item{plotrefs}{if TRUE reference points are plotted}
 
 \item{colour}{color of CIs}
 
@@ -37,6 +37,6 @@ plotFsim(
 ggplot
 }
 \description{
-plotFsim()
+plotFsim
 Plots stochastic stock dynamics against refpts for constant Fsim()
 }

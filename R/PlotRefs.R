@@ -2,15 +2,15 @@
 #{{{
 #' ploteq()
 #
-#' Modification of method plot(FLBRP) to plot equilibrium output of computeFbrp()  
+#' Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()  
 #'
 #' @param brp output object from computeFbrp of class FLBRP  
 #' @param refpts Reference points, defaults are computed refpts from computeFbrp()  
 #' \itemize{
-#'   \item Fbrp Fmsy proxy 
+#'   \item Fbrp  
 #'   \item Blim 
-#'   \item B0  unfished biomass for reference period
-#'   \item Btri Btrigger as fraction of Btrg corresponding Fbrp 
+#'   \item B0  
+#'   \item Btri  
 #' }    
 #' @param obs Should observations be plotted? Defaults to `FALSE`.
 #' @param labels plot refpts label, default to `FALSE`
@@ -160,46 +160,50 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
  # }}}
 
 #{{{
-#' plotFsim()
+#' plotFsim
 #
 #' Plots stochastic stock dynamics against refpts for constant Fsim()
 #'
-#' @param stock simulated `FLStock` object from Fsim() 
-#' @param brp output `FLBRP` object from computeFbrp()     
+#' @param object output object from Fsim() 
 #' @param worms option to show individual iterations
 #' @param thinning thinning rate of iterations shows, e.g. 10 shows every 10th
 #' @param probs determine credibility intervals, default 80th, 90%   
+#' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
 #' @param yrs.eval last years to be used evaluation period, default nyears/2
 #' @param ncol number of plot panel columns
 #' @return ggplot  
 #' @export
  
-plotFsim <- function(stock,brp="missing",worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=2,yrs.eval=NULL){
-nyears=dim(stock)[2]
+plotFsim <- function(object,worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),plotrefs=TRUE
+                     ,colour="dodgerblue",ncol=2,yrs.eval=NULL){
+stock = object$stock
+brp = object$brp
+
+nyears=dims(stock)$maxyear-dims(stock)$minyear+1
 if(is.null(yrs.eval)) yrs.eval=ceiling(nyears/2)
 iters = dims(stock)$iter
 if(!worms){  
-p <- plot(stock)+theme_bw()+xlab("Year")+theme(legend.position = "none")
+p <- ggplotFL::plot(stock)+theme_bw()+xlab("Year")+theme(legend.position = "none")
 } else {
-p <- plot(stock,iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
+p <- ggplotFL::plot(stock,iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
   theme_bw()+xlab("Year")+theme(legend.position = "none")
 }  
 
-p = p +geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.4) +
-  geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.5)+
+p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.4) +
+  ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.5)+
   facet_wrap(~qname, scales="free",ncol=ncol)
 
 
-if(!missing(brp)){   
-p = p + geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)["Fbrp","ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+if(plotrefs){
+p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)["Fbrp","ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
                          F    =FLPar(Fbrp = refpts(brp)["Fbrp","harvest"],Flim = refpts(brp)["Blim","harvest"]),
                          Catch    =FLPar(Yeq = refpts(brp)["Fbrp","yield"]),
                          Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
              x=c(0.2*nyears),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))+
   geom_vline(xintercept = nyears-yrs.eval+0.5,linetype="dashed")
-  
-}
+}  
+
 return(p)
 }
 # }}}

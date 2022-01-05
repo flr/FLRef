@@ -3,7 +3,7 @@
 \name{ploteq}
 \alias{ploteq}
 \title{ploteq()
-Modification of method plot(FLBRP) to plot equilibrium output of computeFbrp()}
+Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()}
 \usage{
 ploteq(
   brp,
@@ -22,10 +22,10 @@ ploteq(
 
 \item{refpts}{Reference points, defaults are computed refpts from computeFbrp()
 \itemize{
-  \item Fbrp Fmsy proxy 
+  \item Fbrp  
   \item Blim 
-  \item B0  unfished biomass for reference period
-  \item Btri Btrigger as fraction of Btrg corresponding Fbrp 
+  \item B0  
+  \item Btri  
 }}
 
 \item{obs}{Should observations be plotted? Defaults to `FALSE`.}
@@ -45,5 +45,5 @@ ggplot
 }
 \description{
 ploteq()
-Modification of method plot(FLBRP) to plot equilibrium output of computeFbrp()
+Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()
 }

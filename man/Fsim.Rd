@@ -16,7 +16,7 @@ Fsim(
 )
 }
 \arguments{
-\item{brp}{output object from computeFbrp() of class `FLBRP`}
+\item{brp}{output object from computeFbrp() of class FLBRP}
 
 \item{sigmaR}{lognormal recruitment standard deviation}
 
@@ -27,9 +27,11 @@ Fsim(
 \item{iters}{number simulation iterations}
 
 \item{yrs.eval}{last years to be used evaluation period, default nyears/2}
+
+\item{verbose}{cat comments}
 }
 \value{
-stock object `FLStock` with iterations
+list of  `FLPar`, `FLStock` and `FLBRP` objects
 }
 \description{
 Fsim()
