@@ -23,7 +23,7 @@ plotFsim(
 
 \item{thinning}{thinning rate of iterations shows, e.g. 10 shows every 10th}
 
-\item{probs}{determine credibility intervals, default 80th, 90%}
+\item{probs}{determine credibility intervals, default 80th, 90th percentiles}
 
 \item{plotrefs}{if TRUE reference points are plotted}
 
@@ -31,7 +31,7 @@ plotFsim(
 
 \item{ncol}{number of plot panel columns}
 
-\item{yrs.eval}{last years to be used evaluation period, default nyears/2}
+\item{yrs.eval}{last years to be used evaluation period, default half nyears}
 }
 \value{
 ggplot

@@ -22,7 +22,7 @@
 #' @export
 
 ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=FALSE,
-                   shapes="missing", colours="missing", panels=NULL, ncol=2, ...) {
+                   shapes="missing", colours="missing", panels=NULL, ncol=2) {
             
             x = brp
             # EXTRACT metrics
@@ -167,16 +167,16 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
 #' @param object output object from Fsim() 
 #' @param worms option to show individual iterations
 #' @param thinning thinning rate of iterations shows, e.g. 10 shows every 10th
-#' @param probs determine credibility intervals, default 80th, 90%   
+#' @param probs determine credibility intervals, default 80th, 90th percentiles   
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
-#' @param yrs.eval last years to be used evaluation period, default nyears/2
+#' @param yrs.eval last years to be used evaluation period, default half nyears
 #' @param ncol number of plot panel columns
 #' @return ggplot  
 #' @export
  
-plotFsim <- function(object,worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),plotrefs=TRUE
-                     ,colour="dodgerblue",ncol=2,yrs.eval=NULL){
+plotFsim <- function(object,worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),plotrefs=TRUE,
+                     colour="dodgerblue",ncol=2,yrs.eval=NULL){
 stock = object$stock
 brp = object$brp
 

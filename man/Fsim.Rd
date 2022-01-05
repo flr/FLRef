@@ -31,7 +31,7 @@ Fsim(
 \item{verbose}{cat comments}
 }
 \value{
-list of  `FLPar`, `FLStock` and `FLBRP` objects
+list of  FLPar, FLStock and FLBRP objects
 }
 \description{
 Fsim()

@@ -13,8 +13,7 @@ ploteq(
   shapes = "missing",
   colours = "missing",
   panels = NULL,
-  ncol = 2,
-  ...
+  ncol = 2
 )
 }
 \arguments{

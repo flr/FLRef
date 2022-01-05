@@ -10,7 +10,7 @@
 #' @param iters number simulation iterations
 #' @param yrs.eval last years to be used evaluation period, default nyears/2
 #' @param verbose cat comments
-#' @return list of  `FLPar`, `FLStock` and `FLBRP` objects
+#' @return list of  FLPar, FLStock and FLBRP objects
 #' @export
 
 Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=1000,yrs.eval=NULL,verbose=TRUE){
@@ -58,14 +58,14 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=1000,yrs.eval=NULL,verbo
 }  
 #}}}
 
-
-#' Fp05()
+#{{{
+# Fp05()
 #
-#' Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5%
+#' Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5 percent
 #'
 #' @param object output from Fsim()
 #' @param range range of Fbar value to be evaluated
-#' @param iters Number of iterations (cannot exceed input object)
+#' @param iters Number of iterations, cannot exceed input object
 #' @param verbose Should progress be shown, TRUE.
 #' @return Fp.05
 #' @export
@@ -98,3 +98,4 @@ fp05 <- mean(fbar(res)[,100])
 return(fp05)
 }
 #}}}
+

@@ -2,15 +2,14 @@
 % Please edit documentation in R/SimRefs.R
 \name{Fp05}
 \alias{Fp05}
-\title{Fp05()
-Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5%}
+\title{Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5 percent}
 \usage{
 Fp05(object, iters = "missing", range = "missing", verbose = TRUE)
 }
 \arguments{
 \item{object}{output from Fsim()}
 
-\item{iters}{Number of iterations (cannot exceed input object)}
+\item{iters}{Number of iterations, cannot exceed input object}
 
 \item{range}{range of Fbar value to be evaluated}
 
@@ -20,6 +19,5 @@ Fp05(object, iters = "missing", range = "missing", verbose = TRUE)
 Fp.05
 }
 \description{
-Fp05()
-Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5%
+Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5 percent
 }
