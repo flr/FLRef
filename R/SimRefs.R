@@ -40,7 +40,7 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=1000,yrs.eval=NULL,verbo
   
   Prisk= mse::performance(run, metrics=list(SB=ssb), statistics=statistic, refpts=FLPar(SBlim=an(refpts(brp)["Blim","ssb"])), years=list(pyrs))  
   
-  if(verbose) cat(paste0("Risk3 P(SSB<Blim) = ",Prisk$data*100,"%"))
+  if(verbose) cat(paste0("Risk3 P(SSB<Blim) = ",Prisk$data*100,"%"),"\n")
   
   out = list()
   out$params= FLPar(Fbrp=median(fbar(run)[,pyrs]),
@@ -80,8 +80,8 @@ Prisk = an(object$params["Prisk"])
 
 if(missing(range)){
 if(Prisk<0.05){ 
-  Fr = c(0.8*Fbrp,Flim)} else {
-  Fr = c(0.1*Fbrp,1.1*Fbrp)
+  range = c(0.8*Fbrp,1.1*Flim)} else {
+  range = c(0.1*Fbrp,1.1*Fbrp)
 }}  
 
 if(!missing(iters)){
@@ -91,10 +91,12 @@ statistic <- list(FP05=list(~apply(iterMeans((SB/SBlim) < 1), c(1, 3:6), max),
                             name="P.05", desc="ICES P.05"))
 res <- mse::bisect(stock, sr=object$sr, refpts=FLPar(SBlim=refpts(object$brp)["Blim","ssb"]), deviances=object$devs,
               metrics=list(SB=ssb), statistic=statistic, years=years, pyears=pyrs, 
-              tune=list(fbar=Fr), prob=0.05, tol=0.01, verbose=verbose)
+              tune=list(fbar=range), prob=0.05, tol=0.01, verbose=verbose)
 
 fp05 <- mean(fbar(res)[,100])
 
+
+if(verbose) cat(paste0("Fp.05 = ",round(fp05,3)," is ",ifelse(fp05<Fbrp,"smaller","larger")," than Fbrp = ",round(Fbrp,3)),"\n")
 return(fp05)
 }
 #}}}
