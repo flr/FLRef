@@ -1,14 +1,13 @@
 
 
 # rGclass {{{ 
-
 #' Function to characterize Productivity and refpts based on r and Generation
 #'
 #' @param r value of the intrinsic rate of population increase
 #' @param gt generation time G
 #'
 #' @return list with Productivity category and suggest Fbrps
-
+#' @export
 rGclass = function(r=NULL,gt=NULL){
   rg = data.frame(Low=c(0.00001,0.15),Medium=c(0.150001,0.5),High=c(0.500001,1))
   gg = data.frame(Low=c(50,10.001),Medium=c(10,5),High=c(5,0))
