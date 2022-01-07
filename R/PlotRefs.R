@@ -208,3 +208,177 @@ return(p)
 }
 # }}}
 
+
+
+#{{{
+#' plotWKREF
+#
+#' Plots the new proposed ICES advice rule
+#'
+#' @param ftrg Target F = min(Fbrp,Fp0.5) 
+#' @param btrg Biomass target corresponding to Fbrp
+#' @param blim biomass limit
+#' @param btrigger biomass trigger below which F is linearly reduced   
+#' @param bthresh biomass threshold beyond which biomass is classified sustainable
+#' @param bclose biomass that invokes fishing closure 
+#' @param fmin minimum allowable (bycatch) fishing mortality under closure 
+#' @param obs obtion to show observation with input class `FLStock`
+#' @param kobe add kobe colour-coding
+#' @param alpha transparency of shading
+#' @param xmax multiplier for upper default xlim
+#' @param ymax multiplier for upper default ylim
+#' @param xlab option customize xlab
+#' @param ylab option customize ylab
+#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param expand option to expand the plot area to border - default TRUE
+#' @param critical option to highlight critical zone below blim
+#' @return ggplot  
+#' @export
+#' @examples
+#' plotWKREF()
+#' # Close fishery at Blim and adjust axis labels to relative
+#' plotWKREF(blim=0.2,bclose=0.2,rel=TRUE)
+#' # Close fishery at Blim, but allow fmin (e.g. bycatch)
+#' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,rel=TRUE)
+#' # Change Btrigger above Btrg
+#' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=1.1,rel=TRUE)
+#' # Plot stock data
+#' data(ple4)
+#' plotWKREF(ftrg=0.25,btrg=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
+
+plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btrg,bclose=0,fmin=0, obs="missing", kobe=TRUE,
+                      alpha=1,xmax=1.5,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,critical=TRUE) {
+  #Define axis
+  metric="ssb"
+  output="fbar"
+  
+  # SET args
+  xlim <- btrigger * xmax
+  ylim <- ftrg * ymax
+  
+  # GET observations
+  if(!missing(obs)) {
+    obs <- model.frame(metrics(obs, list(met=get(metric), out=get(output))))
+    xlim <- max(c(obs$met,btrg*1.5)) * 1.05
+    ylim <- max(c(obs$out,ftrg*1.3)) * 1.05
+  }
+  
+  # SET met values
+  met <- seq(0, xlim, length=200)
+  
+  # BELOW lim
+  out <- ifelse(met <= bclose, fmin,
+                # Revised
+                ifelse(met < btrigger,
+                       pmax(c(((ftrg-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
+                       # ABOVE btrigger
+                       ftrg))
+  
+  # DATA
+  dat <- data.frame(met=met, out=out)
+  if(missing(xlab)){ 
+    xlab="SSB"
+    if(rel) xlab = expression(B/B[trg])
+  }
+  if(missing(ylab)){ 
+    ylab="Fishing Mortality"
+   if(rel) xlab = expression(F/F[trg])
+  }
+  
+  p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
+    xlab(xlab) + ylab(ylab)  
+  
+  if(expand){
+    p <- p + scale_x_continuous(expand = c(0, 0), limits = c(0, xlim)) + 
+      scale_y_continuous(expand = c(0,0), limits = c(0, ylim))+
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), panel.background = element_blank(), 
+            axis.line = element_blank())
+    
+  }
+  
+  # PREDICT for threshold
+  
+  ythresh <- ifelse(bthresh < btrigger,
+                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
+                    ftrg)
+  ytarget <- ifelse(btrg < btrigger,
+                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(btrg - bclose) +fmin,fmin)),
+                    ftrg)
+  
+  
+  
+  
+  if(kobe) {
+    ylwmin = ifelse(fmin>0,0,bclose)
+    p <- p +
+      # YELLOW
+      
+      geom_polygon(data=data.frame(x=c(ylwmin,ylwmin,bclose, bthresh, bthresh, bclose,ylwmin),
+                                   y=c(fmin,0, 0, 0,ythresh,fmin,fmin)),
+                   aes(x=x, y=y), fill="yellow", alpha=alpha) +
+      
+      # GREEN
+      geom_polygon(data=data.frame(
+        x=c(bthresh, xlim, xlim, btrigger, bthresh, bthresh),
+        y=c(0, 0, rep(ftrg, 2), ytarget, ytarget)),
+        aes(x=x, y=y), fill="green", alpha=alpha) +
+      
+      # Orange
+      geom_polygon(data=data.frame(
+        x=c(bthresh, btrigger, xlim, xlim, bthresh,bthresh),
+        y=c(ythresh , ftrg, ftrg, ylim, ylim, ythresh)),
+        aes(x=x, y=y), fill="orange", alpha=alpha)+geom_line()+
+      
+      
+      # RED
+      geom_polygon(data=data.frame(
+        x=c(0, bclose, bthresh, bthresh, bthresh, 0, 0),
+        y=c(fmin, fmin, ythresh, ftrg, ylim, ylim, fmin)),
+        aes(x=x, y=y), fill="red", alpha=alpha)
+  
+  if(critical){
+    p<-p+geom_polygon(data=data.frame(
+      x=c(0, blim, blim,  0,0),
+      y=c(0, 0, ylim, ylim,0)),
+      aes(x=x, y=y), fill="red4", alpha=0.7)  
+  }   
+    
+    
+  }
+  
+  
+  # Btrg
+  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftrg, yend=ftrg), linetype=2) +
+    annotate("text", x=xlim*0.8, y=ftrg + ylim / 30*1.05, label="F[trg]",parse=TRUE, hjust="left") +
+    # Btrigger
+    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftrg), linetype=2)+
+    annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
+             vjust="bottom",parse=TRUE) +
+    # Btrg
+    geom_segment(aes(x=btrg, xend=btrg, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
+    annotate("text", x=btrg*1.02, y=ftrg*0.5, label=paste0("B[trg]"), 
+             hjust="left",parse=TRUE)+  
+    # Btresh
+    geom_segment(aes(x=bthresh, xend=bthresh, y=0, yend=ythresh), linetype=1)+
+    annotate("text", x=bthresh*0.98, y=ftrg*0.4, label=paste0("B[thresh]"), 
+             hjust="right",parse=TRUE) +
+    
+    # Blim
+    geom_segment(aes(x=blim, xend=blim, y=0, yend=ftrg), linetype=1,cex=0.9)+
+    annotate("text", x=blim*0.98, y=ftrg*1.03, label=paste0("B[lim]"), 
+             vjust="bottom",hjust="left",parse=TRUE)+  
+    
+    geom_line()
+  
+  
+  
+  if(!missing(obs)) {
+    p <- p + geom_point(data=obs)
+  }
+  
+  
+  
+  return(p)
+}  
+
