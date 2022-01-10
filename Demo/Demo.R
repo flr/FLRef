@@ -12,6 +12,8 @@ hs= srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4),plim=0.05,pmax=.3)
 blim2 = params(hs)[[2]]
 plot(FLSRs(bh=bh,hs=hs))
 
+
+
 # Check Productivity 
 rG = productivity(ple4)
 plot(rG)
@@ -20,17 +22,21 @@ plot(rG)
 Fref = rGclass(r=mean(rG$r),gt=mean(rG$gt))
 Fref
 # Compute Fspr40 with Blim type 2
-brp.bs = computeFbrp(ple4,sr=bh,proxy="bx",x=Fref$Fsb,blim=0.1)
+brp.bh = computeFbrp(ple4,sr=bh,proxy="bx",x=Fref$Fsb,blim=0.1)
 # Compute Fb35 with Blim type 1
 brp.hs = computeFbrp(ple4,sr=bh,proxy="sprx",x=Fref$Fspr,blim=blim2)
 
+# Check 
+Fbrp(brp.bh)
+Fbrp(brp.hs)
+
 # Plot
-ploteq(brp.bs)
+ploteq(brp.bh)
 ploteq(brp.hs)
 
 # Run Fsim
-sim.bh = Fsim(brp.bs,sigmaR=0.6,rho=0.4,iters=500)
-sim.hs = Fsim(brp.hs,sigmaR=0.6,rho=0.4)
+sim.bh = Fsim(brp.bh,sigmaR=0.6,rho=0.4,iters=500)
+sim.hs = Fsim(brp.hs,sigmaR=0.6,rho=0.4,iters=500)
 
 # Plot 
 plotFsim(sim.bh)

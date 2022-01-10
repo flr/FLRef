@@ -159,6 +159,9 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
           }
  # }}}
 
+
+
+
 #{{{
 #' plotFsim
 #

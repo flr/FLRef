@@ -89,6 +89,70 @@ computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bli
 #}}}
 
 #{{{
+#' computeFbrps()
+#
+#' Computes biological reference points corresponding to the proxy Fbrp
+#'
+#' @param stock object of class FLStock 
+#' @param sr stock recruitment model of class FLSR
+#' @param proxies choice of Fmsy proxies
+#' \itemize{
+#'   \item "all"  both sprx and bx 
+#'   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
+#'   \item "bx" SSB as fraction xSSB0
+#' }    
+#' @param verbose   
+#' @return brp object of class FLBRP with computed Fbrp reference points   
+#' @export
+
+computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
+  
+  # use geomean sr if sr = NULL (only growth overfishing)
+  if(is.null(sr)){
+    sr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
+    if(verbose)cat(paste0("Computing geomean from S-R data in the absense of a specified SRR","\n"))
+  }  
+  proxy=proxy[1] 
+ 
+  brp = brp(FLBRP(stock,sr))
+  if(proxy%in%c("sprx","all")){
+    pr = brp(FLBRP(stock)) # per-recruit
+    Fsprs = FLPar(
+      Fspr35 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*35*0.01))["Btrg","harvest"]),
+      Fspr40 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*40*0.01))["Btrg","harvest"]),
+      Fspr45 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*45*0.01))["Btrg","harvest"]),
+      Fspr50 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*50*0.01))["Btrg","harvest"])
+    )  
+      if(verbose)cat(paste0("Computing Fspr% 35-50 with Btrg = Bspr"))
+  }
+  
+  
+  if(proxy%in%c("bx","all")){
+    Bx = FLPar(
+          B30=refpts(brp)["virgin","ssb"]*30*0.01,
+          B35=refpts(brp)["virgin","ssb"]*35*0.01,
+          B40=refpts(brp)["virgin","ssb"]*40*0.01,
+          B45=refpts(brp)["virgin","ssb"]*45*0.01)
+    fbrps = refpts(brp+Bx)[8:11,"harvest"] 
+    FBs = FLPar(Fb30= fbrps[1,],Fb35= fbrps[2,],Fb40= fbrps[3,],Fb45= fbrps[4,] )
+    
+    if(verbose)cat("\n",paste0("Computing Fsb% 30-35 with Btrg = Bsb"),"\n")
+  }  
+  if(proxy=="all") Fbrps=rbind(Fsprs,FBs) 
+  if(proxy=="sprx") Fbrps=Fsprs 
+  if(proxy=="bx") Fbrps=FBs 
+  
+  Fbrps = rbind(Fbrps, FLPar(B0 = an(refpts(brp)["virgin","ssb"])))
+  
+  brp =  brp(brp+Fbrps)
+  
+  return(brp)
+}
+#}}}
+
+
+
+#{{{
 #' Fbrp()
 #
 #' Extract Fbrp based reference points from output of computeFbrp
@@ -98,6 +162,7 @@ computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bli
 
 Fbrp <- function(brp){
   rpt = refpts(brp)
+  if("Fbrp"%in%rownames(refpts(brp))){
   out = FLPar(Fbrp = rpt["Fbrp","harvest"],
         Btrg=rpt["Fbrp","ssb"],
         Blim=rpt["Blim","ssb"],
@@ -111,6 +176,13 @@ Fbrp <- function(brp){
   if("Btri"%in%rownames(rpt)){
     out = rbind(out,FLPar(Btri=rpt["Btri","ssb"]))
   }
+  } else {
+    rp= refpts(brp)
+    n = nrow(rp)
+    out = FLPar(rp[8:n,c("harvest","ssb","yield")])  
+    
+  } 
+  
   
   return(out)
 }
