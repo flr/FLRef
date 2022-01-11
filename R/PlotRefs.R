@@ -414,6 +414,8 @@ return(p)
 #' data(ple4)
 #' plotWKREF(ftrg=0.25,btrg=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
 
+
+
 plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btrg,bclose=0,fmin=0, obs="missing", kobe=TRUE,
                       alpha=1,xmax=1.3,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,critical=kobe) {
   #Define axis
@@ -482,11 +484,11 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
     
     if(btrigger>=bthresh){
     yell = geom_polygon(data=data.frame(x=c(ylwmin,ylwmin,bclose, bthresh, bthresh,bthresh ,bclose,ylwmin),
-                                          y=c(fmin,0, 0, 0,f1,ythresh,fmin,fmin)),
+                                          y=c(fmin,0, 0, 0,0,ythresh,fmin,fmin)),
                           aes(x=x, y=y), fill="yellow", alpha=alpha)
     } else {
-      yell = geom_polygon(data=data.frame(x=c(ylwmin,ylwmin,bclose, bthresh, bthresh,btrigger ,bclose,ylwmin),
-                                          y=c(fmin,0, 0, 0,f1,ythresh,fmin,fmin)),
+     yell= geom_polygon(data=data.frame(x=c(ylwmin,ylwmin,bclose, bthresh, bthresh,btrigger ,bclose,ylwmin),
+                                          y=c(fmin,  0,    0,      0,       ythresh,ythresh,fmin,fmin)),
                           aes(x=x, y=y), fill="yellow", alpha=alpha)  
       
     }
