@@ -13,7 +13,8 @@ computeFbrp(
   blim = 0.1,
   type = c("b0", "btrg", "value"),
   btri = NULL,
-  verbose = T
+  verbose = T,
+  fmax = 10
 )
 }
 \arguments{
@@ -35,6 +36,8 @@ computeFbrp(
 \item{btri}{Btrigger can specified as ratio to Btrg}
 
 \item{verbose}{}
+
+\item{fmax}{maximum Flim = max(Flim,fmax*Fbrp)}
 
 \item{proxies}{choice of Fmsy proxies
 \itemize{
