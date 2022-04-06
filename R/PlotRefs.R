@@ -375,7 +375,35 @@ return(p)
 }
 # }}}
 
+#{{{
+#' plotAdvice
+#
+#' Plots stochastic stock dynamics against refpts for constant Fsim()
+#'
+#' @param object output object from Fsim() 
+#' @param plotrefs if TRUE reference points are plotted 
+#' @param colour color of CIs
+#' @param ncol number of plot panel columns
+#' @return ggplot  
+#' @export
 
+plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2){
+
+  p = ggplotFL::plot(stock)+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
+  xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,0.2)
+  
+  if(plotrefs){
+    p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)["Fbrp","ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+                                             F    =FLPar(Fbrp = refpts(brp)["Fbrp","harvest"],Flim = refpts(brp)["Blim","harvest"]),
+                                             Catch    =FLPar(Yeq = refpts(brp)["Fbrp","yield"]),
+                                             Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
+                                 x=c(xy),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))
+      
+  }  
+  
+  return(p)
+}
+# }}}
 
 #{{{
 #' plotWKREF
@@ -459,7 +487,7 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
   }
   if(missing(ylab)){ 
     ylab="Fishing Mortality"
-   if(rel) xlab = expression(F/F[trg])
+   if(rel) ylab = expression(F/F[trg])
   }
   p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
     xlab(xlab) + ylab(ylab)  
@@ -548,7 +576,7 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
     
     geom_line()
     if(labels){
-    p <- p+annotate("text", x=xlim*0.8, y=ftrg + ylim / 30*1.05, label="F[trg]",parse=TRUE, hjust="left") +
+    p <- p+annotate("text", x=xlim*0.8, y=ftrg + ylim / 30*1.08, label="F[trg]",parse=TRUE, hjust="left") +
     annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
                vjust="bottom",parse=TRUE) +
     # Btrg
@@ -563,7 +591,9 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
     }  
 
   if(!missing(obs)) {
-    p <- p + geom_point(data=obs)
+    p=p+geom_path(data=obs,cex=0.2,col="blue",linetype=1,alpha=0.5)+
+      geom_point(data=obs,cex=c(rep(1.5,nrow(obs)-1),2.5),pch=21,fill=c(rep("grey",nrow(obs)-1),"blue"))
+    
   }
   return(p)
 }  
@@ -601,7 +631,7 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
 #' data(ple4)
 #' plotICES(fmsy=0.25,blim=2e5,,btrigger = 1.4*2e5,obs=ple4)
 
-plotICES <- function(fmsy = 1,blim=1/1.4,btrigger=1.4,bclose=0,fmin=0, obs="missing", kobe=TRUE,
+plotICES <- function(fmsy = 1,blim=1/1.4,btrigger=1,bclose=0,fmin=0, obs="missing", kobe=TRUE,
                       alpha=1,xmax=3,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,critical=FALSE) {
   # Define 
   btrg=bthresh=btrigger
@@ -642,11 +672,11 @@ plotICES <- function(fmsy = 1,blim=1/1.4,btrigger=1.4,bclose=0,fmin=0, obs="miss
   dat <- data.frame(met=met, out=out)
   if(missing(xlab)){ 
     xlab="SSB"
-    if(rel) xlab = expression(B/B[trg])
+    if(rel) xlab = expression(B/B[trigger])
   }
   if(missing(ylab)){ 
     ylab="Fishing Mortality"
-    if(rel) xlab = expression(F/F[trg])
+    if(rel) ylab = expression(F/F[MSY])
   }
   p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
     xlab(xlab) + ylab(ylab)  
@@ -703,7 +733,7 @@ plotICES <- function(fmsy = 1,blim=1/1.4,btrigger=1.4,bclose=0,fmin=0, obs="miss
     
     geom_line()
   if(labels){
-    p <- p+annotate("text", x=btrigger*1.6, y=ftrg + ylim / 30*0.9, label="F[MSY]",parse=TRUE, hjust="left") +
+    p <- p+annotate("text", x=btrigger*1.6, y=ftrg + ylim / 30*1.09, label="F[MSY]",parse=TRUE, hjust="left") +
       # Btrg
       annotate("text", x=btrigger*1.02, y=ftrg*0.5, label=paste0("B[trigger]"), 
                hjust="left",parse=TRUE)+  
@@ -713,7 +743,205 @@ plotICES <- function(fmsy = 1,blim=1/1.4,btrigger=1.4,bclose=0,fmin=0, obs="miss
   }  
   
   if(!missing(obs)) {
-    p <- p + geom_point(data=obs)
+    p=p+geom_path(data=obs,cex=0.2,col="blue",linetype=1,alpha=0.5)+
+      geom_point(data=obs,cex=c(rep(1.5,nrow(obs)-1),2.5),pch=21,fill=c(rep("grey",nrow(obs)-1),"blue"))
   }
   return(p)
 }  
+
+
+
+#{{{
+#' plotMAjuro
+#
+#' Plots the new proposed ICES advice rule
+#'
+#' @param ftrg Target F = min(Fbrp,Fp0.5) 
+#' @param btrg Biomass target corresponding to Fbrp
+#' @param blim biomass limit
+#' @param btrigger biomass trigger below which F is linearly reduced   
+#' @param bthresh biomass threshold beyond which biomass is classified sustainable
+#' @param bclose biomass that invokes fishing closure 
+#' @param fmin minimum allowable (bycatch) fishing mortality under closure 
+#' @param obs obtion to show observation with input class `FLStock`
+#' @param kobe add kobe colour-coding
+#' @param alpha transparency of shading
+#' @param xmax multiplier for upper default xlim
+#' @param ymax multiplier for upper default ylim
+#' @param xlab option customize xlab
+#' @param ylab option customize ylab
+#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param expand option to expand the plot area to border - default TRUE
+#' @param labels annotate reference point labels
+#' @param critical option to highlight critical zone below blim
+#' @return ggplot  
+#' @export
+#' @examples
+#' plotWKREF()
+#' # Close fishery at Blim and adjust axis labels to relative
+#' plotWKREF(blim=0.2,bclose=0.2,rel=TRUE)
+#' # Close fishery at Blim, but allow fmin (e.g. bycatch)
+#' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,rel=TRUE)
+#' # Change Btrigger above Btrg
+#' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=1.1,rel=TRUE)
+#' # Plot stock data
+#' data(ple4)
+#' plotWKREF(ftrg=0.25,btrg=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
+
+
+
+plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bthresh=0.5*btrg,bclose=0,fmin=0, obs="missing", kobe=TRUE,
+                      alpha=1,xmax=1.5,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,critical=kobe) {
+  #Define axis
+  metric="ssb"
+  output="fbar"
+  
+  # SET args
+  xlim <- btrg * xmax
+  ylim <- ftrg * ymax
+  
+  # GET observations
+  if(!missing(obs)) {
+    if(class(obs)=="FLStock")
+      obs <- model.frame(metrics(obs, list(met=get(metric), out=get(output))))
+    
+    if(class(obs)=="FLQuants"){
+      obs=obs[1:2]
+      names(obs) = c("met","out")
+    }
+    
+    xlim <- max(c(obs$met,btrg*1.5)) * 1.05
+    ylim <- max(c(obs$out,ftrg*1.3)) * 1.05
+  }
+  
+  # SET met values
+  met <- seq(0, xlim, length=200)
+  
+  # BELOW lim
+  out <- ifelse(met <= bclose, fmin,
+                # Revised
+                ifelse(met < btrigger,
+                       pmax(c(((ftrg-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
+                       # ABOVE btrigger
+                       ftrg))
+  # DATA
+  dat <- data.frame(met=met, out=out)
+  
+  
+  
+  if(missing(xlab)){ 
+    xlab="SSB"
+    if(rel) xlab = expression(B/B[trg])
+  }
+  if(missing(ylab)){ 
+    ylab="Fishing Mortality"
+    if(rel) ylab = expression(F/F[trg])
+  }
+  p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
+    xlab(xlab) + ylab(ylab)  
+  if(expand){
+    p <- p + scale_x_continuous(expand = c(0, 0), limits = c(0, xlim)) + 
+      scale_y_continuous(expand = c(0,0), limits = c(0, ylim))+
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(), panel.background = element_blank(), 
+            axis.line = element_blank())
+    
+  }
+  
+  # PREDICT for threshold
+  yfthresh <- ifelse(bthresh < btrigger,
+                    pmax(c(((fthresh-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
+                    fthresh)
+  
+  
+  ythresh <- ifelse(bthresh < btrigger,
+                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
+                    ftrg)
+  ytarget <- ifelse(btrg < btrigger,
+                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(btrg - bclose) +fmin,fmin)),
+                    ftrg)
+  if(kobe) {
+    ylwmin = ifelse(fmin>0,0,bclose)
+    
+    
+    p <- p+
+      # GREEN
+      geom_polygon(data=data.frame(
+        x=c(bthresh, xlim, xlim,bthresh),
+        y=c(0, 0, fthresh,fthresh)),
+        aes(x=x, y=y), fill="green", alpha=alpha) +
+      # Orange
+      geom_polygon(data=data.frame(
+        x=c(bthresh, xlim, xlim, bthresh),
+        y=c(fthresh, fthresh, ylim, ylim)),
+        aes(x=x, y=y), fill="orange", alpha=alpha)+
+      
+      # Yellow
+      geom_polygon(data=data.frame(
+        x=c(blim, bthresh, bthresh, blim),
+        y=c(0, 0, fthresh,fthresh)),
+        aes(x=x, y=y), fill="yellow", alpha=alpha)+
+      # red
+      geom_polygon(data=data.frame(
+        x=c(0,blim, blim, bthresh, bthresh,0,0),
+        y=c(0, 0, fthresh,fthresh,ylim,ylim,0)),
+        aes(x=x, y=y), fill="red", alpha=alpha)+
+    
+    
+    geom_line()
+    
+    
+    if(critical){
+      p<-p+geom_polygon(data=data.frame(
+        x=c(0, blim, blim,  0,0),
+        y=c(0, 0, ylim, ylim,0)),
+        aes(x=x, y=y), fill="red4", alpha=0.7)  
+    }   
+  }
+  
+  # Btrg
+  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftrg, yend=ftrg), linetype=2) +
+    # Btrigger
+    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftrg), linetype=2)+
+   
+    # Btrg
+    #geom_segment(aes(x=btrg, xend=btrg, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
+    
+    # Btresh
+    geom_segment(aes(x=bthresh, xend=bthresh, y=0, yend=fthresh), linetype=1)+
+  
+    
+    # Blim
+    geom_segment(aes(x=blim, xend=blim, y=0, yend=ylim), linetype=1,cex=0.9)+
+    
+    geom_segment(aes(x=blim, xend=xlim, y=fthresh, yend=fthresh),cex=0.2)+
+    
+    geom_line()
+  
+  
+  if(labels){
+    p <- p+annotate("text", x=xlim*0.7, y=ftrg + ylim / 30*1.08, label="F[advive]/F[MSYpa]",parse=TRUE, hjust="left") +
+      annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
+               vjust="bottom",parse=TRUE) +
+      # Btrg
+      #annotate("text", x=btrg*1.02, y=ftrg*0.5, label=paste0("B[MSY]"), 
+      #         hjust="left",parse=TRUE)+  
+      # Btresh
+      annotate("text", x=bthresh, y=fthresh*1.01, label=paste0("B[safe]"), 
+               vjust="bottom",parse=TRUE) +
+      # Fthresh
+      annotate("text", x=btrg, y=fthresh*1.01, label=paste0("F[MSY]"), 
+               vjust="bottom",parse=TRUE) +
+      # Blim
+      annotate("text", x=blim*1.05, y=ftrg*0.7, label=paste0("B[lim]"), 
+               vjust="bottom",hjust="left",parse=TRUE)  
+  }  
+  
+  if(!missing(obs)) {
+    p=p+geom_path(data=obs,cex=0.2,col="blue",linetype=1,alpha=0.5)+
+      geom_point(data=obs,cex=c(rep(1.5,nrow(obs)-1),2.5),pch=21,fill=c(rep("grey",nrow(obs)-1),"blue"))
+    
+  }
+  return(p)
+}  
+

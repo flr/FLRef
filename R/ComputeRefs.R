@@ -22,11 +22,12 @@
 #'   \item "value" absolute value
 #' }
 #' @param btri Btrigger can specified as ratio to Btrg
+#' @param fmax maximum Flim = max(Flim,fmax*Fbrp)
 #' @param verbose   
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri=NULL,verbose=T){
+computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri=NULL,verbose=T,fmax=10){
  
   # use geomean sr if sr = NULL (only growth overfishing)
   if(is.null(sr)){
@@ -77,12 +78,24 @@ computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bli
     Blim = blim
   }
   
+
+  
   refs = FLPar(Fbrp=Fbrp,Blim=Blim,B0=B0)
+  
   if(!is.null(btri)){
     refs= rbind(refs,FLPar(Btri=btri*an(refpts(brpf)["Fbrp","ssb"])))
   }
-  
+  # do check
+  check = brp+refs
+  if(refpts(check)["Blim","harvest"]>fmax*refpts(check)["Fbrp","harvest"]){
+    refs["Blim"] = refpts(brp+FLPar(Flim=fmax*refpts(check)["Fbrp","harvest"]))["Flim","ssb"] 
+  }
+    
   brp = brp+refs
+  #if(fmax*refpts(check)["Fbrp","harvest"]>max(fbar(brp))){
+    fl = 2*c(fmax*refpts(check)["Fbrp","harvest"])
+    fbar(brp) = seq(0,fl,fl/100)
+  #} 
   
   return(brp)
 }
@@ -123,7 +136,7 @@ computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
       Fspr45 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*45*0.01))["Btrg","harvest"]),
       Fspr50 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*50*0.01))["Btrg","harvest"])
     )  
-      if(verbose)cat(paste0("Computing Fspr% 35-50 with Btrg = Bspr"))
+      if(verbose)cat(paste0("Computing Fspr% 35-50 with Btrg = Bspr"),"\n")
   }
   
   
@@ -136,7 +149,7 @@ computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
     fbrps = refpts(brp+Bx)[8:11,"harvest"] 
     FBs = FLPar(Fb30= fbrps[1,],Fb35= fbrps[2,],Fb40= fbrps[3,],Fb45= fbrps[4,] )
     
-    if(verbose)cat("\n",paste0("Computing Fsb% 30-35 with Btrg = Bsb"),"\n")
+    if(verbose)cat("\n",paste0("Computing Fsb% 30-45 with Btrg = Bsb"),"\n")
   }  
   if(proxy=="all") Fbrps=rbind(Fsprs,FBs) 
   if(proxy=="sprx") Fbrps=Fsprs 

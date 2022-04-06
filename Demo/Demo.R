@@ -26,10 +26,12 @@ brp.bh = computeFbrp(ple4,sr=bh,proxy="bx",x=Fref$Fsb,blim=0.1)
 # Compute Fb35 with Blim type 1
 brp.hs = computeFbrp(ple4,sr=bh,proxy="sprx",x=Fref$Fspr,blim=blim2)
 
+brp.msy = computeFbrp(ple4,sr=bh,proxy="sprx",x=Fref$Fspr,blim=blim2)
+
 # Check 
 Fbrp(brp.bh)
 Fbrp(brp.hs)
-
+Fbrp(brp.msy)
 # Plot
 ploteq(brp.bh)
 ploteq(brp.hs)
@@ -50,6 +52,8 @@ Fp.05 = Fp05(sim.hs)
 # Proposed advice
 plotWKREF()
 # Add zones (Figure 1)
+
+
 
 plotWKREF(xmax=1.8)+
   annotate("text", x=0.4, y=1.35, label="Overfished", 
