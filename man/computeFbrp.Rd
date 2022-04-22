@@ -7,12 +7,13 @@ Computes biological reference points corresponding to the proxy Fbrp}
 \usage{
 computeFbrp(
   stock,
-  sr = NULL,
+  srr = NULL,
   proxy = c("sprx", "bx", "f0.1", "msy"),
   x = 40,
   blim = 0.1,
   type = c("b0", "btrg", "value"),
-  btri = NULL,
+  btri = "missing",
+  bpa = "missing",
   verbose = T,
   fmax = 10
 )
@@ -20,7 +21,7 @@ computeFbrp(
 \arguments{
 \item{stock}{object of class FLStock}
 
-\item{sr}{stock recruitment model of class FLSR}
+\item{srr}{stock recruitment model of class FLSR}
 
 \item{x}{basis in percent for sprx and bx}
 
@@ -29,17 +30,19 @@ computeFbrp(
 \item{type}{type of blim input, values < 1 are
 \itemize{
   \item "b0" fraction to B0  
-  \item "btrg" fraction to Btarget    
+  \item "btrg" fraction to Btarget (first occurring in proxy)    
   \item "value" absolute value
 }}
 
-\item{btri}{Btrigger can specified as ratio to Btrg}
+\item{btri}{Btrigger can specified as absolute value}
+
+\item{bpa}{Bpa can specified as absolute value}
 
 \item{verbose}{}
 
 \item{fmax}{maximum Flim = max(Flim,fmax*Fbrp)}
 
-\item{proxies}{choice of Fmsy proxies
+\item{proxies}{choice of Fmsy proxies (combinations permitted) 
 \itemize{
   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
   \item "bx" SSB as fraction xSSB0

@@ -5,12 +5,23 @@
 \title{computeFbrps()
 Computes biological reference points corresponding to the proxy Fbrp}
 \usage{
-computeFbrps(stock, sr = NULL, proxy = c("all", "sprx", "bx"), verbose = T)
+computeFbrps(
+  stock,
+  srr = NULL,
+  proxy = c("all", "sprx", "bx"),
+  fmsy = FALSE,
+  f0.1 = TRUE,
+  verbose = T
+)
 }
 \arguments{
 \item{stock}{object of class FLStock}
 
-\item{sr}{stock recruitment model of class FLSR}
+\item{srr}{stock recruitment model of class FLSR}
+
+\item{fmsy}{if TRUE, Fmsy is computed (not suggest for segreg or geomean srr)}
+
+\item{f0.1}{if TRUE, F0.1 is computed}
 
 \item{verbose}{}
 

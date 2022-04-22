@@ -5,8 +5,8 @@
 #' Computes biological reference points corresponding to the proxy Fbrp
 #'
 #' @param stock object of class FLStock 
-#' @param sr stock recruitment model of class FLSR
-#' @param proxies choice of Fmsy proxies
+#' @param srr stock recruitment model of class FLSR
+#' @param proxies choice of Fmsy proxies (combinations permitted) 
 #' \itemize{
 #'   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
 #'   \item "bx" SSB as fraction xSSB0
@@ -18,82 +18,105 @@
 #' @param type type of blim input, values < 1 are  
 #' \itemize{
 #'   \item "b0" fraction to B0  
-#'   \item "btrg" fraction to Btarget    
+#'   \item "btrg" fraction to Btarget (first occurring in proxy)    
 #'   \item "value" absolute value
 #' }
-#' @param btri Btrigger can specified as ratio to Btrg
+#' @param btri Btrigger can specified as absolute value
+#' @param bpa Bpa can specified as absolute value
 #' @param fmax maximum Flim = max(Flim,fmax*Fbrp)
 #' @param verbose   
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri=NULL,verbose=T,fmax=10){
- 
+computeFbrp <- function(stock,srr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=10){
+   
   # use geomean sr if sr = NULL (only growth overfishing)
-  if(is.null(sr)){
-    sr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
-    if(verbose)cat(paste0("Computing geomean from S-R data in the absense of a specified SRR","\n"))
+  if(is.null(srr)){
+    srr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
+    if(verbose)cat(paste0("Computing geomean from S-R data in the absense of a specified SRR"),"\n")
   }  
-  proxy=proxy[1] 
+  
+  Fbrp = FLPar(none=NA)
+  
+  
   type = type[1]
-  brp = brp(FLBRP(stock,sr))
-  if(proxy%in%c("sprx")){
+  brp = brp(FLBRP(stock,srr))
+  if(c("sprx")%in%proxy){
     pr = brp(FLBRP(stock)) # per-recruit
-    Fbrp = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*x*0.01))["Btrg","harvest"])
-    if(verbose)cat(paste0("Computing Fspr",x," with Btrg = Bspr",x," and"))
+    Fbrp = rbind(Fbrp,FLPar(Fspr = refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*x*0.01))["Btrg","harvest"]))
+    if(verbose)cat(paste0("Computing Fspr",x," with Btrg = Bspr",x),"\n")
   }
-  if(proxy%in%c("bx")){
-    Fbrp = an(refpts(brp+FLPar(Btrg=refpts(brp)["virgin","ssb"]*x*0.01))["Btrg","harvest"])
-    if(verbose)cat(paste0("Computing Fsb",x," with Btrg = Bsb",x, " and"))
+  if(c("bx")%in%proxy){
+    Fbrp = rbind(Fbrp,FLPar(Fb = refpts(brp+FLPar(Btrg=refpts(brp)["virgin","ssb"]*x*0.01))["Btrg","harvest"]))
+    if(verbose)cat(paste0("Computing Fsb",x," with Btrg = Bsb",x),"\n")
   }  
-  if(proxy%in%c("f0.1")){
-    Fbrp = an(refpts(brp)["f0.1","harvest"])
-    if(verbose)cat(paste0("Computing F0.1 with Btrg = B[F.01]"," and"))
+  if(c("f0.1")%in%proxy){
+    Fbrp = rbind(Fbrp,FLPar(F0.1=refpts(brp)["f0.1","harvest"]))
+    if(verbose)cat(paste0("Computing F0.1 with Btrg = B[F.01]"),"\n")
   }
   
-    
-  if(proxy%in%c("msy")){
-    if(SRModelName(model(sr))%in%c("segregA1","segreg","geomean")) 
-       stop(paste0("MSY is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
-    
+  if(c("msy")%in%proxy){
+    if(SRModelName(model(srr))%in%c("segregA1","segreg","mean")){
+       warning(paste0("MSY is not unambiguously defined for ",SRModelName(model(srr))," SR model","\n"))
+    } else {
     #add warning for segreg
-    Fbrp = an(refpts(brp)["msy","harvest"])
-    if(verbose)cat(paste0("Computing Fmsy with Btrg = Bmsy"," and"))
+    Fbrp = rbind(Fbrp,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
+      if(verbose)cat(paste0("Computing Fmsy with Btrg = Bmsy"),"\n")
+    }
   }
+  
+  ord = c("Fspr","Fb","F0.1","Fmsy")[match(proxy,c("sprx","bx","f0.1","msy"))]
+  
+  Fbrp = Fbrp[-1]
+  
+  Fbrp = Fbrp[match(rownames(Fbrp),ord)]
   
   B0 = an(refpts(brp)["virgin","ssb"])
   
-  brpf =  brp+FLPar(Fbrp=Fbrp)
+  brpf =  brp+Fbrp
   if(blim<=1 & type!="value"){
-  if(type%in%c("b0")){
-    Blim =an(refpts(brpf)["virgin","ssb"])*blim
-    if(verbose)cat(paste0(" Blim = ",blim,"B0"),"\n")
-  }
-  if(type%in%c("btrg")){
-    Blim =an(refpts(brpf)["Fbrp","ssb"])*blim
-    if(verbose)cat(paste0("Blim = ",blim,"Btrg"),"\n")
-  }
+    if(type%in%c("b0")){
+      Blim =an(refpts(brpf)["virgin","ssb"])*blim
+      if(verbose)cat("\n",paste0(" Blim = ",blim,"B0"),"\n")
+    }
+    if(type%in%c("btrg")){
+      Blim =an(refpts(brpf)[rownames(Fbrp)[1],"ssb"])*blim
+      if(verbose)cat("\n",paste0("Blim = ",blim," with Btrg corresponding to ", rownames(Fbrp)[1]),"\n")
+    }
   } else {
-    if(verbose)cat(paste0("Blim as input value Blim = ",blim),"\n")
+    if(verbose)cat("\n",paste0("Blim as input value Blim = ",blim),"\n")
     Blim = blim
   }
   
-
+  subs = c("spr","b","0.1","msy")[which(c("sprx","bx","f0.1","msy")%in%proxy)] 
   
-  refs = FLPar(Fbrp=Fbrp,Blim=Blim,B0=B0)
+  xi = which(c("sprx","bx")%in%proxy)
+  fref  = paste0("F",subs)
+  if(length(xi)>0) fref[xi] = paste0(fref[xi],x)
+  # rename
+  rownames(Fbrp)[which(c("Fspr","Fb")%in%rownames(Fbrp))] = fref[xi]
   
-  if(!is.null(btri)){
-    refs= rbind(refs,FLPar(Btri=btri*an(refpts(brpf)["Fbrp","ssb"])))
+  refs = rbind(Fbrp,FLPar(Blim=Blim,B0=B0))
+  
+  
+  if(!missing(btri)){
+    refs= rbind(refs,FLPar(Btri=btri))
   }
+  
+  if(!missing(bpa)){
+    refs= rbind(refs,FLPar(Bpa=bpa))
+  }
+  
+  
   # do check
   check = brp+refs
-  if(refpts(check)["Blim","harvest"]>fmax*refpts(check)["Fbrp","harvest"]){
-    refs["Blim"] = refpts(brp+FLPar(Flim=fmax*refpts(check)["Fbrp","harvest"]))["Flim","ssb"] 
+  if(refpts(check)["Blim","harvest"]>fmax*refpts(check)[paste(fref[1]),"harvest"]){
+    refs["Blim"] = refpts(brp+FLPar(Flim=fmax*refpts(check)[paste(fref[1]),"harvest"]))["Flim","ssb"] 
   }
     
   brp = brp+refs
   #if(fmax*refpts(check)["Fbrp","harvest"]>max(fbar(brp))){
-    fl = 2*c(fmax*refpts(check)["Fbrp","harvest"])
+    fl = min(c(fmax*refpts(check)[paste(fref),"harvest"],refpts(check)["Blim","harvest"]*1.5))
     fbar(brp) = seq(0,fl,fl/100)
   #} 
   
@@ -107,18 +130,20 @@ computeFbrp <- function(stock,sr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bli
 #' Computes biological reference points corresponding to the proxy Fbrp
 #'
 #' @param stock object of class FLStock 
-#' @param sr stock recruitment model of class FLSR
+#' @param srr stock recruitment model of class FLSR
 #' @param proxies choice of Fmsy proxies
 #' \itemize{
 #'   \item "all"  both sprx and bx 
 #'   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
 #'   \item "bx" SSB as fraction xSSB0
 #' }    
+#' @param fmsy if TRUE, Fmsy is computed (not suggest for segreg or geomean srr) 
+#' @param f0.1 if TRUE, F0.1 is computed
 #' @param verbose   
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
+computeFbrps <- function(stock,srr=NULL,proxy=c("all","sprx","bx"),fmsy=FALSE,f0.1=TRUE,verbose=T){
   
   # use geomean sr if sr = NULL (only growth overfishing)
   if(is.null(sr)){
@@ -127,7 +152,7 @@ computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
   }  
   proxy=proxy[1] 
  
-  brp = brp(FLBRP(stock,sr))
+  brp = brp(FLBRP(stock,srr))
   if(proxy%in%c("sprx","all")){
     pr = brp(FLBRP(stock)) # per-recruit
     Fsprs = FLPar(
@@ -154,6 +179,9 @@ computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
   if(proxy=="all") Fbrps=rbind(Fsprs,FBs) 
   if(proxy=="sprx") Fbrps=Fsprs 
   if(proxy=="bx") Fbrps=FBs 
+  if(fmsy) Fbrps = rbind(Fbrps,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
+  if(f0.1) Fbrps = rbind(Fbrps,FLPar(F0.1=refpts(brp)["f0.1","harvest"]))
+  
   
   Fbrps = rbind(Fbrps, FLPar(B0 = an(refpts(brp)["virgin","ssb"])))
   
@@ -175,26 +203,22 @@ computeFbrps <- function(stock,sr=NULL,proxy=c("all","sprx","bx"),verbose=T){
 
 Fbrp <- function(brp){
   rpt = refpts(brp)
-  if("Fbrp"%in%rownames(refpts(brp))){
-  out = FLPar(Fbrp = rpt["Fbrp","harvest"],
-        Btrg=rpt["Fbrp","ssb"],
+  ref = rownames(rpt)[grep("F",rownames(rpt))][1]
+  out = FLPar(Fbrp = rpt[ref,"harvest"],
+        Btrg=rpt[ref,"ssb"],
         Blim=rpt["Blim","ssb"],
         Flim=rpt["Blim","harvest"],
-        Yeq = rpt["Fbrp","yield"],
+        Yeq = rpt[ref,"yield"],
         B0 = rpt["virgin","ssb"] 
         )
+  rownames(out)[1] = ref
   if("Fp.05"%in%rownames(rpt)){
     out = rbind(out,FLPar(Fp.05=rpt["Fp.05","harvest"]))
   }
   if("Btri"%in%rownames(rpt)){
     out = rbind(out,FLPar(Btri=rpt["Btri","ssb"]))
   }
-  } else {
-    rp= refpts(brp)
-    n = nrow(rp)
-    out = FLPar(rp[8:n,c("harvest","ssb","yield")])  
-    
-  } 
+ 
   
   
   return(out)

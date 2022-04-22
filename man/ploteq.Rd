@@ -6,18 +6,17 @@
 Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()}
 \usage{
 ploteq(
-  brp,
-  refpts = c("Fbrp", "Btri", "Blim", "B0"),
+  brps,
+  refpts = NULL,
   obs = FALSE,
-  labels = FALSE,
-  shapes = "missing",
+  dashed = TRUE,
   colours = "missing",
   panels = NULL,
   ncol = 2
 )
 }
 \arguments{
-\item{brp}{output object from computeFbrp of class FLBRP}
+\item{brps}{output object from computeFbrp of class FLBRP}
 
 \item{refpts}{Reference points, defaults are computed refpts from computeFbrp()
 \itemize{
@@ -29,9 +28,7 @@ ploteq(
 
 \item{obs}{Should observations be plotted? Defaults to `FALSE`.}
 
-\item{labels}{plot refpts label, default to `FALSE`}
-
-\item{shapes}{refpts symbols, default is designed for computeFbrp() output}
+\item{dashed}{plots vertical dashed lines to highlight refpts locations}
 
 \item{colours}{refpts colours, default is designed for computeFbrp() output}
 

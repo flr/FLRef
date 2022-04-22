@@ -4,7 +4,7 @@
 #
 #' Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()  
 #'
-#' @param brp output object from computeFbrp of class FLBRP  
+#' @param brps output object from computeFbrp of class FLBRP  
 #' @param refpts Reference points, defaults are computed refpts from computeFbrp()  
 #' \itemize{
 #'   \item Fbrp  
@@ -13,32 +13,56 @@
 #'   \item Btri  
 #' }    
 #' @param obs Should observations be plotted? Defaults to `FALSE`.
-#' @param labels plot refpts label, default to `FALSE`
+#' @param dashed plots vertical dashed lines to highlight refpts locations
 #' @param colours refpts colours, default is designed for computeFbrp() output
-#' @param shapes refpts symbols, default is designed for computeFbrp() output
 #' @param panels plot panel option 1:4 
 #' @param ncol number of plot panel columns
 #' @return ggplot  
 #' @export
 
-ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=FALSE,
-                   shapes="missing", colours="missing", panels=NULL, ncol=2) {
+ploteq <- function(brps, refpts=NULL, obs=FALSE, dashed=TRUE,
+                   colours="missing" ,panels=NULL, ncol=2){
             
-            x = brp
+            if(class(brps)=="FLBRP") brps = FLBRPs(brps)
+            
+            defaults = c("virgin","msy","crash","f0.1","fmax","spr.30","mey")
+            
+            cname= names(brps)
+            
+            df = Map(function(x,y){
             # EXTRACT metrics
-            df <- model.frame(metrics(x,
-                                      list(ssb=ssb, harvest=fbar, rec=rec, yield=landings, profit=profit)),
-                              drop=FALSE)
+            data.frame(model.frame(metrics(x,list(ssb=ssb, harvest=fbar, rec=rec, yield=landings, profit=profit)),
+                              drop=FALSE),cname=y)
+            },x=brps,y=as.list(cname))
+            
             # refpts
-            drps <- dimnames(refpts(x))$refpt
-            rps <- refpts(x)[drps %in% refpts,]
+            drps <- as.vector(do.call(c,lapply(brps,function(x){
+            dimnames(refpts(x))$refpt
+            })))
+            
+            drps = unique(drps)
+            # re-arrange
+            drps = drps[c(drps%in%defaults,grep("B",drps),grep("F",drps))]
+            if("B0"%in%drps) drps = c(drps[!drps=="B0"],"B0") 
+            
+            
+          
+            if(is.null(refpts)) refpts = drps[drps%in%defaults==FALSE]
+            
+          
+            
+            rps = FLPars(Map(function(x,y){
+            drpx =  drps[drps%in%rownames(refpts(x))]
+            rp = refpts(x)[drpx %in% refpts,]
+            dms <- dimnames(rp)
+            rp[!dms$refpt %in% "mey",
+                         !dms$quant %in% c("revenue", "cost", "profit")]
+              
+            },x=brps,y=cname)) 
             
             # estimated?
-            rpf <- !all(is.na(rps))
+            rpf <- TRUE
             
-            # SUBSET df IF rpf
-            if(rpf && "crash" %in% dimnames(rps)$refpt)
-              df <- df[df$harvest <= c(rps['crash', 'harvest']),]
             
             # NO economics
             plots <- list(
@@ -47,26 +71,23 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
               P3=c(x="harvest", y="yield", panel="Yield ~ F", pos=3),
               P4=c(x="ssb", y="yield", panel="Yield ~ SSB", pos=4))
             
-            # WITH economics
-            if(!all(is.na(rps[, 'profit']))) {
-              plots <- c(plots, list(
-                P5=c(x="harvest", y="profit", panel="Equilibrium Profit v. F", pos=5),
-                P6=c(x="ssb", y="profit", panel="Equilibrium Profit v. SSB", pos=6)))
-            } else {
-              dms <- dimnames(rps)
-              rps <- rps[!dms$refpt %in% "mey",
-                         !dms$quant %in% c("revenue", "cost", "profit")]
-            }
+            
             
             # SUBSET panels if not NULL
             if(!is.null(panels))
               plots <- plots[panels]
             
             # APPLY over plots to extract x, y and panel for each element
+            
+            
             dat <- lapply(plots, function(p) {
-              data.frame(x=df[,p['x']], y=df[,p['y']], iter=df[,'iter'],
-                         panel=p['panel'], pos=p['pos'], row.names=NULL)
-            })
+              pd = NULL
+              for(i in 1:length(df)){
+                pd = rbind(pd,data.frame(x=df[[i]][,p['x']], y=df[[i]][,p['y']], iter=df[[i]][,'iter'],
+                         panel=p['panel'], pos=p['pos'], row.names=NULL,cname=cname[i]))
+              }
+              pd
+              })
             
             # RBIND into single df
             dat <- do.call(rbind, c(dat, list(make.row.names = FALSE)))
@@ -77,58 +98,79 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
             # CREATE facet labels vector
             facl <- setNames(unique(dat$panel), nm=unique(dat$pos))
             
+            dat$cname = factor(dat$cname,levels=cname)
+            
             # PLOT
-            p <- ggplot(dat, aes_(x=~x, y=~y, group=~iter)) + geom_line() + theme_bw()+
+            p <- ggplot(dat, aes_(x=~x, y=~y))  + theme_bw()+
               facet_wrap(~pos, scales="free", ncol=ncol, labeller=labeller(pos=facl)) +
               xlab("") + ylab("") +
               scale_x_continuous(expand = expansion(mult = c(0, .05)),labels=human_numbers, limits=c(0, NA))+
               scale_y_continuous(expand = expansion(mult = c(0, .1)))+
               theme(legend.title = element_blank())
-            
+            if(length(brps)>1) p <- p + geom_line(aes(color=cname),size=0.6)
+            if(length(brps)==1) p <- p + geom_line(size=0.5)
             # PLOT observations
+           
             if(obs) {
               
-              dfo <- model.frame(metrics(x,
+              dfo <- Map(function(x,y){ 
+                 data.frame( model.frame(metrics(x,
                                          list(ssb=ssb.obs, harvest=fbar.obs, rec=rec.obs, yield=landings.obs,
-                                              profit=profit.obs)), drop=FALSE)
+                                              profit=profit.obs)), drop=FALSE),cname=y)
+              },x=brps,y=as.list(cname))
               
               # APPLY over plots to extract x, y and panel for each element
-              dato <- lapply(plots, function(p)
-                data.frame(x=dfo[,p['x']], y=dfo[,p['y']], iter=dfo[,'iter'],
-                           pos=p['pos'], row.names=NULL))
+              dato <- lapply(plots, function(p){
+                pdo = NULL
+                for(i in 1:length(brps)){
+                pdo = rbind(pdo,data.frame(x=dfo[[i]][,p['x']], y=dfo[[i]][,p['y']], iter=dfo[[i]][,'iter'],
+                           pos=p['pos'],cname=dfo[[i]]$cname, row.names=NULL))
+                }
+                pdo
+                })
+              
+              
               
               # REMOVE if NA
               idx <- unlist(lapply(dato, function(x) all(is.na(x$y))))
               
               dato <- do.call(rbind, c(dato[!idx], list(make.row.names = FALSE)))
-              
-              p <- p + geom_point(data=dato,pch=21,bg="grey")
-            }
+              p <- p + geom_point(data=dato,pch=21,bg="lightgrey",color=1,cex=1)
+            
+              }
             
             # PLOT refpts
             if(rpf) {
               rpdat <- lapply(plots, function(p) {
+                rpd = NULL
+                for(i in 1:length(brps)){
                 # CBIND x, + refpt, iter ...
-                cbind(as(rps[, p['x']], 'data.frame')[, -2],
+                  rpd= rbind(rpd,cbind(as(rps[[i]][, p['x']], 'data.frame')[, -2],
                       # ... y, panel
-                      y=c(rps[,p['y']]), pos=unname(p['pos']))
+                      y=c(rps[[i]][,p['y']]), pos=unname(p['pos']),cname=cname[i]))
+                  
+                }    
+                rpd
               })
               rpdat <- do.call(rbind, c(rpdat, list(make.row.names = FALSE)))
+              
+              rpdat$refpt = factor(rpdat$refpt,levels=refpts)
+              
               
               # CALCULATE ymin per panel
               rpdat$ymin <- ave(rpdat$y, rpdat$pos, FUN=function(x) pmin(min(x), 0))
               
               # SET shapes and colors
-              if(missing(shapes))
-                shapes <- rep(21,length(refpts))
+              #if(missing(shapes))
+              #  shapes <- rep(21:25,10)[1:length(brps)] # c(rep(21,length(refpts)),rep(22,length(refpts)))
               if(missing(colours))
-                colours <- c(rainbow(3)[c(2,1,3)],"orange", rep(c("#e69f00",
-                                                                     "#56b4e9", "#f0e442", "#0072b2", "#d55e00", "#cc79a7"), 4))
-              
+                colours <- rev(ss3col(length(refpts)))
+                
+                
+                
               # ADD rps points
               p <- p + geom_point(data=rpdat, size=2.5,
-                                  aes_(x=~data, y=~y, group=~refpt, fill=~refpt, shape=~refpt),alpha=0.7) +
-                scale_shape_manual(values=shapes) +
+                                  aes(x=data, y=y, group=refpt, fill=refpt,shape=cname),alpha=0.6,pch=c(21)) +
                 scale_fill_manual(values=colours) 
               
               # ADD refpts labels and text
@@ -142,187 +184,18 @@ ploteq <- function(brp, refpts=c("Fbrp","Btri","Blim","B0"), obs=FALSE, labels=F
                 rpdat$ymin <- 0
                 rpdat$ystart <- 0
                 
-                # LABEL
-                if(labels) {
-                  p <- p + geom_text(data=rpdat,
-                                     aes_(x=~data, y=~ymin, label=~refpt), angle = 90, size=3, vjust="left") +
-                    # LINES
-                    geom_segment(data=rpdat, aes_(x=~data, y=~ystart, xend=~data, yend=~yend),
-                                 colour="grey")
-                } else {
-                  p<-p+geom_segment(data=rpdat, aes_(x=~data, y=~ystart, xend=~data, yend=~yend),linetype="dashed",color="darkgrey") 
-                   
-                }
-              }
+                
+              if(dashed==TRUE)   
+                p<-p+geom_segment(data=rpdat, aes_(x=~data, y=~ystart, xend=~data, yend=~yend),linetype="dashed",color="darkgrey") 
+              
+              }    
+                
+              
             }
             return(p)
           }
  # }}}
 
-#{{{
-#' plotFbrps()
-#
-#' Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()  
-#'
-#' @param brp output object from computeFbrp of class FLBRP  
-#' @param refpts Reference points, defaults are computed refpts from computeFbrp()  
-#' \itemize{
-#'   \item all  
-#'   \item sprx 
-#'   \item bx  
-#' }    
-#' @param obs Should observations be plotted? Defaults to `FALSE`.
-#' @param labels plot refpts label, default to `FALSE`
-#' @param colours refpts colours, default is designed for computeFbrp() output
-#' @param shapes refpts symbols, default is designed for computeFbrp() output
-#' @param panels plot panel option 1:4 
-#' @param ncol number of plot panel columns
-#' @return ggplot  
-#' @export
-
-plotFbrps <- function(brp, proxies=c("all","sprx","bx"), obs=FALSE, labels=FALSE,
-                   shapes="missing", colours="missing", panels=NULL, ncol=2) {
-  
-  x = brp
-  # EXTRACT metrics
-  df <- model.frame(metrics(x,
-                            list(ssb=ssb, harvest=fbar, rec=rec, yield=landings, profit=profit)),
-                    drop=FALSE)
-  
-  if(SRModelName(model(sr))%in%c("segregA1","segreg","geomean"))
-  
-    
-  # refpts
-  drps <- dimnames(refpts(x))$refpt
-  if(proxies=="sprx") refpts = c("msy","virgin",drps[8:11])
-  
-  rps <- refpts(x)[drps %in% refpts,]
-  
-  # estimated?
-  rpf <- !all(is.na(rps))
-  
-  # SUBSET df IF rpf
-  if(rpf && "crash" %in% dimnames(rps)$refpt)
-    df <- df[df$harvest <= c(rps['crash', 'harvest']),]
-  
-  # NO economics
-  plots <- list(
-    P1=c(x="harvest", y="ssb", panel="SSB ~ F", pos=1),
-    P2=c(x="ssb", y="rec", panel="Recruitment ~ SSB", pos=2),
-    P3=c(x="harvest", y="yield", panel="Yield ~ F", pos=3),
-    P4=c(x="ssb", y="yield", panel="Yield ~ SSB", pos=4))
-  
-  # WITH economics
-  if(!all(is.na(rps[, 'profit']))) {
-    plots <- c(plots, list(
-      P5=c(x="harvest", y="profit", panel="Equilibrium Profit v. F", pos=5),
-      P6=c(x="ssb", y="profit", panel="Equilibrium Profit v. SSB", pos=6)))
-  } else {
-    dms <- dimnames(rps)
-    rps <- rps[!dms$refpt %in% "mey",
-               !dms$quant %in% c("revenue", "cost", "profit")]
-  }
-  
-  # SUBSET panels if not NULL
-  if(!is.null(panels))
-    plots <- plots[panels]
-  
-  # APPLY over plots to extract x, y and panel for each element
-  dat <- lapply(plots, function(p) {
-    data.frame(x=df[,p['x']], y=df[,p['y']], iter=df[,'iter'],
-               panel=p['panel'], pos=p['pos'], row.names=NULL)
-  })
-  
-  # RBIND into single df
-  dat <- do.call(rbind, c(dat, list(make.row.names = FALSE)))
-  
-  # Limit y to 0 in panels 1:4
-  dat[dat$pos %in% 1:4 & dat$y<0, "y"] <- 0
-  
-  # CREATE facet labels vector
-  facl <- setNames(unique(dat$panel), nm=unique(dat$pos))
-  
-  # PLOT
-  p <- ggplot(dat, aes_(x=~x, y=~y, group=~iter)) + geom_line() + theme_bw()+
-    facet_wrap(~pos, scales="free", ncol=ncol, labeller=labeller(pos=facl)) +
-    xlab("") + ylab("") +
-    scale_x_continuous(expand = expansion(mult = c(0, .05)),labels=human_numbers, limits=c(0, NA))+
-    scale_y_continuous(expand = expansion(mult = c(0, .1)))+
-    theme(legend.title = element_blank())
-  
-  # PLOT observations
-  if(obs) {
-    
-    dfo <- model.frame(metrics(x,
-                               list(ssb=ssb.obs, harvest=fbar.obs, rec=rec.obs, yield=landings.obs,
-                                    profit=profit.obs)), drop=FALSE)
-    
-    # APPLY over plots to extract x, y and panel for each element
-    dato <- lapply(plots, function(p)
-      data.frame(x=dfo[,p['x']], y=dfo[,p['y']], iter=dfo[,'iter'],
-                 pos=p['pos'], row.names=NULL))
-    
-    # REMOVE if NA
-    idx <- unlist(lapply(dato, function(x) all(is.na(x$y))))
-    
-    dato <- do.call(rbind, c(dato[!idx], list(make.row.names = FALSE)))
-    
-    p <- p + geom_point(data=dato,pch=21,bg="grey")
-  }
-  
-  # PLOT refpts
-  if(rpf) {
-    rpdat <- lapply(plots, function(p) {
-      # CBIND x, + refpt, iter ...
-      cbind(as(rps[, p['x']], 'data.frame')[, -2],
-            # ... y, panel
-            y=c(rps[,p['y']]), pos=unname(p['pos']))
-    })
-    rpdat <- do.call(rbind, c(rpdat, list(make.row.names = FALSE)))
-    
-    # CALCULATE ymin per panel
-    rpdat$ymin <- ave(rpdat$y, rpdat$pos, FUN=function(x) pmin(min(x), 0))
-    
-    # SET shapes and colors
-    if(missing(shapes))
-      shapes <- rep(21,length(refpts))
-    if(missing(colours))
-      colours <- c(rainbow(3)[c(2,1,3)],"orange", rep(c("#e69f00",
-                                                        "#56b4e9", "#f0e442", "#0072b2", "#d55e00", "#cc79a7"), 4))
-    
-    # ADD rps points
-    p <- p + geom_point(data=rpdat, size=2.5,
-                        aes_(x=~data, y=~y, group=~refpt, fill=~refpt, shape=~refpt),alpha=0.7) +
-      scale_shape_manual(values=shapes) +
-      scale_fill_manual(values=colours) 
-    
-    # ADD refpts labels and text
-    if(length(refpts) > 0 & is.character(refpts)){
-      rpdat <- rpdat[rpdat$refpt %in% refpts,]
-      
-      # CALCULATE limits of lines
-      rpdat$yend <- rpdat$y * 0.99
-      rpdat$ymax <- ave(rpdat$y, rpdat$pos, FUN=max)
-      rpdat$ystart <- rpdat$ymin + (rpdat$ymax * 0.05)
-      rpdat$ymin <- 0
-      rpdat$ystart <- 0
-      
-      # LABEL
-      if(labels) {
-        p <- p + geom_text(data=rpdat,
-                           aes_(x=~data, y=~ymin, label=~refpt), angle = 90, size=3, vjust="left") +
-          # LINES
-          geom_segment(data=rpdat, aes_(x=~data, y=~ystart, xend=~data, yend=~yend),
-                       colour="grey")
-      } else {
-        p<-p+geom_segment(data=rpdat, aes_(x=~data, y=~ystart, xend=~data, yend=~yend),linetype="dashed",color="darkgrey") 
-        
-      }
-    }
-  }
-  return(p)
-}
-# }}}
 
 
 
@@ -361,11 +234,14 @@ p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.4)
   ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.5)+
   facet_wrap(~qname, scales="free",ncol=ncol)
 
+ref = rownames(object$params)[1]
+Fs = FLPar(Fbrp = refpts(brp)[ref,"harvest"],Flim = refpts(brp)["Blim","harvest"])
+rownames(Fs)[1] = ref
 
 if(plotrefs){
-p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)["Fbrp","ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
-                         F    =FLPar(Fbrp = refpts(brp)["Fbrp","harvest"],Flim = refpts(brp)["Blim","harvest"]),
-                         Catch    =FLPar(Yeq = refpts(brp)["Fbrp","yield"]),
+p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+                         F    =Fs,
+                         Catch    =FLPar(Yeq = refpts(brp)[ref,"yield"]),
                          Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
              x=c(0.2*nyears),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))+
   geom_vline(xintercept = nyears-yrs.eval+0.5,linetype="dashed")
@@ -390,14 +266,32 @@ return(p)
 plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2){
 
   p = ggplotFL::plot(stock)+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
-  xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,0.2)
+  xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3))
+  
+  
+  Fs = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"harvest"]),
+             params=rownames(refpts(brp))[grep("F",rownames(refpts(brp)))])
+  Fs= rbind(Fs,FLPar(Flim=refpts(brp)["Blim","harvest"]))
+  nf = length(Fs)-1
+  Bs = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"ssb"]),
+             params=paste0(rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],""))
+  Bs= rbind(Bs,FLPar(Flim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]))
+  rownames(Bs) = gsub("F","B",rownames(Bs))
+  if(any(rownames(Bs)%in%"B0.1")) rownames(Bs)[rownames(Bs)%in%"B0.1"] = "Bf0.1" 
+  
+  Ys = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"yield"]),
+             params=paste0(rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],""))
+  rownames(Ys) = gsub("F","Y",rownames(Ys))
+  if(any(rownames(Bs)%in%"B0.1")) rownames(Ys)[rownames(Ys)%in%"Y0.1"] = "Yf0.1" 
+  
+  xy = xy[1:nf]
   
   if(plotrefs){
-    p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)["Fbrp","ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
-                                             F    =FLPar(Fbrp = refpts(brp)["Fbrp","harvest"],Flim = refpts(brp)["Blim","harvest"]),
-                                             Catch    =FLPar(Yeq = refpts(brp)["Fbrp","yield"]),
+    p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =Bs,
+                                             F    =Fs,
+                                             Catch    =Ys,
                                              Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
-                                 x=c(xy),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))
+                                 x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
       
   }  
   
