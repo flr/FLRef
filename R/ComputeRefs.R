@@ -146,8 +146,8 @@ computeFbrp <- function(stock,srr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bl
 computeFbrps <- function(stock,srr=NULL,proxy=c("all","sprx","bx"),fmsy=FALSE,f0.1=TRUE,verbose=T){
   
   # use geomean sr if sr = NULL (only growth overfishing)
-  if(is.null(sr)){
-    sr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
+  if(is.null(srr)){
+    srr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
     if(verbose)cat(paste0("Computing geomean from S-R data in the absense of a specified SRR","\n"))
   }  
   proxy=proxy[1] 
