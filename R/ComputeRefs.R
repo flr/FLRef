@@ -88,14 +88,13 @@ computeFbrp <- function(stock,srr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bl
     Blim = blim
   }
   
-  subs = c("spr","b","0.1","msy")[which(c("sprx","bx","f0.1","msy")%in%proxy)] 
+  #subs = c("spr","b","0.1","msy")[which(c("sprx","bx","f0.1","msy")%in%proxy)] 
+  #xi = which(c("sprx","bx")%in%proxy)
   
-  xi = which(c("sprx","bx")%in%proxy)
-  fref  = paste0("F",subs)
-  if(length(xi)>0) fref[xi] = paste0(fref[xi],x)
+  
   # rename
-  rownames(Fbrp)[which(c("Fspr","Fb")%in%rownames(Fbrp))] = fref[xi]
-  
+  rownames(Fbrp)[which(rownames(Fbrp)%in%c("Fspr","Fb"))] = paste0(rownames(Fbrp)[which(rownames(Fbrp)%in%c("Fspr","Fb"))],x) 
+  fref  = rownames(Fbrp)
   refs = rbind(Fbrp,FLPar(Blim=Blim,B0=B0))
   
   
