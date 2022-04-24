@@ -5,7 +5,7 @@
 #' Computes biological reference points corresponding to the proxy Fbrp
 #'
 #' @param stock object of class FLStock 
-#' @param srr stock recruitment model of class FLSR
+#' @param sr stock recruitment model of class FLSR
 #' @param proxies choice of Fmsy proxies (combinations permitted) 
 #' \itemize{
 #'   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
@@ -28,19 +28,18 @@
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrp <- function(stock,srr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=10){
+computeFbrp <- function(stock,sr='missing',proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=10){
    
-  # use geomean sr if sr = NULL (only growth overfishing)
-  if(is.null(srr)){
-    srr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
-    if(verbose)cat(paste0("Computing geomean from S-R data in the absense of a specified SRR"),"\n")
+  if(missing(sr)){
+    if(verbose)cat(paste0("Computing Per-Recruit Quantities"),"\n")
+    sr = FLSR(params=FLPar(1, params='a'),model=formula(rec~a))
+    
   }  
-  
   Fbrp = FLPar(none=NA)
   
   
   type = type[1]
-  brp = brp(FLBRP(stock,srr))
+  brp = brp(FLBRP(stock,sr))
   if(c("sprx")%in%proxy){
     pr = brp(FLBRP(stock)) # per-recruit
     Fbrp = rbind(Fbrp,FLPar(Fspr = refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*x*0.01))["Btrg","harvest"]))
@@ -56,8 +55,8 @@ computeFbrp <- function(stock,srr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bl
   }
   
   if(c("msy")%in%proxy){
-    if(SRModelName(model(srr))%in%c("segregA1","segreg","mean")){
-       warning(paste0("MSY is not unambiguously defined for ",SRModelName(model(srr))," SR model","\n"))
+    if(SRModelName(model(sr))%in%c("segregA1","segreg","mean")){
+       warning(paste0("MSY is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
     } else {
     #add warning for segreg
     Fbrp = rbind(Fbrp,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
@@ -129,29 +128,33 @@ computeFbrp <- function(stock,srr=NULL,proxy=c("sprx","bx","f0.1","msy"),x=40,bl
 #' Computes biological reference points corresponding to the proxy Fbrp
 #'
 #' @param stock object of class FLStock 
-#' @param srr stock recruitment model of class FLSR
+#' @param sr stock recruitment model of class FLSR
 #' @param proxies choice of Fmsy proxies
 #' \itemize{
 #'   \item "all"  both sprx and bx 
 #'   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
 #'   \item "bx" SSB as fraction xSSB0
 #' }    
-#' @param fmsy if TRUE, Fmsy is computed (not suggest for segreg or geomean srr) 
+#' @param fmsy if TRUE, Fmsy is computed (not suggest for segreg or geomean sr) 
 #' @param f0.1 if TRUE, F0.1 is computed
+#' @param fmax maximum Flim = minfmax*Fbrp)
 #' @param verbose   
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrps <- function(stock,srr=NULL,proxy=c("all","sprx","bx"),fmsy=FALSE,f0.1=TRUE,verbose=T){
+computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALSE,f0.1=TRUE,fmax=5,verbose=T){
   
-  # use geomean sr if sr = NULL (only growth overfishing)
-  if(is.null(srr)){
-    srr = fmle(as.FLSR(stock,model=geomean),method="BFGS")
-    if(verbose)cat(paste0("Computing geomean from S-R data in the absense of a specified SRR","\n"))
-  }  
+    
+    # use geomean sr if sr = NULL (only growth overfishing)
+    if(missing(sr)){
+      if(verbose)cat(paste0("Computing Per-Recruit Quantities"),"\n")
+      sr = FLSR(params=FLPar(1, params='a'),model=formula(rec~a))
+      
+    }  
+    
   proxy=proxy[1] 
  
-  brp = brp(FLBRP(stock,srr))
+  brp = brp(FLBRP(stock,sr))
   if(proxy%in%c("sprx","all")){
     pr = brp(FLBRP(stock)) # per-recruit
     Fsprs = FLPar(
@@ -162,6 +165,7 @@ computeFbrps <- function(stock,srr=NULL,proxy=c("all","sprx","bx"),fmsy=FALSE,f0
     )  
       if(verbose)cat(paste0("Computing Fspr% 35-50 with Btrg = Bspr"),"\n")
   }
+  
   
   
   if(proxy%in%c("bx","all")){
@@ -181,10 +185,16 @@ computeFbrps <- function(stock,srr=NULL,proxy=c("all","sprx","bx"),fmsy=FALSE,f0
   if(fmsy) Fbrps = rbind(Fbrps,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
   if(f0.1) Fbrps = rbind(Fbrps,FLPar(F0.1=refpts(brp)["f0.1","harvest"]))
   
+  fref = rownames(Fbrps)
   
   Fbrps = rbind(Fbrps, FLPar(B0 = an(refpts(brp)["virgin","ssb"])))
   
+  
   brp =  brp(brp+Fbrps)
+  
+  fl = min(c(fmax*refpts(brp)[paste(fref),"harvest"]))
+  fbar(brp) = seq(0,fl,fl/100)
+  
   
   return(brp)
 }
