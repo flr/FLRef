@@ -7,21 +7,24 @@ Computes biological reference points corresponding to the proxy Fbrp}
 \usage{
 computeFbrps(
   stock,
-  srr = NULL,
-  proxy = c("all", "sprx", "bx"),
+  sr = "missing",
+  proxy = c("sprx", "bx", "all"),
   fmsy = FALSE,
   f0.1 = TRUE,
+  fmax = 5,
   verbose = T
 )
 }
 \arguments{
 \item{stock}{object of class FLStock}
 
-\item{srr}{stock recruitment model of class FLSR}
+\item{sr}{stock recruitment model of class FLSR}
 
-\item{fmsy}{if TRUE, Fmsy is computed (not suggest for segreg or geomean srr)}
+\item{fmsy}{if TRUE, Fmsy is computed (not suggest for segreg or geomean sr)}
 
 \item{f0.1}{if TRUE, F0.1 is computed}
+
+\item{fmax}{maximum Flim = minfmax*Fbrp)}
 
 \item{verbose}{}
 

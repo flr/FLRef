@@ -7,23 +7,23 @@ Computes biological reference points corresponding to the proxy Fbrp}
 \usage{
 computeFbrp(
   stock,
-  srr = NULL,
-  proxy = c("sprx", "bx", "f0.1", "msy"),
-  x = 40,
+  sr = "missing",
+  proxy = NULL,
+  x = NULL,
   blim = 0.1,
   type = c("b0", "btrg", "value"),
   btri = "missing",
   bpa = "missing",
   verbose = T,
-  fmax = 10
+  fmax = 5
 )
 }
 \arguments{
 \item{stock}{object of class FLStock}
 
-\item{srr}{stock recruitment model of class FLSR}
+\item{sr}{stock recruitment model of class FLSR}
 
-\item{x}{basis in percent for sprx and bx}
+\item{x}{basis in percent for sprx and bx, e.g. 40 for spr40}
 
 \item{blim}{values < 1 are taken as fraction to B0 and blim > 1 as absolute values unless specified otherwise}
 

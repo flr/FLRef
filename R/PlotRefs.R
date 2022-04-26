@@ -20,11 +20,10 @@
 #' @return ggplot  
 #' @export
 
-ploteq <- function(brps, refpts=NULL, obs=FALSE, dashed=TRUE,
+ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
                    colours="missing" ,panels=NULL, ncol=2){
             
             if(class(brps)=="FLBRP") brps = FLBRPs(brps)
-            
             defaults = c("virgin","msy","crash","f0.1","fmax","spr.30","mey")
             
             cname= names(brps)
@@ -42,13 +41,18 @@ ploteq <- function(brps, refpts=NULL, obs=FALSE, dashed=TRUE,
             
             drps = unique(drps)
             # re-arrange
-            drps = drps[c(drps%in%defaults,grep("B",drps),grep("F",drps))]
+            drps = drps[c(which(drps%in%defaults),grep("B",drps),grep("F",drps))]
             if("B0"%in%drps) drps = c(drps[!drps=="B0"],"B0") 
             
             
           
-            if(is.null(refpts)) refpts = drps[drps%in%defaults==FALSE]
-            
+            if(missing(refpts)){ 
+              refpts = drps[drps%in%defaults==FALSE]
+            } else {
+              
+              excl = defaults[defaults%in%refpts==FALSE]
+              refpts = drps[drps%in%excl==FALSE]
+            }
           
             
             rps = FLPars(Map(function(x,y){
@@ -154,6 +158,8 @@ ploteq <- function(brps, refpts=NULL, obs=FALSE, dashed=TRUE,
               })
               rpdat <- do.call(rbind, c(rpdat, list(make.row.names = FALSE)))
               
+              # reorganize
+              refpts = unique(c(refpts[grep("Blim",refpts)],refpts[grep("F",refpts)],refpts[-grep("F",refpts)]))
               rpdat$refpt = factor(rpdat$refpt,levels=refpts)
               
               
@@ -212,11 +218,12 @@ ploteq <- function(brps, refpts=NULL, obs=FALSE, dashed=TRUE,
 #' @param colour color of CIs
 #' @param yrs.eval last years to be used evaluation period, default half nyears
 #' @param ncol number of plot panel columns
+#' @param label.size size of reference points
 #' @return ggplot  
 #' @export
  
 plotFsim <- function(object,worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),plotrefs=TRUE,
-                     colour="dodgerblue",ncol=2,yrs.eval=NULL){
+                     colour="dodgerblue",ncol=2,label.size=3,yrs.eval=NULL){
 stock = object$stock
 brp = object$brp
 
@@ -224,9 +231,9 @@ nyears=dims(stock)$maxyear-dims(stock)$minyear+1
 if(is.null(yrs.eval)) yrs.eval=ceiling(nyears/2)
 iters = dims(stock)$iter
 if(!worms){  
-p <- ggplotFL::plot(stock)+theme_bw()+xlab("Year")+theme(legend.position = "none")
+p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar))+theme_bw()+xlab("Year")+theme(legend.position = "none")
 } else {
-p <- ggplotFL::plot(stock,iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
+p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar),iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
   theme_bw()+xlab("Year")+theme(legend.position = "none")
 }  
 
@@ -239,11 +246,16 @@ Fs = FLPar(Fbrp = refpts(brp)[ref,"harvest"],Flim = refpts(brp)["Blim","harvest"
 rownames(Fs)[1] = ref
 
 if(plotrefs){
-p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
-                         F    =Fs,
-                         Catch    =FLPar(Yeq = refpts(brp)[ref,"yield"]),
-                         Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
-             x=c(0.2*nyears),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))+
+  
+  ggp =ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+                                   F    =Fs,
+                                   Landings    =FLPar(Yeq = refpts(brp)[ref,"yield"]),
+                                   Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
+                       x=c(0.2*nyears),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))
+  ggp[[2]]$aes_params$size=label.size
+  
+  
+p = p + ggp +
   geom_vline(xintercept = nyears-yrs.eval+0.5,linetype="dashed")
 }  
 
@@ -260,12 +272,42 @@ return(p)
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
 #' @param ncol number of plot panel columns
+#' @param label.size size of refpts labels 
 #' @return ggplot  
 #' @export
 
-plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2){
+plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 
-  p = ggplotFL::plot(stock)+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
+  
+  rp = refpts(brp)
+  pr = FALSE
+  if(model(brp)=="rec ~ a") pr = TRUE
+  
+  if(pr){
+  b0 = c(rp["B0",c("ssb")])
+  r0 = exp(mean(log(rec(stock))))
+  ref = rownames(rp)[grep("F",rownames(rp))[1]]
+  yref = c(rp[ref,"yield"])
+  fref = c(rp[ref,"harvest"])
+  fls = FLQuants("Recruitment"=rec(stock)/r0,
+                 "Spawning Ratio Potential"=(ssb(stock)/r0)/b0,"Yield per Recruit"=(landings(stock)/r0)/yref,"F"=fbar(stock))
+  
+  names(fls)[names(fls)=="F"] =  paste0("F(",paste0(range(stock, c("minfbar", "maxfbar")),
+         collapse="-"),")")
+  
+  p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
+  
+  }
+  if(!pr){
+    fls = FLQuants("Recruitment"=rec(stock),
+                   "SSB"=ssb(stock),"Landings"=landings(stock),"F"=fbar(stock))
+    names(fls)[names(fls)=="F"] =  paste0("F(",paste0(range(stock, c("minfbar", "maxfbar")),
+                                                      collapse="-"),")")
+    p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
+    
+  }
+     
+  
   xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3))
   
   
@@ -284,16 +326,45 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2){
   rownames(Ys) = gsub("F","Y",rownames(Ys))
   if(any(rownames(Bs)%in%"B0.1")) rownames(Ys)[rownames(Ys)%in%"Y0.1"] = "Yf0.1" 
   
+  if(pr){
+    Bs = Bs/b0
+    Ys = Ys/yref    
+    
+  }
+  
   xy = xy[1:nf]
   
   if(plotrefs){
-    p = p + ggplotFL::geom_flpar(data=FLPars(SSB  =Bs,
-                                             F    =Fs,
-                                             Catch    =Ys,
-                                             Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
-                                 x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
-      
-  }  
+  if(!pr){  
+    
+    fps =FLPars(SSB  =Bs,
+           F    =Fs,
+           Catch    =Ys,
+           Rec=FLPar(R0=refpts(brp)["virgin","rec"]))
+    fps@names = names(fls)[c(2,4,3,1)] 
+    ggp = ggplotFL::geom_flpar(data=fps,
+                               x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
+    ggp[[2]]$aes_params$size=label.size
+    p = p +ggp 
+  }
+  if(pr){  
+  
+  rownames(Bs)[grep("B0",rownames(Bs))] = "SPR0"  
+  fps = FLPars(SSB  =Bs,
+               F    =Fs,
+               Catch    =Ys,
+               Rec=FLPar(R0=refpts(brp)["virgin","rec"]))    
+    
+  
+  fps@names = names(fls)[c(2,4,3,1)] 
+  ggp = ggplotFL::geom_flpar(data=fps,
+                              x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
+  ggp[[2]]$aes_params$size=label.size
+  p = p +ggp 
+ }  
+    
+    
+    }  
   
   return(p)
 }

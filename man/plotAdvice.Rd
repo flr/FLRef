@@ -5,12 +5,14 @@
 \title{plotAdvice
 Plots stochastic stock dynamics against refpts for constant Fsim()}
 \usage{
-plotAdvice(stock, brp, plotrefs = TRUE, ncol = 2)
+plotAdvice(stock, brp, plotrefs = TRUE, ncol = 2, label.size = 3)
 }
 \arguments{
 \item{plotrefs}{if TRUE reference points are plotted}
 
 \item{ncol}{number of plot panel columns}
+
+\item{label.size}{size of refpts labels}
 
 \item{object}{output object from Fsim()}
 

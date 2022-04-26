@@ -1,6 +1,6 @@
 Package: FLRef
 Title: Reference point computation for advice rules
-Version: 1.0.3
+Version: 1.0.4
 Authors@R: 
     c(person(given = "Henning",
            family = "Winker",
@@ -9,13 +9,14 @@ Authors@R:
 Maintainer: Henning Winker <Henning.Winker@gmail.com>
 Description: Blah
 Depends:
-    R (>= 3.5),
+    R (>= 4.0),
     ggplot2,
     FLCore,
     ggplotFL,
     FLBRP,
     FLasher,
-    mse
+    mse,
+    FLSRTMB
 Imports:
   methods,
   ggplot2

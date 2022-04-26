@@ -35,6 +35,10 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=1000,yrs.eval=NULL,verbo
   run=window(run,start=2,end=(nyears+1))
   #range(run)[4:5]=c(1,nyears)
   
+  run@landings = computeLandings(run)
+  run@discards = computeDiscards(run)
+  run@catch = computeCatch(run)
+  
   statistic <- list(FP05=list(~apply(iterMeans((SB/SBlim) < 1), c(1, 3:6), max),name="Prisk", desc="ICES Prisk"))
   pyrs = ((nyears-yrs.eval+1):nyears)
   

@@ -13,7 +13,7 @@
 #'   \item "f0.1" 10% slope of yield-per-recruit curve
 #'   \item "msy"  maximum surplus production (not defined for segreg)
 #' }    
-#' @param x basis in percent for sprx and bx 
+#' @param x basis in percent for sprx and bx, e.g. 40 for spr40
 #' @param blim values < 1 are taken as fraction to B0 and blim > 1 as absolute values unless specified otherwise
 #' @param type type of blim input, values < 1 are  
 #' \itemize{
@@ -28,14 +28,28 @@
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrp <- function(stock,sr='missing',proxy=c("sprx","bx","f0.1","msy"),x=40,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=10){
-   
+computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=5){
+ 
+  
+  
   if(missing(sr)){
     if(verbose)cat(paste0("Computing Per-Recruit Quantities"),"\n")
     sr = FLSR(params=FLPar(1, params='a'),model=formula(rec~a))
     
   }  
-  Fbrp = FLPar(none=NA)
+  
+ 
+    if(SRModelName(model(sr))%in%c("bevholtSV","rickerSV")){
+        if(is.null(proxy)) proxy=c("bx","f0.1","msy")
+        if(is.null(x)) x=35
+    } else {
+      if(is.null(proxy)) proxy=c("sprx","f0.1","msy")
+      if(is.null(x)) x=40
+    }
+    
+  
+  
+   Fbrp = FLPar(none=NA)
   
   
   type = type[1]
@@ -56,12 +70,12 @@ computeFbrp <- function(stock,sr='missing',proxy=c("sprx","bx","f0.1","msy"),x=4
   
   if(c("msy")%in%proxy){
     if(SRModelName(model(sr))%in%c("segregA1","segreg","mean")){
-       warning(paste0("MSY is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
-    } else {
+      if(verbose)warning(paste0("MSY is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
+    } 
     #add warning for segreg
     Fbrp = rbind(Fbrp,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
       if(verbose)cat(paste0("Computing Fmsy with Btrg = Bmsy"),"\n")
-    }
+    
   }
   
   ord = c("Fspr","Fb","F0.1","Fmsy")[match(proxy,c("sprx","bx","f0.1","msy"))]
@@ -94,7 +108,7 @@ computeFbrp <- function(stock,sr='missing',proxy=c("sprx","bx","f0.1","msy"),x=4
   # rename
   rownames(Fbrp)[which(rownames(Fbrp)%in%c("Fspr","Fb"))] = paste0(rownames(Fbrp)[which(rownames(Fbrp)%in%c("Fspr","Fb"))],x) 
   fref  = rownames(Fbrp)
-  refs = rbind(Fbrp,FLPar(Blim=Blim,B0=B0))
+  refs = rbind(FLPar(Blim=Blim),Fbrp)
   
   
   if(!missing(btri)){
@@ -105,6 +119,7 @@ computeFbrp <- function(stock,sr='missing',proxy=c("sprx","bx","f0.1","msy"),x=4
     refs= rbind(refs,FLPar(Bpa=bpa))
   }
   
+  refs=rbind(refs,FLPar(B0=B0))
   
   # do check
   check = brp+refs

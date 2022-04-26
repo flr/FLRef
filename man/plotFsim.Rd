@@ -13,6 +13,7 @@ plotFsim(
   plotrefs = TRUE,
   colour = "dodgerblue",
   ncol = 2,
+  label.size = 3,
   yrs.eval = NULL
 )
 }
@@ -30,6 +31,8 @@ plotFsim(
 \item{colour}{color of CIs}
 
 \item{ncol}{number of plot panel columns}
+
+\item{label.size}{size of reference points}
 
 \item{yrs.eval}{last years to be used evaluation period, default half nyears}
 }

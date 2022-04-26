@@ -7,7 +7,7 @@ Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()
 \usage{
 ploteq(
   brps,
-  refpts = NULL,
+  refpts = "missing",
   obs = FALSE,
   dashed = TRUE,
   colours = "missing",
