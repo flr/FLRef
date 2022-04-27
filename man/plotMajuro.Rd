@@ -72,14 +72,5 @@ plotMAjuro
 Plots the new proposed ICES advice rule
 }
 \examples{
-plotWKREF()
-# Close fishery at Blim and adjust axis labels to relative
-plotWKREF(blim=0.2,bclose=0.2,rel=TRUE)
-# Close fishery at Blim, but allow fmin (e.g. bycatch)
-plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,rel=TRUE)
-# Change Btrigger above Btrg
-plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=1.1,rel=TRUE)
-# Plot stock data
-data(ple4)
-plotWKREF(ftrg=0.25,btrg=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
+plotMajuro()
 }

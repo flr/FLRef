@@ -27,6 +27,11 @@
 #' @param verbose   
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
+#' @examples
+#' data(ple4)
+#' srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
+#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
+#' ploteq(brp,obs=TRUE,refpts="msy")
 
 computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=5){
  
