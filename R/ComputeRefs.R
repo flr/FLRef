@@ -42,9 +42,9 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     sr = FLSR(params=FLPar(1, params='a'),model=formula(rec~a))
     
   }  
-  
+    srmod = SRModelName(model(sr))
  
-    if(SRModelName(model(sr))%in%c("bevholtSV","rickerSV")){
+    if(srmod%in%c("bevholtSV","rickerSV")){
         if(is.null(proxy)) proxy=c("bx","f0.1","msy")
         if(is.null(x)) x=35
     } else {
@@ -74,13 +74,19 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   }
   
   if(c("msy")%in%proxy){
-    if(SRModelName(model(sr))%in%c("segregA1","segreg","mean")){
-      if(verbose)warning(paste0("MSY is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
-    } 
+    if(SRModelName(model(sr))%in%c("mean")){
+      if(verbose)cat(paste0("Warning: Fmsy = Fmax is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
+      Fbrp = rbind(Fbrp,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
+    } else if(SRModelName(model(sr))%in%c("segregA1","segreg")){  
+      flim = refpts(brp+FLPar(Blim=sr@params[[2]]))["Blim","harvest"]
+      Fbrp = rbind(Fbrp,FLPar(Fmsy=min(flim,refpts(brp)["fmax","harvest"])))
+      if(verbose)cat(paste0("Warning: Fmsy = min(Flim,Fmax) is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
+    } else {
     #add warning for segreg
+    
     Fbrp = rbind(Fbrp,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
       if(verbose)cat(paste0("Computing Fmsy with Btrg = Bmsy"),"\n")
-    
+    }
   }
   
   ord = c("Fspr","Fb","F0.1","Fmsy")[match(proxy,c("sprx","bx","f0.1","msy"))]
@@ -95,14 +101,35 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   if(blim<=1 & type!="value"){
     if(type%in%c("b0")){
       Blim =an(refpts(brpf)["virgin","ssb"])*blim
+      if(srmod=="segreg"){
+        if(verbose & Blim<sr@params[[2]]) cat("\n",paste0(" Upward adjusted Blim to breakpoint  = ",round(sr@params[[2]],0)," of segreg"),"\n")
+        if(verbose & Blim>=sr@params[[2]]) cat("\n",paste0(" Blim = ",blim,"B0"),"\n")
+        Blim = max(Blim,sr@params[[2]])
+        } else {
       if(verbose)cat("\n",paste0(" Blim = ",blim,"B0"),"\n")
-    }
+        }
+        }
     if(type%in%c("btrg")){
       Blim =an(refpts(brpf)[rownames(Fbrp)[1],"ssb"])*blim
-      if(verbose)cat("\n",paste0("Blim = ",blim," with Btrg corresponding to ", rownames(Fbrp)[1]),"\n")
+      if(srmod=="segreg"){
+        if(verbose & Blim<sr@params[[2]]) cat("\n",paste0(" Upward adjusted Blim to breakpoint  = ",round(sr@params[[2]],0)," of segreg"),"\n")
+        if(verbose & Blim>=sr@params[[2]]) cat("\n",paste0("Blim = ",blim," with Btrg corresponding to ", rownames(Fbrp)[1]),"\n")
+        Blim = max(Blim,sr@params[[2]])
+      } else {
+        if(verbose)cat("\n",paste0("Blim = ",blim," with Btrg corresponding to ", rownames(Fbrp)[1]),"\n")
+      }
+
     }
   } else {
-    if(verbose)cat("\n",paste0("Blim as input value Blim = ",blim),"\n")
+    Blim = blim
+    if(srmod=="segreg"){
+      if(verbose & Blim<sr@params[[2]]) cat("\n",paste0(" Upward adjusted Blim to breakpoint  = ",round(sr@params[[2]],0)," of segreg"),"\n")
+      if(verbose & Blim>=sr@params[[2]]) cat("\n",paste0("Blim as input value Blim = ",blim),"\n")
+      Blim = max(Blim,sr@params[[2]])
+    } else {
+      if(verbose)cat("\n",paste0("Blim as input value Blim = ",blim),"\n")
+    }
+    
     Blim = blim
   }
   

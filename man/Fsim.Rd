@@ -10,7 +10,7 @@ Fsim(
   sigmaR = 0.5,
   rho = 0,
   nyears = 100,
-  iters = 1000,
+  iters = 250,
   yrs.eval = NULL,
   verbose = TRUE
 )

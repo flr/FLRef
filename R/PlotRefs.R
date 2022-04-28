@@ -203,8 +203,6 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
  # }}}
 
 
-
-
 #{{{
 #' plotFsim
 #
@@ -223,35 +221,81 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
 #' @export
  
 plotFsim <- function(object,worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0.95),plotrefs=TRUE,
-                     colour="dodgerblue",ncol=2,label.size=3,yrs.eval=NULL){
+                     colour="missing",ncol="missing",label.size=3,yrs.eval=NULL,panels="missing"){
 stock = object$stock
 brp = object$brp
+if(missing(panels)){
+  panels=c(2,4)
+}
+
+if(missing(ncol)){
+  if(length(panels)%in%c(1,3,5)){ncol=1} else {
+    ncol=2}
+}
+  
+
 
 nyears=dims(stock)$maxyear-dims(stock)$minyear+1
 if(is.null(yrs.eval)) yrs.eval=ceiling(nyears/2)
 iters = dims(stock)$iter
 if(!worms){  
-p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar))+theme_bw()+xlab("Year")+theme(legend.position = "none")
+p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar)[panels])+theme_bw()+xlab("Year")+theme(legend.position = "none")
 } else {
-p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar),iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
+p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar)[panels],iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
   theme_bw()+xlab("Year")+theme(legend.position = "none")
 }  
+
+
+
+ref = rownames(object$params)[1]
+if(ref=="Fmmy") ref = "Fmsy"
+if(ref=="Fp05") ref = rownames(Fbrp(brp))[[1]]
+
+Fs = FLPar(Fbrp = refpts(brp)[ref,"harvest"],Flim = refpts(brp)["Blim","harvest"])
+rownames(Fs)[1] = ref
+
+if(missing(colour)){
+ if(rownames(object$params)[1]=="Fp05"){
+   colour  = "orange"
+ } else {
+   colour  = "dodgerblue"
+ }
+  } 
 
 p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.4) +
   ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.5)+
   facet_wrap(~qname, scales="free",ncol=ncol)
 
-ref = rownames(object$params)[1]
-Fs = FLPar(Fbrp = refpts(brp)[ref,"harvest"],Flim = refpts(brp)["Blim","harvest"])
-rownames(Fs)[1] = ref
-
 if(plotrefs){
   
-  ggp =ggplotFL::geom_flpar(data=FLPars(SSB  =FLPar(Btrg=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
-                                   F    =Fs,
-                                   Landings    =FLPar(Yeq = refpts(brp)[ref,"yield"]),
-                                   Rec=FLPar(R0=refpts(brp)["virgin","rec"])),
-                       x=c(0.2*nyears),colour = c(c("darkgreen","red","blue"),c("darkgreen","red"),c("darkgreen","blue")))
+   
+  
+  det.refs = FLPars(Rec=FLPar(R0=refpts(brp)["virgin","rec"]),
+                    SSB  =FLPar(Btrg=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+                    Landings    =FLPar(Yeq = refpts(brp)[ref,"yield"]),
+                    F    =Fs)
+  if(ref=="Fmsy"){
+    rownames(det.refs[[2]])[1] = "Bmsy"   
+    rownames(det.refs[[3]]) = "MSY"   
+  }
+  
+  det.refs = det.refs[panels]
+  
+  pg = list(
+  pan1 = c(1),
+  pan2 = c(2:4),
+  pan3 = c(5),
+  pan4 = c(6:7)
+  )[panels]
+  
+  what = as.vector(do.call(c,lapply(pg,function(x){
+    (x)
+  })))
+    
+    
+  ggp =ggplotFL::geom_flpar(data=det.refs,
+                       x=c(0.15*nyears,0.4*nyears,rep(0.15*nyears,2),0.15*nyears,0.4*nyears,rep(0.2*nyears,2))[what],
+                       colour = c("blue",c("darkgreen","red","blue"),("darkgreen"),c("darkgreen","red"))[what])
   ggp[[2]]$aes_params$size=label.size
   
   
@@ -278,7 +322,7 @@ return(p)
 
 plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 
-  stock@landing =computeLandings(stock)
+  stock@landings =computeLandings(stock)
   rp = refpts(brp)
   pr = FALSE
   if(model(brp)=="rec ~ a") pr = TRUE

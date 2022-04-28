@@ -58,7 +58,7 @@ rc4 <- function(n,alpha=1){
 ss3col <- function(n,alpha=1){
   if(n>3) col <- rc4(n+1)[-1]
   if(n<3)  col <- rc4(n)
-  if(n==3) col <- c("blue","red","green3")
+  if(n==3) col <- c("blue","green","red")
   if(alpha<1){
     # new approach thanks to Trevor Branch
     cols <- adjustcolor(col, alpha.f=alpha)
