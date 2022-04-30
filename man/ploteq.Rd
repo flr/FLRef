@@ -9,7 +9,9 @@ ploteq(
   brps,
   refpts = "missing",
   obs = FALSE,
-  dashed = TRUE,
+  rel = FALSE,
+  rpf = TRUE,
+  dashed = rpf,
   colours = "missing",
   panels = NULL,
   ncol = 2
@@ -27,6 +29,10 @@ ploteq(
 }}
 
 \item{obs}{Should observations be plotted? Defaults to `FALSE`.}
+
+\item{rel}{option to denote x,y labs as relative B/Btrg and F/Ftrg}
+
+\item{rpf}{adds refpts in plots}
 
 \item{dashed}{plots vertical dashed lines to highlight refpts locations}
 

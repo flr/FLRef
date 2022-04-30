@@ -37,9 +37,9 @@ plotAR(
 
 \item{ftrg}{factor to adjust Fmsy or its proxy e.g. 0.8Fmsy}
 
-\item{btrigger}{biomass trigger below which F is linearly reduced}
+\item{btrigger}{biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btrg}
 
-\item{bpa}{biomass threshold above which biomass is considered precautionary}
+\item{bpa}{precautionary biomass threshold, if > 10 value, else factor*Blim}
 
 \item{bclose}{biomass that invokes fishing closure}
 
@@ -84,11 +84,11 @@ brp = computeFbrp(stock=ple4,sr=srr,proxy="f0.1",blim=blim)
 rpt = Fbrp(brp)
 plotAR(rpt,btrigger=an(0.8*rpt["Btrg"]))
 # Use Bpa as trigger (ICES style)
-plotAR(rpt,obs=ple4,bpa=an(1.4*rpt["Blim"]))
+plotAR(rpt,obs=ple4,bpa=1.4)
 # Change kobe to greyscale
-plotAR(rpt,obs=ple4,bpa=an(1.4*rpt["Blim"]),kobe=F)
-# add fishing closure
-plotAR(rpt,obs=ple4,bpa=an(1.4*rpt["Blim"]),kobe=T,bclose=1,fmin=0.02)
+plotAR(rpt,obs=ple4,bpa=1.4,kobe=F)
+# add fishing closure with minimum unavoidable F and Btrigger
+plotAR(rpt,obs=ple4,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.01)
 # show a relative
-plotAR(rpt,obs=ple4,rel=TRUE,bpa=an(1.4*rpt["Blim"]),kobe=T,bclose=1,fmin=0.02)
+plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.02)
 }

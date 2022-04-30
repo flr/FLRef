@@ -13,6 +13,8 @@
 #'   \item Btri  
 #' }    
 #' @param obs Should observations be plotted? Defaults to `FALSE`.
+#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param rpf adds refpts in plots
 #' @param dashed plots vertical dashed lines to highlight refpts locations
 #' @param colours refpts colours, default is designed for computeFbrp() output
 #' @param panels plot panel option 1:4 
@@ -20,18 +22,29 @@
 #' @return ggplot  
 #' @export
 
-ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
-                   colours="missing" ,panels=NULL, ncol=2){
+ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=rpf,
+                   colours="missing",panels=NULL, ncol=2){
             
             if(class(brps)=="FLBRP") brps = FLBRPs(brps)
             defaults = c("virgin","msy","crash","f0.1","fmax","spr.30","mey")
-            
             cname= names(brps)
+            if(rel & length(cname)>1) obs=FALSE
+            
             
             df = Map(function(x,y){
             # EXTRACT metrics
-            data.frame(model.frame(metrics(x,list(ssb=ssb, harvest=fbar, rec=rec, yield=landings, profit=profit)),
+            d.= data.frame(model.frame(metrics(x,list(ssb=ssb, harvest=fbar, rec=rec, yield=landings, profit=profit)),
                               drop=FALSE),cname=y)
+              if(rel){
+                rp = Fbrp(x)
+                r0 = an(refpts(x)["virgin","rec"])
+                
+                d.$ssb=d.$ssb/an(rp["B0"]) 
+                d.$rec=d.$rec/r0 
+                d.$harvest=d.$harvest/rp[[1]] 
+                d.$yield=d.$yield/an(rp["Yeq"]) 
+              }
+              d.
             },x=brps,y=as.list(cname))
             
             # refpts
@@ -65,16 +78,30 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
             },x=brps,y=cname)) 
             
             # estimated?
-            rpf <- TRUE
+            #rpf <- rpf
             
             
             # NO economics
+            if(!rel){
             plots <- list(
               P1=c(x="harvest", y="ssb", panel="SSB ~ F", pos=1),
               P2=c(x="ssb", y="rec", panel="Recruitment ~ SSB", pos=2),
               P3=c(x="harvest", y="yield", panel="Yield ~ F", pos=3),
               P4=c(x="ssb", y="yield", panel="Yield ~ SSB", pos=4))
-            
+            } else {
+              plots <- list(
+                P1=c(x="harvest", y="ssb", panel="SSB/SSB0 ~ F/Fbrp", pos=1),
+                P2=c(x="ssb", y="rec", panel="R/R0 ~ SSB/SSB0", pos=2),
+                P3=c(x="harvest", y="yield", panel="Y/Ybrp ~ F/Fbrp", pos=3),
+                P4=c(x="ssb", y="yield", panel="Y/Ybrp ~ SSB/SSB0", pos=4))
+              if(Fbrp(brps[[1]])[[1]]=="Fmsy"){
+                plots <- list(
+                  P1=c(x="harvest", y="ssb", panel="SSB/SSB0 ~ F/Fmsy", pos=1),
+                  P2=c(x="ssb", y="rec", panel="R/R0 ~ SSB/SSB0", pos=2),
+                  P3=c(x="harvest", y="yield", panel="Yield/MSY ~ F/Fmsy", pos=3),
+                  P4=c(x="ssb", y="yield", panel="Yield/MSY ~ SSB/SSB0", pos=4))
+                }
+              }
             
             
             # SUBSET panels if not NULL
@@ -105,7 +132,10 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
             dat$cname = factor(dat$cname,levels=cname)
             
             # PLOT
-            p <- ggplot(dat, aes_(x=~x, y=~y))  + theme_bw()+
+            
+            p <- ggplot(dat, aes(x=x, y=y))
+  
+            p <- p+  theme_bw()+
               facet_wrap(~pos, scales="free", ncol=ncol, labeller=labeller(pos=facl)) +
               xlab("") + ylab("") +
               scale_x_continuous(expand = expansion(mult = c(0, .05)),labels=human_numbers, limits=c(0, NA))+
@@ -114,16 +144,32 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
             if(length(brps)>1) p <- p + geom_line(aes(color=cname),size=0.6)
             if(length(brps)==1) p <- p + geom_line(size=0.5)
             # PLOT observations
-           
+            
+            # TODO out of fill,col options to add obs for rel=T and FLBRPs
             if(obs) {
               
-              dfo <- Map(function(x,y){ 
-                 data.frame( model.frame(metrics(x,
-                                         list(ssb=ssb.obs, harvest=fbar.obs, rec=rec.obs, yield=landings.obs,
-                                              profit=profit.obs)), drop=FALSE),cname=y)
-              },x=brps,y=as.list(cname))
+                dfo <- Map(function(x,y){ 
+                d.= data.frame( model.frame(metrics(x,
+                list(ssb=ssb.obs, harvest=fbar.obs, rec=rec.obs,yield=landings.obs,
+                profit=profit.obs)), drop=FALSE),cname=y)
+                
+                if(rel){
+                  rp = Fbrp(x)
+                  r0 = an(refpts(x)["virgin","rec"])
+                  
+                d.$ssb=d.$ssb/an(rp["B0"]) 
+                d.$rec=d.$rec/r0 
+                d.$harvest=d.$harvest/rp[[1]] 
+                d.$yield=d.$yield/an(rp["Yeq"]) 
+                }
+                d.
+                  
+                },x=brps,y=as.list(cname))
+              
               
               # APPLY over plots to extract x, y and panel for each element
+              
+              
               dato <- lapply(plots, function(p){
                 pdo = NULL
                 for(i in 1:length(brps)){
@@ -139,19 +185,41 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
               idx <- unlist(lapply(dato, function(x) all(is.na(x$y))))
               
               dato <- do.call(rbind, c(dato[!idx], list(make.row.names = FALSE)))
-              p <- p + geom_point(data=dato,pch=21,bg="lightgrey",color=1,cex=1)
+              
+              #if(rel) p <- p + geom_point(data=dato,pch=21,color=1,cex=1)
+               p <- p + geom_point(data=dato,pch=21,bg="lightgrey",color=1,cex=1)
+              
+              if(length(brps)>1) p <- p + geom_line(aes(color=cname),size=0.6)
+              if(length(brps)==1) p <- p + geom_line(size=0.5)
+            }
             
-              }
+            if(rpf){
+           
+            if(rel){
+             
+             rps1 = FLPars(Map(function(x,y){
+               rp = Fbrp(y)
+               r0 = an(refpts(y)["virgin","rec"])
+             x[,"harvest"] =x[,"harvest"]/rp[[1]] 
+             x[,"rec"] =x[,"rec"]/r0
+             x[,"yield"] =x[,"yield"]/an(rp["Yeq"])
+             x[,"ssb"] =x[,"ssb"]/an(rp["B0"])
+             x
+             },x=rps,y=brps))
+             
+           } else {
+              rps1=rps
+            }
+                          
             
             # PLOT refpts
-            if(rpf) {
               rpdat <- lapply(plots, function(p) {
                 rpd = NULL
                 for(i in 1:length(brps)){
                 # CBIND x, + refpt, iter ...
-                  rpd= rbind(rpd,cbind(as(rps[[i]][, p['x']], 'data.frame')[, -2],
+                  rpd= rbind(rpd,cbind(as(rps1[[i]][, p['x']], 'data.frame')[, -2],
                       # ... y, panel
-                      y=c(rps[[i]][,p['y']]), pos=unname(p['pos']),cname=cname[i]))
+                      y=c(rps1[[i]][,p['y']]), pos=unname(p['pos']),cname=cname[i]))
                   
                 }    
                 rpd
@@ -170,7 +238,7 @@ ploteq <- function(brps, refpts="missing", obs=FALSE, dashed=TRUE,
               #if(missing(shapes))
               #  shapes <- rep(21:25,10)[1:length(brps)] # c(rep(21,length(refpts)),rep(22,length(refpts)))
               if(missing(colours))
-                colours <- rev(ss3col(length(refpts)))
+                colours <- rep(rev(ss3col(length(refpts))))
                 
                 
                 
@@ -244,8 +312,6 @@ p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar)
 p <- ggplotFL::plot(stock,metrics=list(Rec=rec,SSB=ssb,Landings=landings,F=fbar)[panels],iter=seq(1,iters,thinning))+scale_color_manual(values=c(grey.colors(length(seq(1,iters,thinning)))))+
   theme_bw()+xlab("Year")+theme(legend.position = "none")
 }  
-
-
 
 ref = rownames(object$params)[1]
 if(ref=="Fmmy") ref = "Fmsy"
@@ -428,8 +494,8 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #'   \item 4: "B0"
 #' }    
 #' @param ftrg factor to adjust Fmsy or its proxy e.g. 0.8Fmsy 
-#' @param btrigger biomass trigger below which F is linearly reduced   
-#' @param bpa biomass threshold above which biomass is considered precautionary
+#' @param btrigger biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btrg   
+#' @param bpa precautionary biomass threshold, if > 10 value, else factor*Blim 
 #' @param bclose biomass that invokes fishing closure 
 #' @param fmin minimum allowable (bycatch) fishing mortality under closure 
 #' @param obs obtion to show observation with input class `FLStock`
@@ -454,13 +520,13 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' rpt = Fbrp(brp)
 #' plotAR(rpt,btrigger=an(0.8*rpt["Btrg"]))
 #' # Use Bpa as trigger (ICES style)
-#' plotAR(rpt,obs=ple4,bpa=an(1.4*rpt["Blim"]))
+#' plotAR(rpt,obs=ple4,bpa=1.4)
 #' # Change kobe to greyscale
-#' plotAR(rpt,obs=ple4,bpa=an(1.4*rpt["Blim"]),kobe=F)
-#' # add fishing closure
-#' plotAR(rpt,obs=ple4,bpa=an(1.4*rpt["Blim"]),kobe=T,bclose=1,fmin=0.02)
+#' plotAR(rpt,obs=ple4,bpa=1.4,kobe=F)
+#' # add fishing closure with minimum unavoidable F and Btrigger
+#' plotAR(rpt,obs=ple4,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.01)
 #' # show a relative
-#' plotAR(rpt,obs=ple4,rel=TRUE,bpa=an(1.4*rpt["Blim"]),kobe=T,bclose=1,fmin=0.02)
+#' plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.02)
 
 plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=0, obs="missing", kobe=TRUE,
                    alpha=1,xmax=1.2,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,label.cex=3.,critical=TRUE) {
@@ -480,14 +546,17 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
   blim = an(pars["Blim"])
   bclose = blim*bclose
   
-  
-  
   btri.label=TRUE
-  if(!missing(btrigger)) btrigger=an(btrigger)
+  if(!missing(btrigger)) 
+      btrigger=ifelse(an(btrigger)>10,an(btrigger),an(btrigger)*btrg)
+  if(!missing(bpa)) 
+     bthresh=bpa=ifelse(an(bpa)>10,an(bpa),an(bpa)*blim)
+  
   if(!missing(bpa)& missing(btrigger)){
-    bthresh=btrigger=an(bpa)
+            bthresh=btrigger=ifelse(an(bpa)>10,an(bpa),an(bpa)*blim)
     btri.label=FALSE
   }
+  
   if(missing(btrigger) & missing(bpa)) btrigger=0.7*an(btrg)
   if(missing(bpa)){bthresh=an(btrigger)} 
   if(!missing(bpa)){bthresh=an(bpa)}
@@ -505,6 +574,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
   # label
   trg = base::strsplit(rownames(pars)[[1]],"F")[[1]][2]
   bta = paste0("B[",trg,"]")
+  if(trg=="0.1") bta = paste0("B[F",trg,"]")
   fta = ifelse(ftrg==fbrp, paste0("F[",trg,"]"),paste0("F[trg]"))
   
   
@@ -577,7 +647,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
   
   if(kobe){ colors = c("green","yellow","orange","red","red4")
   } else {
-    colors = c(grey(0.95,1),grey(0.8,1),grey(0.7,1),grey(0.45,1),grey(0.45,1))
+    colors = c(grey(0.95,1),grey(0.8,1),grey(0.7,1),grey(0.45,1),grey(0.3,0.8))
   }
   
   ylwmin = ifelse(fmin>0,0,bclose)
