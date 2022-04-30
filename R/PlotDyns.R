@@ -18,7 +18,7 @@ plotdyn <- function(stk,ncol=2){
              "Selectivity"=catch.sel(stk)))
   dat$Age = factor(dat$age)
   # Plotting dynamics at age
-  p =ggplot(dat)+
+  p =ggplot2::ggplot(dat)+
     geom_line(aes(year,data,group=age,col=Age))+
     facet_wrap(~qname,scale="free",ncol=ncol)+
     theme_bw()+theme(legend.position="right")+
@@ -43,14 +43,18 @@ plotdyn <- function(stk,ncol=2){
 #' plotbioyr(ple4)
 
 plotbioyr <- function(stk,ncol=2){
-  dat=as.data.frame(metrics(stk,metrics=list(Numbers=stock.n, Weight=catch.wt,M=m,Maturity=mat)))
+  flqs = metrics(stk,metrics=list(Numbers=stock.n, Weight=catch.wt,M=m,Maturity=mat))
+  dat=as.data.frame(flqs)
+
   dat$Age = factor(dat$age)
+  dat
   # Plotting dynamics at age
-  p =ggplot(dat)+
-    geom_line(aes(year,data,group=age,col=Age))+
+  
+  p <- ggplot(dat,aes(year,data,group=age,col=Age))+
+    geom_line()+
     facet_wrap(~qname,scale="free",ncol=ncol)+
     theme_bw()+
-    xlab("Year")+ylab("Quantities")+
+    xlab("Year")+ylab("Quantities")#+
     theme(legend.position="right",legend.text = element_text(size=5),
           legend.title = element_text(size=6),legend.key.height = unit(.3, 'cm'))
   return(p)
@@ -74,7 +78,7 @@ plotbioage = function(stk,ncol=2){
     FLQuants(Weight=stock.wt(stk),Maturity=mat(stk),M=m(stk),Selectivity=catch.sel(stk))
   )
   dat$Year = factor(dat$year)
-  p =ggplot(dat)+
+  p =ggplot2::ggplot(dat)+
     geom_line(aes(age,data,group=Year,col=Year))+
     facet_wrap(~qname,scale="free",ncol=ncol)+
     theme_bw()+
@@ -108,7 +112,7 @@ plotspr = function(stk,nyears=3){
     "Unfished"=yearMeans(tail(spr0y(stk,byage=T),nyears)))
   names(df) = c(paste0("Current(F = ",Fcur,")"),paste("Unfished (F = 0)"))
   
-  p=ggplot(as.data.frame(df),aes(x=age,y=data,fill=qname))+
+  p=ggplot2::ggplot(as.data.frame(df),aes(x=age,y=data,fill=qname))+
     geom_bar(position="dodge", stat="identity")+theme_bw()+
     theme(legend.position="bottom",legend.title = element_blank(),legend.text = element_text(size=6),legend.key.height = unit(.4, 'cm'))+
     xlab("Age")+ylab("SPR-at-age")

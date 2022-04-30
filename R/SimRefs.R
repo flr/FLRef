@@ -67,7 +67,7 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbos
 #}}}
 
 #{{{
-# computeFp05()
+# Fp05()
 #
 #' Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5 percent
 #'
@@ -75,10 +75,10 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbos
 #' @param range range of Fbar value to be evaluated
 #' @param iters Number of iterations, cannot exceed input object
 #' @param verbose Should progress be shown, TRUE.
-#' @return Fp.05
+#' @return list
 #' @export
 
-computeFp05 <- function(object,iters="missing",range="missing",tol=0.001,maxit=15,verbose=TRUE){
+Fp05 <- function(object,iters="missing",range="missing",tol=0.001,maxit=15,verbose=TRUE){
 stock = object$stock 
 years = (dims(stock)$minyear:dims(stock)$maxyear)[-1]
 pyrs = an(object$params["styr"]) :an(object$params["endyr"])
@@ -283,7 +283,7 @@ opt.bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics,
 } # }}}
 
 #{{{
-#' computeFmmy()
+#' Fmmy()
 #
 #' Uses opt.bisect to derive the F at Maximum Median Yield from stochastic simulations  
 #'
@@ -315,7 +315,7 @@ opt.bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics,
 #' mean(fbar(fmmy)[,ac(2069:2118)]) 
 #' 
 #' 
-computeFmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range="missing",tol=0.01,maxit=15,verbose=TRUE){
+Fmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range="missing",tol=0.01,maxit=15,verbose=TRUE){
   fbar(brp)[] = 0.01
   stock=as(brp,"FLStock")
   sr = as(brp,"FLSR")
