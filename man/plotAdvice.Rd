@@ -25,3 +25,9 @@ ggplot
 plotAdvice
 Plots stochastic stock dynamics against refpts for constant Fsim()
 }
+\examples{
+data(ple4)
+srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
+brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
+plotAdvice (ple4,brp)
+}

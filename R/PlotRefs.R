@@ -21,6 +21,12 @@
 #' @param ncol number of plot panel columns
 #' @return ggplot  
 #' @export
+#' @examples
+#' data(ple4)
+#' srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
+#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
+#' ploteq(brp,obs=TRUE,refpts="msy")
+#' ploteq(brp,obs=TRUE,refpts="msy",rel=T)
 
 ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=rpf,
                    colours="missing",panels=NULL, ncol=2){
@@ -385,6 +391,11 @@ return(p)
 #' @param label.size size of refpts labels 
 #' @return ggplot  
 #' @export
+#' @examples
+#' data(ple4)
+#' srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
+#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
+#' plotAdvice (ple4,brp)
 
 plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 
@@ -434,7 +445,7 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
   Ys = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"yield"]),
              params=paste0(rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],""))
   rownames(Ys) = gsub("F","Y",rownames(Ys))
-  if(any(rownames(Bs)%in%"B0.1")) rownames(Ys)[rownames(Ys)%in%"Y0.1"] = "Yf0.1" 
+  if(any(rownames(Ys)%in%"Y0.1")) rownames(Ys)[rownames(Ys)%in%"Y0.1"] = "Yf0.1" 
   
   if(pr){
     Bs = Bs/b0

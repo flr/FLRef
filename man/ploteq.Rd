@@ -49,3 +49,10 @@ ggplot
 ploteq()
 Modification of method plot(`FLBRP`) to plot equilibrium output of computeFbrp()
 }
+\examples{
+data(ple4)
+srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
+brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
+ploteq(brp,obs=TRUE,refpts="msy")
+ploteq(brp,obs=TRUE,refpts="msy",rel=T)
+}
