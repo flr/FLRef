@@ -10,6 +10,7 @@ plotAR(
   ftrg = 1,
   btrigger = "missing",
   bpa = "missing",
+  fpa = "missing",
   bclose = 0,
   fmin = 0,
   obs = "missing",
@@ -22,7 +23,7 @@ plotAR(
   rel = FALSE,
   expand = TRUE,
   labels = TRUE,
-  label.cex = 3,
+  label.cex = 3.5,
   critical = TRUE
 )
 }
@@ -40,6 +41,8 @@ plotAR(
 \item{btrigger}{biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btrg}
 
 \item{bpa}{precautionary biomass threshold, if > 10 value, else factor*Blim}
+
+\item{fpa}{option to input Fpa value}
 
 \item{bclose}{biomass that invokes fishing closure}
 
@@ -67,7 +70,7 @@ plotAR(
 
 \item{critical}{option to highlight critical zone below blim}
 
-\item{labelslabel.cex=3.}{set size of labels}
+\item{labelslabel.cex=3.5}{set size of labels}
 }
 \value{
 ggplot

@@ -96,10 +96,10 @@ ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=
               P4=c(x="ssb", y="yield", panel="Yield ~ SSB", pos=4))
             } else {
               plots <- list(
-                P1=c(x="harvest", y="ssb", panel="SSB/SSB0 ~ F/Fbrp", pos=1),
+                P1=c(x="harvest", y="ssb", panel="SSB/SSB0 ~ F/Fref", pos=1),
                 P2=c(x="ssb", y="rec", panel="R/R0 ~ SSB/SSB0", pos=2),
-                P3=c(x="harvest", y="yield", panel="Y/Ybrp ~ F/Fbrp", pos=3),
-                P4=c(x="ssb", y="yield", panel="Y/Ybrp ~ SSB/SSB0", pos=4))
+                P3=c(x="harvest", y="yield", panel="Y/Yref ~ F/Fref", pos=3),
+                P4=c(x="ssb", y="yield", panel="Y/Yref ~ SSB/SSB0", pos=4))
               if(Fbrp(brps[[1]])[[1]]=="Fmsy"){
                 plots <- list(
                   P1=c(x="harvest", y="ssb", panel="SSB/SSB0 ~ F/Fmsy", pos=1),
@@ -509,6 +509,7 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' @param bpa precautionary biomass threshold, if > 10 value, else factor*Blim 
 #' @param bclose biomass that invokes fishing closure 
 #' @param fmin minimum allowable (bycatch) fishing mortality under closure 
+#' @param fpa option to input Fpa value
 #' @param obs obtion to show observation with input class `FLStock`
 #' @param kobe add kobe colour-coding
 #' @param alpha transparency of shading
@@ -519,7 +520,7 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
 #' @param expand option to expand the plot area to border - default TRUE
 #' @param labels annotate reference point labels
-#' @param labelslabel.cex=3. set size of labels
+#' @param labelslabel.cex=3.5 set size of labels
 #' @param critical option to highlight critical zone below blim
 #' @return ggplot  
 #' @export
@@ -539,8 +540,8 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' # show a relative
 #' plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.02)
 
-plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=0, obs="missing", kobe=TRUE,
-                   alpha=1,xmax=1.2,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,label.cex=3.,critical=TRUE) {
+plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",bclose=0,fmin=0, obs="missing", kobe=TRUE,
+                   alpha=1,xmax=1.2,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,label.cex=3.5,critical=TRUE) {
   
   
   #Define axis
@@ -592,7 +593,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
   # SET args
   xlim <- btrg * xmax
   ylim <- ftrg * ymax
-  
+  if(!missing(fpa)) ylim <- max(ftrg * ymax,fpa*1.1)
   # GET observations
   if(!missing(obs)) {
     if(class(obs)=="FLStock")
@@ -610,7 +611,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
     }
     
     xlim <- max(c(obs$met,btrg*1.5)) * 1.05
-    ylim <- max(c(obs$out,ftrg*1.3)) * 1.05
+    ylim <- max(c(obs$out,ylim)) * 1.05
   }
   
   # SET met values
@@ -708,7 +709,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
   
   
   # Btrg
-  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftrg, yend=ftrg), linetype=2) +
+  p <- p+geom_segment(aes(x=0, xend=Inf, y=ftrg, yend=ftrg), linetype=2) +
     # Btrigger
     geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftrg), linetype=2)+
     # Btrg
@@ -718,7 +719,10 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
     # Blim
     geom_segment(aes(x=blim, xend=blim, y=0, yend=ftrg), linetype=1,cex=0.9)+
     geom_line()
-  
+    # Fpa
+    if(!missing(fpa)){   
+    p <- p+geom_segment(aes(x=0, xend=Inf, y=fpa, yend=fpa), linetype=2)
+    }
   
   
   if(labels){
@@ -727,16 +731,21 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",bclose=0,fmin=
     p <- p+annotate("text", x=xlim*0.8, y=ftrg + ylim / 30*1.08, label=fta,parse=TRUE, hjust="left",size=label.cex) +
       # Btrg
       annotate("text", x=btrg*1.02, y=ftrg*0.5, label=bta, 
-               hjust="left",parse=TRUE)+
+               hjust="left",parse=TRUE,size=label.cex)+
       # Blim
       annotate("text", x=blim*0.98, y=ftrg*1.03, label=paste0("B[lim]"), 
-               vjust="bottom",hjust="left",parse=TRUE)  
+               vjust="bottom",hjust="left",parse=TRUE,size=label.cex)  
     
     # Btresh
     if(!missing(bpa)){ p=p+annotate("text", x=bthresh*1.03, y=ftrg*0.4, label=paste0("B[pa]"), 
-                                    hjust="left",parse=TRUE)}  
+                                    hjust="left",parse=TRUE,size=label.cex)}  
     if(btri.label){ p = p+annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
-                                   vjust="bottom",parse=TRUE)}
+                                   vjust="bottom",parse=TRUE,size=label.cex)}
+    
+    if(!missing(fpa)){   
+      p = p+annotate("text", x=1.1*Bpa, y=Fpa*1.03, label="F[pa]",parse=TRUE, hjust="left",vjust="bottom",size=label.cex)
+    }  
+    
     
   }  
   

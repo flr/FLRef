@@ -54,11 +54,16 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     
   
   
-   Fbrp = FLPar(none=NA)
-  
-  
+ 
   type = type[1]
   brp = brp(FLBRP(stock,sr))
+  
+  if(is.numeric(proxy)){
+    Fbrp = FLPar(Fref=proxy)
+    if(verbose)cat(paste0("Computing Fref = ",proxy," with Btrg = Bref"),"\n")
+  } else {
+  
+  Fbrp = FLPar(none=NA)
   if(c("sprx")%in%proxy){
     pr = brp(FLBRP(stock)) # per-recruit
     Fbrp = rbind(Fbrp,FLPar(Fspr = refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*x*0.01))["Btrg","harvest"]))
@@ -90,10 +95,9 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   }
   
   ord = c("Fspr","Fb","F0.1","Fmsy")[match(proxy,c("sprx","bx","f0.1","msy"))]
-  
   Fbrp = Fbrp[-1]
-  
   Fbrp = Fbrp[match(rownames(Fbrp),ord)]
+  }
   
   B0 = an(refpts(brp)["virgin","ssb"])
   
@@ -133,9 +137,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     Blim = blim
   }
   
-  #subs = c("spr","b","0.1","msy")[which(c("sprx","bx","f0.1","msy")%in%proxy)] 
-  #xi = which(c("sprx","bx")%in%proxy)
-  
+
   
   # rename
   rownames(Fbrp)[which(rownames(Fbrp)%in%c("Fspr","Fb"))] = paste0(rownames(Fbrp)[which(rownames(Fbrp)%in%c("Fspr","Fb"))],x) 
