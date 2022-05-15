@@ -16,9 +16,11 @@
 #' data(ple4)
 #' hs = srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4),lplim=0.05,uplim=0.25)
 #' blim = params(hs)[[2]]
-#' brp = computeFbrp(ple4,hs,proxy="sprx",x=35,blim=blim)
+#' brp = computeFbrp(ple4,hs,proxy=c("sprx","f0.1","msy"),x=40,blim=blim)
+#' ploteq(brp)
 #' fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
 #' plotFsim(fsim)
+#' plotFsim(fsim,panels=2)
 
 Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbose=TRUE){
   fbar(brp)[] = 0.01
@@ -87,8 +89,8 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbos
 #' @examples 
 #' data(ple4)
 #' bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
-#' brp = computeFbrp(ple4,bh,proxy="bx",x=35,blim=0.1)
-#' fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
+#' brp = computeFbrp(ple4,bh,proxy="bx",x=35,blim=0.2) # set Blim higher
+#' fsim = Fsim(brp,sigmaR=0.7,rho=0.3,iters=500)
 #' plotFsim(fsim)
 #' fp.05 = Fp05(fsim)
 #' plotFsim(fp.05,panels=c(2,4)) # black line is Fp0.05
@@ -101,6 +103,9 @@ pyrs = an(object$params["styr"]) :an(object$params["endyr"])
 Fbrp = an(object$params[1])
 Flim = an(refpts(object$brp)["Blim","harvest"])
 Prisk = an(object$params["Prisk"])
+brp =  object$brp
+sr = object$sr 
+
 
 if(missing(range)){
 if(Prisk<0.05){ 
@@ -119,7 +124,7 @@ run <- mse::bisect(stock, sr=object$sr, refpts=FLPar(SBlim=refpts(object$brp)["B
               tune=list(fbar=range), prob=0.05, tol=tol, verbose=verbose)
 
 
-Prisk= mean(mse::performance(run, metrics=list(SB=ssb), statistics=statistic, refpts=FLPar(SBlim=an(refpts(brp)["Blim","ssb"])), years=pyrs)$data)
+Prisk= mean(mse::performance(run, metrics=list(SB=ssb), statistics=statistic, refpts=FLPar(SBlim=an(refpts(object$brp)["Blim","ssb"])), years=pyrs)$data)
 
 
 out = list()
@@ -128,16 +133,15 @@ out$params= FLPar(Fp05=median(fbar(run)[,ac(pyrs)]),
                   Btrg= median(ssb(run)[,ac(pyrs)]),
                   Prisk=Prisk,styr=pyrs[1],endyr=tail(pyrs,1))
 
-out$brp = brp
-out$sr =sr 
+out$brp = object$brp
+out$sr =object$sr 
 out$devs =object$devs
 out$stock = run
-return(out)  
+
 
 fp05 <- mean(fbar(run)[,ac(100)])
-
-
 if(verbose) cat(paste0("Fp.05 = ",round(fp05,3)," is ",ifelse(fp05<Fbrp,"smaller","larger")," than Fbrp = ",round(Fbrp,3)),"\n")
+
 return(out)
 }
 #}}}
@@ -323,7 +327,9 @@ opt.bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics,
 #' bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
 #' brp = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
 #' fmmy = Fmmy(brp,sigmaR=0.7,rho=0.3)
+#' getF(fmmy) # FMMY value 
 #' plotFsim(fmmy)
+
 
 Fmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range="missing",tol=0.001,maxit=15,verbose=TRUE){
   fbar(brp)[] = 0.01
