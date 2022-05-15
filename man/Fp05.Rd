@@ -8,8 +8,8 @@ Fp05(
   object,
   iters = "missing",
   range = "missing",
-  tol = 0.001,
-  maxit = 15,
+  tol = 0.01,
+  maxit = 20,
   verbose = TRUE
 )
 }
@@ -27,4 +27,14 @@ list
 }
 \description{
 Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5 percent
+}
+\examples{
+data(ple4)
+bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
+brp = computeFbrp(ple4,hs,proxy="bx",x=35,blim=0.1)
+fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
+plotFsim(fsim)
+fp.05 = Fp05(fsim)
+plotFsim(fp.05) # black line is Fp0.05
+getF(fp.05) 
 }

@@ -299,7 +299,7 @@ plotFsim <- function(object,worms=TRUE,thinning = 10,probs=c(0.05,0.2,0.50,0.8,0
 stock = object$stock
 brp = object$brp
 if(missing(panels)){
-  panels=c(2,4)
+  panels=c(1:4)
 }
 
 if(missing(ncol)){

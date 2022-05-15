@@ -37,3 +37,11 @@ list of  FLPar, FLStock and FLBRP objects
 Fsim()
 Simulates stochastic stock dynamics under under constant Fbrp
 }
+\examples{
+data(ple4)
+hs = srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4),lplim=0.05,uplim=0.25)
+blim = params(hs)[[2]]
+brp = computeFbrp(ple4,hs,proxy="sprx",x=35,blim=blim)
+fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
+plotFsim(fsim)
+}
