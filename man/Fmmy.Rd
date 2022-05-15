@@ -49,14 +49,7 @@ Uses opt.bisect to derive the F at Maximum Median Yield from stochastic simulati
 \examples{
 data(ple4)
 bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
-brp.bh = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
-fmmy.bh = Fmmy(brp.bh,sigmaR=0.7,rho=0.3)
-# Compare with deterministic Fmsy
-refpts(fmmy.bh$)  
-srr = srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4),plim=0.15)
-brp=computeFbrp(ple4,st,proxy = c("msy","sprx"),x=35,blim=params(st)[[2]])
-fmmy(brp,sigmaR=0.7,rho=0.3)
-refpts(fmmy.bh$brp)["Fmsy","harvest"]
-getF(fmmy.bh) # Stochastic Fmsy
-plotFsim(fmmy.bh)
+brp = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
+fmmy = Fmmy(brp,sigmaR=0.7,rho=0.3)
+plotFsim(fmmy)
 }

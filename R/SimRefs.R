@@ -87,14 +87,14 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbos
 #' @examples 
 #' data(ple4)
 #' bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
-#' brp = computeFbrp(ple4,hs,proxy="bx",x=35,blim=0.1)
+#' brp = computeFbrp(ple4,bh,proxy="bx",x=35,blim=0.1)
 #' fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
 #' plotFsim(fsim)
 #' fp.05 = Fp05(fsim)
-#' plotFsim(fp.05) # black line is Fp0.05
+#' plotFsim(fp.05,panels=c(2,4)) # black line is Fp0.05
 #' getF(fp.05) 
 
-Fp05 <- function(object,iters="missing",range="missing",tol=0.01,maxit=20,verbose=TRUE){
+Fp05 <- function(object,iters="missing",range="missing",tol=0.001,maxit=20,verbose=TRUE){
 stock = object$stock 
 years = (dims(stock)$minyear:dims(stock)$maxyear)[-1]
 pyrs = an(object$params["styr"]) :an(object$params["endyr"])
@@ -321,16 +321,9 @@ opt.bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics,
 #' @examples 
 #' data(ple4)
 #' bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
-#' brp.bh = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
-#' fmmy.bh = Fmmy(brp.bh,sigmaR=0.7,rho=0.3)
-#' # Compare with deterministic Fmsy
-#' refpts(fmmy.bh$)  
-#' srr = srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4),plim=0.15)
-#' brp=computeFbrp(ple4,st,proxy = c("msy","sprx"),x=35,blim=params(st)[[2]])
-#' fmmy(brp,sigmaR=0.7,rho=0.3)
-#' refpts(fmmy.bh$brp)["Fmsy","harvest"]
-#' getF(fmmy.bh) # Stochastic Fmsy
-#' plotFsim(fmmy.bh)
+#' brp = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
+#' fmmy = Fmmy(brp,sigmaR=0.7,rho=0.3)
+#' plotFsim(fmmy)
 
 Fmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range="missing",tol=0.001,maxit=15,verbose=TRUE){
   fbar(brp)[] = 0.01
