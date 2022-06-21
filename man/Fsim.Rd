@@ -41,7 +41,9 @@ Simulates stochastic stock dynamics under under constant Fbrp
 data(ple4)
 hs = srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4),lplim=0.05,uplim=0.25)
 blim = params(hs)[[2]]
-brp = computeFbrp(ple4,hs,proxy="sprx",x=35,blim=blim)
+brp = computeFbrp(ple4,hs,proxy=c("sprx","f0.1","msy"),x=40,blim=blim)
+ploteq(brp)
 fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
 plotFsim(fsim)
+plotFsim(fsim,panels=2)
 }

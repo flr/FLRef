@@ -31,8 +31,8 @@ Calculates the Fbar value giving a maximum probability of ssb being below Blim o
 \examples{
 data(ple4)
 bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
-brp = computeFbrp(ple4,bh,proxy="bx",x=35,blim=0.1)
-fsim = Fsim(brp,sigmaR=0.7,rho=0.3)
+brp = computeFbrp(ple4,bh,proxy="bx",x=35,blim=0.2) # set Blim higher
+fsim = Fsim(brp,sigmaR=0.7,rho=0.3,iters=500)
 plotFsim(fsim)
 fp.05 = Fp05(fsim)
 plotFsim(fp.05,panels=c(2,4)) # black line is Fp0.05

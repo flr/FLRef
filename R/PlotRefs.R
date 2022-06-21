@@ -579,6 +579,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
     btrigger=btrigger/btrg
     bclose=bclose/btrg
     fbrp = fbrp/ftrg
+    if(!missing(fpa)) fpa = fpa/ftrg
     ftrg=1
     btrg=1
   } 
@@ -743,7 +744,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
                                    vjust="bottom",parse=TRUE,size=label.cex)}
     
     if(!missing(fpa)){   
-      p = p+annotate("text", x=1.1*Bpa, y=Fpa*1.03, label="F[pa]",parse=TRUE, hjust="left",vjust="bottom",size=label.cex)
+      p = p+annotate("text", x=1.1*bpa, y=fpa*1.03, label="F[pa]",parse=TRUE, hjust="left",vjust="bottom",size=label.cex)
     }  
     
     

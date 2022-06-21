@@ -51,5 +51,6 @@ data(ple4)
 bh = srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=spr0y(ple4))
 brp = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
 fmmy = Fmmy(brp,sigmaR=0.7,rho=0.3)
+getF(fmmy) # FMMY value 
 plotFsim(fmmy)
 }
