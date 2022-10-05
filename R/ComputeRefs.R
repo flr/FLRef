@@ -236,10 +236,13 @@ computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALS
   
   fref = rownames(Fbrps)
   
-  Fbrps = rbind(Fbrps, FLPar(B0 = an(refpts(brp)["virgin","ssb"])))
+  Fbrps = rbind(Fbrps, FLPar(B0 = 0.99*an(refpts(brp)["virgin","ssb"])))
   
   
   brp =  brp(brp+Fbrps)
+  # Fix
+  refpts(brp)["B0"] =   refpts(brp)["virgin"] 
+  
   
   fl = min(c(fmax*refpts(brp)[paste(fref),"harvest"]))
   fbar(brp) = seq(0,fl,fl/100)
