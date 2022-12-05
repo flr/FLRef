@@ -153,7 +153,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     refs= rbind(refs,FLPar(Bpa=bpa))
   }
   
-  refs=rbind(refs,FLPar(B0=B0))
+  refs=rbind(refs,FLPar(B0=0.99*B0))
   
   # do check
   check = brp+refs
@@ -162,6 +162,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   }
     
   brp = brp+refs
+  refpts(brp)["B0"] = refpts(brp)["virgin"]
   #if(fmax*refpts(check)["Fbrp","harvest"]>max(fbar(brp))){
     fl = min(c(fmax*refpts(check)[paste(fref),"harvest"],refpts(check)["Blim","harvest"]*1.5))
     fbar(brp) = seq(0,fl,fl/100)
@@ -236,10 +237,13 @@ computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALS
   
   fref = rownames(Fbrps)
   
-  Fbrps = rbind(Fbrps, FLPar(B0 = an(refpts(brp)["virgin","ssb"])))
+  Fbrps = rbind(Fbrps, FLPar(B0 = 0.99*an(refpts(brp)["virgin","ssb"])))
   
   
   brp =  brp(brp+Fbrps)
+  # Fix
+  refpts(brp)["B0"] =   refpts(brp)["virgin"] 
+  
   
   fl = min(c(fmax*refpts(brp)[paste(fref),"harvest"]))
   fbar(brp) = seq(0,fl,fl/100)
