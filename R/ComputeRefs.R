@@ -18,7 +18,7 @@
 #' @param type type of blim input, values < 1 are  
 #' \itemize{
 #'   \item "b0" fraction to B0  
-#'   \item "btrg" fraction to Btarget (first occurring in proxy)    
+#'   \item "btgt" fraction to Btarget (first occurring in proxy)    
 #'   \item "value" absolute value
 #' }
 #' @param btri Btrigger can specified as absolute value
@@ -33,7 +33,7 @@
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
 #' ploteq(brp,obs=TRUE,refpts="msy")
 
-computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btrg","value"),btri="missing",bpa="missing",verbose=T,fmax=5){
+computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",verbose=T,fmax=5){
  
   
   
@@ -60,22 +60,22 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   
   if(is.numeric(proxy)){
     Fbrp = FLPar(Fref=proxy)
-    if(verbose)cat(paste0("Computing Fref = ",proxy," with Btrg = Bref"),"\n")
+    if(verbose)cat(paste0("Computing Fref = ",proxy," with Btgt = Bref"),"\n")
   } else {
   
   Fbrp = FLPar(none=NA)
   if(c("sprx")%in%proxy){
     pr = brp(FLBRP(stock)) # per-recruit
-    Fbrp = rbind(Fbrp,FLPar(Fspr = refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*x*0.01))["Btrg","harvest"]))
-    if(verbose)cat(paste0("Computing Fspr",x," with Btrg = Bspr",x),"\n")
+    Fbrp = rbind(Fbrp,FLPar(Fspr = refpts(pr+FLPar(Btgt=refpts(pr)["virgin","ssb"]*x*0.01))["Btgt","harvest"]))
+    if(verbose)cat(paste0("Computing Fspr",x," with Btgt = Bspr",x),"\n")
   }
   if(c("bx")%in%proxy){
-    Fbrp = rbind(Fbrp,FLPar(Fb = refpts(brp+FLPar(Btrg=refpts(brp)["virgin","ssb"]*x*0.01))["Btrg","harvest"]))
-    if(verbose)cat(paste0("Computing Fsb",x," with Btrg = Bsb",x),"\n")
+    Fbrp = rbind(Fbrp,FLPar(Fb = refpts(brp+FLPar(Btgt=refpts(brp)["virgin","ssb"]*x*0.01))["Btgt","harvest"]))
+    if(verbose)cat(paste0("Computing Fsb",x," with Btgt = Bsb",x),"\n")
   }  
   if(c("f0.1")%in%proxy){
     Fbrp = rbind(Fbrp,FLPar(F0.1=refpts(brp)["f0.1","harvest"]))
-    if(verbose)cat(paste0("Computing F0.1 with Btrg = B[F.01]"),"\n")
+    if(verbose)cat(paste0("Computing F0.1 with Btgt = B[F.01]"),"\n")
   }
   
   if(c("msy")%in%proxy){
@@ -90,7 +90,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     #add warning for segreg
     
     Fbrp = rbind(Fbrp,FLPar(Fmsy=refpts(brp)["msy","harvest"]))
-      if(verbose)cat(paste0("Computing Fmsy with Btrg = Bmsy"),"\n")
+      if(verbose)cat(paste0("Computing Fmsy with Btgt = Bmsy"),"\n")
     }
   }
   
@@ -113,14 +113,14 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
       if(verbose)cat("\n",paste0(" Blim = ",blim,"B0"),"\n")
         }
         }
-    if(type%in%c("btrg")){
+    if(type%in%c("btgt")){
       Blim =an(refpts(brpf)[rownames(Fbrp)[1],"ssb"])*blim
       if(srmod=="segreg"){
         if(verbose & Blim<sr@params[[2]]) cat("\n",paste0(" Upward adjusted Blim to breakpoint  = ",round(sr@params[[2]],0)," of segreg"),"\n")
-        if(verbose & Blim>=sr@params[[2]]) cat("\n",paste0("Blim = ",blim," with Btrg corresponding to ", rownames(Fbrp)[1]),"\n")
+        if(verbose & Blim>=sr@params[[2]]) cat("\n",paste0("Blim = ",blim," with Btgt corresponding to ", rownames(Fbrp)[1]),"\n")
         Blim = max(Blim,sr@params[[2]])
       } else {
-        if(verbose)cat("\n",paste0("Blim = ",blim," with Btrg corresponding to ", rownames(Fbrp)[1]),"\n")
+        if(verbose)cat("\n",paste0("Blim = ",blim," with Btgt corresponding to ", rownames(Fbrp)[1]),"\n")
       }
 
     }
@@ -207,12 +207,12 @@ computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALS
   if(proxy%in%c("sprx","all")){
     pr = brp(FLBRP(stock)) # per-recruit
     Fsprs = FLPar(
-      Fspr35 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*35*0.01))["Btrg","harvest"]),
-      Fspr40 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*40*0.01))["Btrg","harvest"]),
-      Fspr45 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*45*0.01))["Btrg","harvest"]),
-      Fspr50 = an(refpts(pr+FLPar(Btrg=refpts(pr)["virgin","ssb"]*50*0.01))["Btrg","harvest"])
+      Fspr35 = an(refpts(pr+FLPar(Btgt=refpts(pr)["virgin","ssb"]*35*0.01))["Btgt","harvest"]),
+      Fspr40 = an(refpts(pr+FLPar(Btgt=refpts(pr)["virgin","ssb"]*40*0.01))["Btgt","harvest"]),
+      Fspr45 = an(refpts(pr+FLPar(Btgt=refpts(pr)["virgin","ssb"]*45*0.01))["Btgt","harvest"]),
+      Fspr50 = an(refpts(pr+FLPar(Btgt=refpts(pr)["virgin","ssb"]*50*0.01))["Btgt","harvest"])
     )  
-      if(verbose)cat(paste0("Computing Fspr% 35-50 with Btrg = Bspr"),"\n")
+      if(verbose)cat(paste0("Computing Fspr% 35-50 with Btgt = Bspr"),"\n")
   }
   
   
@@ -226,7 +226,7 @@ computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALS
     fbrps = refpts(brp+Bx)[8:11,"harvest"] 
     FBs = FLPar(Fb30= fbrps[1,],Fb35= fbrps[2,],Fb40= fbrps[3,],Fb45= fbrps[4,] )
     
-    if(verbose)cat("\n",paste0("Computing Fsb% 30-45 with Btrg = Bsb"),"\n")
+    if(verbose)cat("\n",paste0("Computing Fsb% 30-45 with Btgt = Bsb"),"\n")
   }  
   if(proxy=="all") Fbrps=rbind(Fsprs,FBs) 
   if(proxy=="sprx") Fbrps=Fsprs 
@@ -263,7 +263,7 @@ Fbrp <- function(brp){
   rpt = refpts(brp)
   ref = rownames(rpt)[grep("F",rownames(rpt))][1]
   out = FLPar(Fbrp = rpt[ref,"harvest"],
-        Btrg=rpt[ref,"ssb"],
+        Btgt=rpt[ref,"ssb"],
         Blim=rpt["Blim","ssb"],
         Flim=rpt["Blim","harvest"],
         Yeq = rpt[ref,"yield"],

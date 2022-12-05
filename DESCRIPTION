@@ -1,6 +1,6 @@
 Package: FLRef
 Title: Reference point computation for advice rules
-Version: 1.0.6
+Version: 1.0.7
 Authors@R: 
     c(person(given = "Henning",
            family = "Winker",
@@ -23,4 +23,4 @@ Imports:
 License: EUPL
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.1

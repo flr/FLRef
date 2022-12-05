@@ -11,7 +11,7 @@ computeFbrp(
   proxy = NULL,
   x = NULL,
   blim = 0.1,
-  type = c("b0", "btrg", "value"),
+  type = c("b0", "btgt", "value"),
   btri = "missing",
   bpa = "missing",
   verbose = T,
@@ -30,7 +30,7 @@ computeFbrp(
 \item{type}{type of blim input, values < 1 are
 \itemize{
   \item "b0" fraction to B0  
-  \item "btrg" fraction to Btarget (first occurring in proxy)    
+  \item "btgt" fraction to Btarget (first occurring in proxy)    
   \item "value" absolute value
 }}
 

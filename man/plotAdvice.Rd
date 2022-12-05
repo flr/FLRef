@@ -5,16 +5,18 @@
 \title{plotAdvice
 Plots stochastic stock dynamics against refpts for constant Fsim()}
 \usage{
-plotAdvice(stock, brp, plotrefs = TRUE, ncol = 2, label.size = 3)
+plotAdvice(stock, rpts = "missing", plotrefs = TRUE, ncol = 2, label.size = 3)
 }
 \arguments{
+\item{stock}{FLStock or FLStockR}
+
 \item{plotrefs}{if TRUE reference points are plotted}
 
 \item{ncol}{number of plot panel columns}
 
 \item{label.size}{size of refpts labels}
 
-\item{object}{output object from Fsim()}
+\item{refpts}{as FLPar or Fbrp() if FLStockR is not provided or should be overwritten}
 
 \item{colour}{color of CIs}
 }

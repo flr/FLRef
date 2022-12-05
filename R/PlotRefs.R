@@ -13,7 +13,7 @@
 #'   \item Btri  
 #' }    
 #' @param obs Should observations be plotted? Defaults to `FALSE`.
-#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param rel option to denote x,y labs as relative B/Btgt and F/Ftgt
 #' @param rpf adds refpts in plots
 #' @param dashed plots vertical dashed lines to highlight refpts locations
 #' @param colours refpts colours, default is designed for computeFbrp() output
@@ -343,7 +343,7 @@ if(plotrefs){
    
   
   det.refs = FLPars(Rec=FLPar(R0=refpts(brp)["virgin","rec"]),
-                    SSB  =FLPar(Btrg=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
+                    SSB  =FLPar(Btgt=refpts(brp)[ref,"ssb"],Blim=refpts(brp)["Blim","ssb"],B0=refpts(brp)["virgin","ssb"]),
                     Landings    =FLPar(Yeq = refpts(brp)[ref,"yield"]),
                     F    =Fs)
   if(ref=="Fmsy"){
@@ -384,7 +384,8 @@ return(p)
 #
 #' Plots stochastic stock dynamics against refpts for constant Fsim()
 #'
-#' @param object output object from Fsim() 
+#' @param stock FLStock or FLStockR 
+#' @param  refpts as FLPar or Fbrp() if FLStockR is not provided or should be overwritten 
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
 #' @param ncol number of plot panel columns
@@ -397,13 +398,26 @@ return(p)
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
-plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
+plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
 
+  landings = stock@landings 
   stock@landings =computeLandings(stock)
-  rp = refpts(brp)
-  pr = FALSE
-  if(model(brp)=="rec ~ a") pr = TRUE
+  stock@landings[is.na(stock@landings)] = landings[is.na(stock@landings)]
   
+  pr = FALSE
+  brp = NULL
+  if(class(stock)[1]=="FLStockR" & missing(rpts)){
+  rp = refpts(stk)   
+  }
+  if(!missing(rpts)){
+  if(class(rpts) == "FLBRP"){
+  brp = rpts
+  rp = refpts(brp)
+  if(model(brp)=="rec ~ a") pr = TRUE
+  }
+  if(class(rpts)=="FLPar") rp = rpts   
+  }
+
   if(pr){
   b0 = c(rp["B0",c("ssb")])
   r0 = exp(mean(log(rec(stock))))
@@ -429,9 +443,9 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
   }
      
   
-  xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3))
+  xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
   
-  
+  if(!is.null(brp)){
   Fs = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"harvest"]),
              params=rownames(refpts(brp))[grep("F",rownames(refpts(brp)))])
   Fs= rbind(Fs,FLPar(Flim=refpts(brp)["Blim","harvest"]))
@@ -450,39 +464,75 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
   if(pr){
     Bs = Bs/b0
     Ys = Ys/yref    
+  }
+  }
+  
+  if(is.null(brp)){
+    Fs = FLPar(an(rp[rownames(rp)[grep("F",rownames(rp))]]),
+               params=rownames(rp)[grep("F",rownames(rp))])
+    nf = length(Fs)
+    Bs = FLPar(an(rp[rownames(rp)[grep("B",rownames(rp))]]),
+               params=paste0(rownames(rp)[grep("B",rownames(rp))],""))
+
+    Ys = FLPar(an(rp[rownames(rp)[grep("Y",rownames(rp))]]),
+               params=paste0(rownames(rp)[grep("Y",rownames(rp))],""))
+    MSY = FLPar(an(rp[rownames(rp)[grep("MSY",rownames(rp))]]),
+               params=paste0(rownames(rp)[grep("MSY",rownames(rp))],""))
+    C = FLPar(an(rp[rownames(rp)[grep("C",rownames(rp))]]),
+                params=paste0(rownames(rp)[grep("C",rownames(rp))],""))
+    
+    if(!is.na(an(MSY))) Ys= rbind(Ys,MSY)
+    if(!is.na(an(MSY))) Ys= rbind(Ys,C)
+    
     
   }
   
-  xy = xy[1:nf]
   
   if(plotrefs){
   if(!pr){  
     
+    Bsc = data.frame(red =  rownames(Bs)%in%c("Bcrit","Blim"),
+    orange = rownames(Bs)%in%c("Bpa","Bthr","Btri","Btrigger"),
+    green = !rownames(Bs)%in%c("B0","Bpa","Bthr","Btri","Btrigger","Bcrit","Blim"),
+    blue = rownames(Bs)%in%c("B0")
+    )
+    Fsc = data.frame(red =  rownames(Fs)%in%c("Flim","Fext","Fcrash","Fcrit"),
+                     orange = rownames(Fs)%in%c("Fpa","Ftrh","Fthresh","Ftri"),
+                     green = !rownames(Fs)%in%c("Fpa","Ftrh","Fcrit","Flim","Fext","Fcrash")
+    )
+    
+    bcol = NULL 
+    for(i in 1:length(Bs))  bcol = c(bcol,c("red","orange","darkgreen","blue")[which(Bsc[i,]==TRUE)])
+    fcol = NULL 
+    for(i in 1:length(Fs))  fcol = c(fcol,c("red","orange","darkgreen")[which(Fsc[i,]==TRUE)])
+    ycol = rep("darkgreen",length(Ys))
+    colo = c(bcol,fcol,ycol)
+    posx = c(xy[1:length(Bs)],xy[1:length(Ys)],xy[1:length(Fs)])
+      
     fps =FLPars(SSB  =Bs,
            F    =Fs,
-           Catch    =Ys,
-           Rec=FLPar(R0=refpts(brp)["virgin","rec"]))
-    fps@names = names(fls)[c(2,4,3,1)] 
-    ggp = ggplotFL::geom_flpar(data=fps,
-                               x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
+           Catch    =Ys)
+    fps@names = names(fls)[c(2,4,3)] 
+    ggp = ggplotFL::geom_flpar(data=fps,x=posx,colour=colo)
+  
     ggp[[2]]$aes_params$size=label.size
     p = p +ggp 
   }
-  if(pr){  
-  
-  rownames(Bs)[grep("B0",rownames(Bs))] = "SPR0"  
-  fps = FLPars(SSB  =Bs,
-               F    =Fs,
-               Catch    =Ys,
-               Rec=FLPar(R0=refpts(brp)["virgin","rec"]))    
-    
-  
-  fps@names = names(fls)[c(2,4,3,1)] 
-  ggp = ggplotFL::geom_flpar(data=fps,
-                              x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
-  ggp[[2]]$aes_params$size=label.size
-  p = p +ggp 
- }  
+    if(pr){  
+      
+      rownames(Bs)[grep("B0",rownames(Bs))] = "SPR0"  
+      fps = FLPars(SSB  =Bs,
+                   F    =Fs,
+                   Catch    =Ys,
+                   Rec=FLPar(R0=refpts(brp)["virgin","rec"]))    
+      
+      
+      fps@names = names(fls)[c(2,4,3,1)] 
+      ggp = ggplotFL::geom_flpar(data=fps,
+                                 x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
+      ggp[[2]]$aes_params$size=label.size
+      p = p +ggp 
+    }  
     
     
     }  
@@ -500,12 +550,12 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' @param pars FLPar object or computeFbrp() ouput 
 #' \itemize{
 #'   \item 1: "Fbrp"  # "F.." must first
-#'   \item 2: "Btrg"
+#'   \item 2: "Btgt"
 #'   \item 3: "Blim"
 #'   \item 4: "B0"
 #' }    
-#' @param ftrg factor to adjust Fmsy or its proxy e.g. 0.8Fmsy 
-#' @param btrigger biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btrg   
+#' @param ftgt factor to adjust Fmsy or its proxy e.g. 0.8Fmsy 
+#' @param btrigger biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btgt   
 #' @param bpa precautionary biomass threshold, if > 10 value, else factor*Blim 
 #' @param bclose biomass that invokes fishing closure 
 #' @param fmin minimum allowable (bycatch) fishing mortality under closure 
@@ -517,7 +567,7 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' @param ymax multiplier for upper default ylim
 #' @param xlab option customize xlab
 #' @param ylab option customize ylab
-#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param rel option to denote x,y labs as relative B/Btgt and F/Ftgt
 #' @param expand option to expand the plot area to border - default TRUE
 #' @param labels annotate reference point labels
 #' @param labelslabel.cex=3.5 set size of labels
@@ -530,7 +580,7 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' blim = params(srr)[[2]]
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy="f0.1",blim=blim)
 #' rpt = Fbrp(brp)
-#' plotAR(rpt,btrigger=an(0.8*rpt["Btrg"]))
+#' plotAR(rpt,btrigger=an(0.8*rpt["Btgt"]))
 #' # Use Bpa as trigger (ICES style)
 #' plotAR(rpt,obs=ple4,bpa=1.4)
 #' # Change kobe to greyscale
@@ -540,7 +590,7 @@ plotAdvice <- function(stock,brp,plotrefs=TRUE,ncol=2,label.size=3){
 #' # show a relative
 #' plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.02)
 
-plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",bclose=0,fmin=0, obs="missing", kobe=TRUE,
+plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missing",fpa="missing",fthresh="missing",bclose=0,fmin=0, obs="missing", kobe=TRUE,
                    alpha=1,xmax=1.2,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,label.cex=3.5,critical=TRUE) {
   
   
@@ -553,14 +603,39 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
   }
   
   fbrp = pars[[1]]
-  ftrg = fbrp*ftrg
-  btrg = an(pars["Btrg"])
+  ftgt = fbrp*ftgt
+  btgt = an(pars["Btgt"])
   blim = an(pars["Blim"])
   bclose = blim*bclose
   
+  bpa.label="B[pa]" 
+  fpa.label = "F[pa]"
+  
+  if(any(c("Bpa")%in%rownames(pars)))
+    bpa= pars[[which(rownames(pars)%in%c("Bpa"))]]
+  
+  if(any(c("Bthr","Bthresh")%in%rownames(pars)))
+            bthresh= pars[[which(rownames(pars)%in%c("Bthr","Bthresh"))]]
+  
+  if(!missing(bthresh)){
+                bpa = bthresh
+   bpa.label="B[thr]"             
+  }              
+  
+ 
+  if(!missing(fthresh)){
+    fpa = fthresh
+  fpa.label = "F[thr]"
+  }
+  if(any(c("Fpa","Fthr","Fthresh")%in%rownames(pars))){
+              fpa= pars[[which(rownames(pars)%in%c("Fpa","Fthr","Fthresh"))]]
+  fpa.label = "F[thr]"
+  }
   btri.label=TRUE
+  if(any(c("Btri","Btrigger")%in%rownames(pars)))
+       btrigger= pars[[which(rownames(pars)%in%c("Btri","Btrigger"))]]
   if(!missing(btrigger)) 
-      btrigger=ifelse(an(btrigger)>10,an(btrigger),an(btrigger)*btrg)
+      btrigger=ifelse(an(btrigger)>10,an(btrigger),an(btrigger)*btgt)
   if(!missing(bpa)) 
      bthresh=bpa=ifelse(an(bpa)>10,an(bpa),an(bpa)*blim)
   
@@ -569,32 +644,32 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
     btri.label=FALSE
   }
   
-  if(missing(btrigger) & missing(bpa)) btrigger=0.7*an(btrg)
+  if(missing(btrigger) & missing(bpa)) btrigger=0.7*an(btgt)
   if(missing(bpa)){bthresh=an(btrigger)} 
   if(!missing(bpa)){bthresh=an(bpa)}
   
   if(rel){
-    blim=blim/btrg
-    bthresh=bthresh/btrg
-    btrigger=btrigger/btrg
-    bclose=bclose/btrg
-    fbrp = fbrp/ftrg
-    if(!missing(fpa)) fpa = fpa/ftrg
-    ftrg=1
-    btrg=1
+    blim=blim/btgt
+    bthresh=bthresh/btgt
+    btrigger=btrigger/btgt
+    bclose=bclose/btgt
+    fbrp = fbrp/ftgt
+    if(!missing(fpa)) fpa = fpa/ftgt
+    ftgt=1
+    btgt=1
   } 
   
   # label
-  trg = base::strsplit(rownames(pars)[[1]],"F")[[1]][2]
-  bta = paste0("B[",trg,"]")
-  if(trg=="0.1") bta = paste0("B[F",trg,"]")
-  fta = ifelse(ftrg==fbrp, paste0("F[",trg,"]"),paste0("F[trg]"))
+  tgt = base::strsplit(rownames(pars)[[1]],"F")[[1]][2]
+  bta = paste0("B[",tgt,"]")
+  if(tgt=="0.1") bta = paste0("B[F",tgt,"]")
+  fta = ifelse(ftgt==fbrp, paste0("F[",tgt,"]"),paste0("F[tgt]"))
   
   
   # SET args
-  xlim <- btrg * xmax
-  ylim <- ftrg * ymax
-  if(!missing(fpa)) ylim <- max(ftrg * ymax,fpa*1.1)
+  xlim <- btgt * xmax
+  ylim <- ftgt * ymax
+  if(!missing(fpa)) ylim <- max(ftgt * ymax,fpa*1.1)
   # GET observations
   if(!missing(obs)) {
     if(class(obs)=="FLStock")
@@ -606,12 +681,12 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
     }
     
     if(rel){
-      obs$met = obs$met/an(pars["Btrg"])
+      obs$met = obs$met/an(pars["Btgt"])
       obs$out = obs$out/an(pars[[1]])
       
     }
     
-    xlim <- max(c(obs$met,btrg*1.5)) * 1.05
+    xlim <- max(c(obs$met,btgt*1.5)) * 1.05
     ylim <- max(c(obs$out,ylim)) * 1.05
   }
   
@@ -624,20 +699,20 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
   out <- ifelse(met <= bclose, fmin,
                 # Revised
                 ifelse(met < btrigger,
-                       pmax(c(((ftrg-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
+                       pmax(c(((ftgt-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
                        # ABOVE btrigger
-                       ftrg))
+                       ftgt))
   # DATA
   dat <- data.frame(met=met, out=out)
   
   
   if(missing(xlab)){ 
     xlab="SSB"
-    if(rel) xlab = expression(B/B[trg])
+    if(rel) xlab = expression(B/B[tgt])
   }
   if(missing(ylab)){ 
     ylab="Fishing Mortality"
-    if(rel) ylab = expression(F/F[trg])
+    if(rel) ylab = expression(F/F[tgt])
   }
   p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
     xlab(xlab) + ylab(ylab)  
@@ -652,11 +727,11 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
   
   # PREDICT for threshold
   ythresh <- ifelse(bthresh < btrigger,
-                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
-                    ftrg)
-  ytarget <- ifelse(btrg < btrigger,
-                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(btrg - bclose) +fmin,fmin)),
-                    ftrg)
+                    pmax(c(((ftgt-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
+                    ftgt)
+  ytarget <- ifelse(btgt < btrigger,
+                    pmax(c(((ftgt-fmin)/(btrigger-bclose))*(btgt - bclose) +fmin,fmin)),
+                    ftgt)
   
   if(kobe){ colors = c("green","yellow","orange","red","red4")
   } else {
@@ -679,25 +754,25 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
   if(btrigger>=bthresh){
     rdd = geom_polygon(data=data.frame(
       x=c(0, bclose,bthresh, bthresh, bthresh, bthresh, 0, 0),
-      y=c(fmin, fmin, ythresh, ftrg,ftrg ,ylim, ylim, fmin)),
+      y=c(fmin, fmin, ythresh, ftgt,ftgt ,ylim, ylim, fmin)),
       aes(x=x, y=y), fill=colors[4], alpha=alpha)
   } else {
     rdd = geom_polygon(data=data.frame(
       x=c(0, bclose,btrigger, bthresh, bthresh, bthresh, 0, 0),
-      y=c(fmin, fmin, ythresh, ftrg,ftrg ,ylim, ylim, fmin)),
+      y=c(fmin, fmin, ythresh, ftgt,ftgt ,ylim, ylim, fmin)),
       aes(x=x, y=y), fill=colors[4], alpha=alpha)
   }
   p <- p+yell+rdd+
     # GREEN
     geom_polygon(data=data.frame(
       x=c(bthresh, xlim, xlim,btrigger, bthresh, bthresh),
-      y=c(0, 0, ftrg,ytarget, ytarget, ythresh)),
+      y=c(0, 0, ftgt,ytarget, ytarget, ythresh)),
       aes(x=x, y=y), fill=colors[1], alpha=alpha) +
     
     # Orange
     geom_polygon(data=data.frame(
       x=c(bthresh, btrigger, xlim, xlim, bthresh,bthresh),
-      y=c(ythresh , ftrg, ftrg, ylim, ylim, ythresh)),
+      y=c(ythresh , ftgt, ftgt, ylim, ylim, ythresh)),
       aes(x=x, y=y), fill=colors[3], alpha=alpha)+geom_line()
   
   
@@ -709,16 +784,16 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
   }   
   
   
-  # Btrg
-  p <- p+geom_segment(aes(x=0, xend=Inf, y=ftrg, yend=ftrg), linetype=2) +
+  # Btgt
+  p <- p+geom_segment(aes(x=0, xend=Inf, y=ftgt, yend=ftgt), linetype=2) +
     # Btrigger
-    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftrg), linetype=2)+
-    # Btrg
-    geom_segment(aes(x=btrg, xend=btrg, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
+    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftgt), linetype=2)+
+    # Btgt
+    geom_segment(aes(x=btgt, xend=btgt, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
     # Btresh/Bpa
     geom_segment(aes(x=bthresh, xend=bthresh, y=0, yend=ythresh), linetype=1)+
     # Blim
-    geom_segment(aes(x=blim, xend=blim, y=0, yend=ftrg), linetype=1,cex=0.9)+
+    geom_segment(aes(x=blim, xend=blim, y=0, yend=ftgt), linetype=1,cex=0.9)+
     geom_line()
     # Fpa
     if(!missing(fpa)){   
@@ -729,22 +804,26 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
   if(labels){
     
     
-    p <- p+annotate("text", x=xlim*0.8, y=ftrg + ylim / 30*1.08, label=fta,parse=TRUE, hjust="left",size=label.cex) +
-      # Btrg
-      annotate("text", x=btrg*1.02, y=ftrg*0.5, label=bta, 
+    p <- p+annotate("text", x=xlim*0.8, y=ftgt + ylim / 30*1.08, label=fta,parse=TRUE, hjust="left",size=label.cex) +
+      # Btgt
+      annotate("text", x=btgt*1.02, y=ftgt*0.5, label=bta, 
                hjust="left",parse=TRUE,size=label.cex)+
       # Blim
-      annotate("text", x=blim*0.98, y=ftrg*1.03, label=paste0("B[lim]"), 
+      annotate("text", x=blim*0.98, y=ftgt*1.03, label=paste0("B[lim]"), 
                vjust="bottom",hjust="left",parse=TRUE,size=label.cex)  
     
     # Btresh
-    if(!missing(bpa)){ p=p+annotate("text", x=bthresh*1.03, y=ftrg*0.4, label=paste0("B[pa]"), 
+    if(!missing(bpa)){ p=p+annotate("text", x=bthresh*1.03, y=ftgt*0.4, label=paste0(bpa.label), 
                                     hjust="left",parse=TRUE,size=label.cex)}  
-    if(btri.label){ p = p+annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
+    if(btri.label){ p = p+annotate("text", x=btrigger*1.02, y=ftgt*1.03, label=paste0("B[trigger]"), 
                                    vjust="bottom",parse=TRUE,size=label.cex)}
     
+    
+    
     if(!missing(fpa)){   
-      p = p+annotate("text", x=1.1*bpa, y=fpa*1.03, label="F[pa]",parse=TRUE, hjust="left",vjust="bottom",size=label.cex)
+    if(any)
+      
+       p = p+annotate("text", x=1.1*bpa, y=fpa*1.03, label=paste0(fpa.label),parse=TRUE, hjust="left",vjust="bottom",size=label.cex)
     }  
     
     
@@ -766,8 +845,8 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
 #
 #' Plots the new proposed ICES advice rule
 #'
-#' @param ftrg Target F = min(Fbrp,Fp0.5) 
-#' @param btrg Biomass target corresponding to Fbrp
+#' @param ftgt Target F = min(Fbrp,Fp0.5) 
+#' @param btgt Biomass target corresponding to Fbrp
 #' @param blim biomass limit
 #' @param btrigger biomass trigger below which F is linearly reduced   
 #' @param bthresh biomass threshold beyond which biomass is classified sustainable
@@ -780,7 +859,7 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
 #' @param ymax multiplier for upper default ylim
 #' @param xlab option customize xlab
 #' @param ylab option customize ylab
-#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param rel option to denote x,y labs as relative B/Btgt and F/Ftgt
 #' @param expand option to expand the plot area to border - default TRUE
 #' @param labels annotate reference point labels
 #' @param critical option to highlight critical zone below blim
@@ -792,21 +871,21 @@ plotAR <- function(pars,ftrg = 1,btrigger="missing",bpa="missing",fpa="missing",
 #' plotWKREF(blim=0.2,bclose=0.2,rel=TRUE)
 #' # Close fishery at Blim, but allow fmin (e.g. bycatch)
 #' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,rel=TRUE)
-#' # Change Btrigger above Btrg
+#' # Change Btrigger above Btgt
 #' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=btresh,rel=TRUE)
 #' # Plot stock data
 #' data(ple4)
-#' plotWKREF(ftrg=0.25,btrg=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
+#' plotWKREF(ftgt=0.25,btgt=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
 
-plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btrg,bclose=0,fmin=0, obs="missing", kobe=TRUE,
+plotWKREF <- function(ftgt = 1,btgt=1,blim=0.2,btrigger=0.9*btgt,bthresh=0.8*btgt,bclose=0,fmin=0, obs="missing", kobe=TRUE,
                       alpha=1,xmax=1.3,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,critical=kobe) {
   #Define axis
   metric="ssb"
   output="fbar"
   
   # SET args
-  xlim <- btrg * xmax
-  ylim <- ftrg * ymax
+  xlim <- btgt * xmax
+  ylim <- ftgt * ymax
   
   # GET observations
   if(!missing(obs)) {
@@ -818,8 +897,8 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
       names(obs) = c("met","out")
     }
     
-    xlim <- max(c(obs$met,btrg*1.5)) * 1.05
-    ylim <- max(c(obs$out,ftrg*1.3)) * 1.05
+    xlim <- max(c(obs$met,btgt*1.5)) * 1.05
+    ylim <- max(c(obs$out,ftgt*1.3)) * 1.05
   }
   
   # SET met values
@@ -829,19 +908,19 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
   out <- ifelse(met <= bclose, fmin,
                 # Revised
                 ifelse(met < btrigger,
-                       pmax(c(((ftrg-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
+                       pmax(c(((ftgt-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
                        # ABOVE btrigger
-                       ftrg))
+                       ftgt))
   # DATA
   dat <- data.frame(met=met, out=out)
   
   if(missing(xlab)){ 
     xlab="SSB"
-    if(rel) xlab = expression(B/B[trg])
+    if(rel) xlab = expression(B/B[tgt])
   }
   if(missing(ylab)){ 
     ylab="Fishing Mortality"
-   if(rel) ylab = expression(F/F[trg])
+   if(rel) ylab = expression(F/F[tgt])
   }
   p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
     xlab(xlab) + ylab(ylab)  
@@ -856,11 +935,11 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
   
   # PREDICT for threshold
   ythresh <- ifelse(bthresh < btrigger,
-                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
-                    ftrg)
-  ytarget <- ifelse(btrg < btrigger,
-                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(btrg - bclose) +fmin,fmin)),
-                    ftrg)
+                    pmax(c(((ftgt-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
+                    ftgt)
+  ytarget <- ifelse(btgt < btrigger,
+                    pmax(c(((ftgt-fmin)/(btrigger-bclose))*(btgt - bclose) +fmin,fmin)),
+                    ftgt)
   if(kobe) {
     ylwmin = ifelse(fmin>0,0,bclose)
     
@@ -878,25 +957,25 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
     if(btrigger>=bthresh){
       rdd = geom_polygon(data=data.frame(
         x=c(0, bclose,bthresh, bthresh, bthresh, bthresh, 0, 0),
-        y=c(fmin, fmin, ythresh, ftrg,ftrg ,ylim, ylim, fmin)),
+        y=c(fmin, fmin, ythresh, ftgt,ftgt ,ylim, ylim, fmin)),
         aes(x=x, y=y), fill="red", alpha=alpha)
     } else {
       rdd = geom_polygon(data=data.frame(
         x=c(0, bclose,btrigger, bthresh, bthresh, bthresh, 0, 0),
-        y=c(fmin, fmin, ythresh, ftrg,ftrg ,ylim, ylim, fmin)),
+        y=c(fmin, fmin, ythresh, ftgt,ftgt ,ylim, ylim, fmin)),
         aes(x=x, y=y), fill="red", alpha=alpha)
     }
     p <- p+yell+rdd+
       # GREEN
       geom_polygon(data=data.frame(
         x=c(bthresh, xlim, xlim,btrigger, bthresh, bthresh),
-        y=c(0, 0, ftrg,ytarget, ytarget, ythresh)),
+        y=c(0, 0, ftgt,ytarget, ytarget, ythresh)),
         aes(x=x, y=y), fill="green", alpha=alpha) +
       
       # Orange
       geom_polygon(data=data.frame(
         x=c(bthresh, btrigger, xlim, xlim, bthresh,bthresh),
-        y=c(ythresh , ftrg, ftrg, ylim, ylim, ythresh)),
+        y=c(ythresh , ftgt, ftgt, ylim, ylim, ythresh)),
         aes(x=x, y=y), fill="orange", alpha=alpha)+geom_line()
 
   
@@ -908,39 +987,39 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
   }   
   }
   
-  # Btrg
-  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftrg, yend=ftrg), linetype=2) +
+  # Btgt
+  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftgt, yend=ftgt), linetype=2) +
     # Btrigger
-    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftrg), linetype=2)+
-    annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
+    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftgt), linetype=2)+
+    annotate("text", x=btrigger*1.02, y=ftgt*1.03, label=paste0("B[trigger]"), 
              vjust="bottom",parse=TRUE) +
-    # Btrg
-    geom_segment(aes(x=btrg, xend=btrg, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
-    annotate("text", x=btrg*1.02, y=ftrg*0.5, label=paste0("B[trg]"), 
+    # Btgt
+    geom_segment(aes(x=btgt, xend=btgt, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
+    annotate("text", x=btgt*1.02, y=ftgt*0.5, label=paste0("B[tgt]"), 
              hjust="left",parse=TRUE)+  
     # Btresh
     geom_segment(aes(x=bthresh, xend=bthresh, y=0, yend=ythresh), linetype=1)+
-    annotate("text", x=bthresh*0.98, y=ftrg*0.4, label=paste0("B[thresh]"), 
+    annotate("text", x=bthresh*0.98, y=ftgt*0.4, label=paste0("B[thresh]"), 
              hjust="right",parse=TRUE) +
     
     # Blim
-    geom_segment(aes(x=blim, xend=blim, y=0, yend=ftrg), linetype=1,cex=0.9)+
-    annotate("text", x=blim*0.98, y=ftrg*1.03, label=paste0("B[lim]"), 
+    geom_segment(aes(x=blim, xend=blim, y=0, yend=ftgt), linetype=1,cex=0.9)+
+    annotate("text", x=blim*0.98, y=ftgt*1.03, label=paste0("B[lim]"), 
              vjust="bottom",hjust="left",parse=TRUE)+  
     
     geom_line()
     if(labels){
-    p <- p+annotate("text", x=xlim*0.8, y=ftrg + ylim / 30*1.08, label="F[trg]",parse=TRUE, hjust="left") +
-    annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
+    p <- p+annotate("text", x=xlim*0.8, y=ftgt + ylim / 30*1.08, label="F[tgt]",parse=TRUE, hjust="left") +
+    annotate("text", x=btrigger*1.02, y=ftgt*1.03, label=paste0("B[trigger]"), 
                vjust="bottom",parse=TRUE) +
-    # Btrg
-    annotate("text", x=btrg*1.02, y=ftrg*0.5, label=paste0("B[trg]"), 
+    # Btgt
+    annotate("text", x=btgt*1.02, y=ftgt*0.5, label=paste0("B[tgt]"), 
                hjust="left",parse=TRUE)+  
     # Btresh
-    annotate("text", x=bthresh*0.98, y=ftrg*0.4, label=paste0("B[thresh]"), 
+    annotate("text", x=bthresh*0.98, y=ftgt*0.4, label=paste0("B[thresh]"), 
                hjust="right",parse=TRUE) +
     # Blim
-    annotate("text", x=blim*0.98, y=ftrg*1.03, label=paste0("B[lim]"), 
+    annotate("text", x=blim*0.98, y=ftgt*1.03, label=paste0("B[lim]"), 
                vjust="bottom",hjust="left",parse=TRUE)  
     }  
 
@@ -958,8 +1037,8 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
 #
 #' Plots the new proposed ICES advice rule
 #'
-#' @param ftrg Target F = min(Fbrp,Fp0.5) 
-#' @param btrg Biomass target corresponding to Fbrp
+#' @param ftgt Target F = min(Fbrp,Fp0.5) 
+#' @param btgt Biomass target corresponding to Fbrp
 #' @param blim biomass limit
 #' @param btrigger biomass trigger below which F is linearly reduced   
 #' @param bthresh biomass threshold beyond which biomass is classified sustainable
@@ -972,7 +1051,7 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
 #' @param ymax multiplier for upper default ylim
 #' @param xlab option customize xlab
 #' @param ylab option customize ylab
-#' @param rel option to denote x,y labs as relative B/Btrg and F/Ftrg
+#' @param rel option to denote x,y labs as relative B/Btgt and F/Ftgt
 #' @param expand option to expand the plot area to border - default TRUE
 #' @param labels annotate reference point labels
 #' @param critical option to highlight critical zone below blim
@@ -981,15 +1060,15 @@ plotWKREF <- function(ftrg = 1,btrg=1,blim=0.2,btrigger=0.9*btrg,bthresh=0.8*btr
 #' @examples 
 #' plotMajuro()
 
-plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bthresh=0.5*btrg,bclose=0,fmin=0, obs="missing", kobe=TRUE,
+plotMajuro<- function(ftgt = 1,fthresh=1.1,btgt=1,blim=0.1,btrigger=0.8*btgt,bthresh=0.5*btgt,bclose=0,fmin=0, obs="missing", kobe=TRUE,
                       alpha=1,xmax=1.5,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,critical=kobe) {
   #Define axis
   metric="ssb"
   output="fbar"
   
   # SET args
-  xlim <- btrg * xmax
-  ylim <- ftrg * ymax
+  xlim <- btgt * xmax
+  ylim <- ftgt * ymax
   
   # GET observations
   if(!missing(obs)) {
@@ -1001,8 +1080,8 @@ plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bth
       names(obs) = c("met","out")
     }
     
-    xlim <- max(c(obs$met,btrg*1.5)) * 1.05
-    ylim <- max(c(obs$out,ftrg*1.3)) * 1.05
+    xlim <- max(c(obs$met,btgt*1.5)) * 1.05
+    ylim <- max(c(obs$out,ftgt*1.3)) * 1.05
   }
   
   # SET met values
@@ -1012,9 +1091,9 @@ plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bth
   out <- ifelse(met <= bclose, fmin,
                 # Revised
                 ifelse(met < btrigger,
-                       pmax(c(((ftrg-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
+                       pmax(c(((ftgt-fmin)/(btrigger-bclose))*(met - bclose) +fmin,fmin)),
                        # ABOVE btrigger
-                       ftrg))
+                       ftgt))
   # DATA
   dat <- data.frame(met=met, out=out)
   
@@ -1022,11 +1101,11 @@ plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bth
   
   if(missing(xlab)){ 
     xlab="SSB"
-    if(rel) xlab = expression(B/B[trg])
+    if(rel) xlab = expression(B/B[tgt])
   }
   if(missing(ylab)){ 
     ylab="Fishing Mortality"
-    if(rel) ylab = expression(F/F[trg])
+    if(rel) ylab = expression(F/F[tgt])
   }
   p <- ggplot(dat, aes(x=met, y=out))+theme_bw()  +
     xlab(xlab) + ylab(ylab)  
@@ -1046,11 +1125,11 @@ plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bth
   
   
   ythresh <- ifelse(bthresh < btrigger,
-                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
-                    ftrg)
-  ytarget <- ifelse(btrg < btrigger,
-                    pmax(c(((ftrg-fmin)/(btrigger-bclose))*(btrg - bclose) +fmin,fmin)),
-                    ftrg)
+                    pmax(c(((ftgt-fmin)/(btrigger-bclose))*(bthresh - bclose) +fmin,fmin)),
+                    ftgt)
+  ytarget <- ifelse(btgt < btrigger,
+                    pmax(c(((ftgt-fmin)/(btrigger-bclose))*(btgt - bclose) +fmin,fmin)),
+                    ftgt)
   if(kobe) {
     ylwmin = ifelse(fmin>0,0,bclose)
     
@@ -1090,13 +1169,13 @@ plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bth
     }   
   }
   
-  # Btrg
-  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftrg, yend=ftrg), linetype=2) +
+  # Btgt
+  p <- p+geom_segment(aes(x=0, xend=btrigger * 1.25, y=ftgt, yend=ftgt), linetype=2) +
     # Btrigger
-    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftrg), linetype=2)+
+    geom_segment(aes(x=btrigger, xend=btrigger, y=0, yend=ftgt), linetype=2)+
    
-    # Btrg
-    #geom_segment(aes(x=btrg, xend=btrg, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
+    # Btgt
+    #geom_segment(aes(x=btgt, xend=btgt, y=0, yend=ytarget), linetype=1,color="blue",cex=0.9)+
     
     # Btresh
     geom_segment(aes(x=bthresh, xend=bthresh, y=0, yend=fthresh), linetype=1)+
@@ -1111,20 +1190,20 @@ plotMajuro<- function(ftrg = 1,fthresh=1.1,btrg=1,blim=0.1,btrigger=0.8*btrg,bth
   
   
   if(labels){
-    p <- p+annotate("text", x=xlim*0.7, y=ftrg + ylim / 30*1.08, label="F[advive]/F[MSYpa]",parse=TRUE, hjust="left") +
-      annotate("text", x=btrigger*1.02, y=ftrg*1.03, label=paste0("B[trigger]"), 
+    p <- p+annotate("text", x=xlim*0.7, y=ftgt + ylim / 30*1.08, label="F[advive]/F[MSYpa]",parse=TRUE, hjust="left") +
+      annotate("text", x=btrigger*1.02, y=ftgt*1.03, label=paste0("B[trigger]"), 
                vjust="bottom",parse=TRUE) +
-      # Btrg
-      #annotate("text", x=btrg*1.02, y=ftrg*0.5, label=paste0("B[MSY]"), 
+      # Btgt
+      #annotate("text", x=btgt*1.02, y=ftgt*0.5, label=paste0("B[MSY]"), 
       #         hjust="left",parse=TRUE)+  
       # Btresh
       annotate("text", x=bthresh, y=fthresh*1.01, label=paste0("B[safe]"), 
                vjust="bottom",parse=TRUE) +
       # Fthresh
-      annotate("text", x=btrg, y=fthresh*1.01, label=paste0("F[MSY]"), 
+      annotate("text", x=btgt, y=fthresh*1.01, label=paste0("F[MSY]"), 
                vjust="bottom",parse=TRUE) +
       # Blim
-      annotate("text", x=blim*1.05, y=ftrg*0.7, label=paste0("B[lim]"), 
+      annotate("text", x=blim*1.05, y=ftgt*0.7, label=paste0("B[lim]"), 
                vjust="bottom",hjust="left",parse=TRUE)  
   }  
   

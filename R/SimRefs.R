@@ -60,7 +60,7 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbos
   out = list()
   out$params= FLPar(Fbrp=median(fbar(run)[,pyrs]),
                       MMY = median(landings(run)[,pyrs]),
-                      Btrg= median(ssb(run)[,pyrs]),
+                      Btgt= median(ssb(run)[,pyrs]),
                       Prisk=Prisk,styr=pyrs[1],endyr=tail(pyrs,1))
   
   rownames(out$params)[1] = paste(ref)
@@ -130,7 +130,7 @@ Prisk= mean(mse::performance(run, metrics=list(SB=ssb), statistics=statistic, re
 out = list()
 out$params= FLPar(Fp05=median(fbar(run)[,ac(pyrs)]),
                   Yp05 = median(landings(run)[,ac(pyrs)]),
-                  Btrg= median(ssb(run)[,ac(pyrs)]),
+                  Btgt= median(ssb(run)[,ac(pyrs)]),
                   Prisk=Prisk,styr=pyrs[1],endyr=tail(pyrs,1))
 
 out$brp = object$brp
@@ -373,7 +373,7 @@ Fmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range
   out = list()
   out$params= FLPar(Fmmy=median(fbar(run)[,ac(pyrs)]),
                     MMY = median(landings(run)[,ac(pyrs)]),
-                    Btrg= median(ssb(run)[,ac(pyrs)]),
+                    Btgt= median(ssb(run)[,ac(pyrs)]),
                     Prisk=Prisk,styr=pyrs[1],endyr=tail(pyrs,1))
   
   out$brp = brp

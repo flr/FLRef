@@ -30,7 +30,7 @@ ploteq(
 
 \item{obs}{Should observations be plotted? Defaults to `FALSE`.}
 
-\item{rel}{option to denote x,y labs as relative B/Btrg and F/Ftrg}
+\item{rel}{option to denote x,y labs as relative B/Btgt and F/Ftgt}
 
 \item{rpf}{adds refpts in plots}
 
