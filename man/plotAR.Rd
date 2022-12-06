@@ -7,10 +7,12 @@ Plots the new proposed ICES advice rule}
 \usage{
 plotAR(
   pars,
-  ftrg = 1,
+  ftgt = 1,
   btrigger = "missing",
   bpa = "missing",
+  bthresh = "missing",
   fpa = "missing",
+  fthresh = "missing",
   bclose = 0,
   fmin = 0,
   obs = "missing",
@@ -31,14 +33,14 @@ plotAR(
 \item{pars}{FLPar object or computeFbrp() ouput 
 \itemize{
   \item 1: "Fbrp"  # "F.." must first
-  \item 2: "Btrg"
+  \item 2: "Btgt"
   \item 3: "Blim"
   \item 4: "B0"
 }}
 
-\item{ftrg}{factor to adjust Fmsy or its proxy e.g. 0.8Fmsy}
+\item{ftgt}{factor to adjust Fmsy or its proxy e.g. 0.8Fmsy}
 
-\item{btrigger}{biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btrg}
+\item{btrigger}{biomass trigger below which F is linearly reduced, if > 10 value, else factor*Btgt}
 
 \item{bpa}{precautionary biomass threshold, if > 10 value, else factor*Blim}
 
@@ -62,7 +64,7 @@ plotAR(
 
 \item{xlab}{option customize xlab}
 
-\item{rel}{option to denote x,y labs as relative B/Btrg and F/Ftrg}
+\item{rel}{option to denote x,y labs as relative B/Btgt and F/Ftgt}
 
 \item{expand}{option to expand the plot area to border - default TRUE}
 
@@ -85,7 +87,7 @@ srr = srrTMB(as.FLSR(ple4,model=segreg),spr0=spr0y(ple4))
 blim = params(srr)[[2]]
 brp = computeFbrp(stock=ple4,sr=srr,proxy="f0.1",blim=blim)
 rpt = Fbrp(brp)
-plotAR(rpt,btrigger=an(0.8*rpt["Btrg"]))
+plotAR(rpt,btrigger=an(0.8*rpt["Btgt"]))
 # Use Bpa as trigger (ICES style)
 plotAR(rpt,obs=ple4,bpa=1.4)
 # Change kobe to greyscale

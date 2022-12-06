@@ -24,9 +24,12 @@
 #' @examples
 #' data(ple4)
 #' srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
-#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
-#' ploteq(brp,obs=TRUE,refpts="msy")
+#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","msy"),blim=0.1,type="b0")
+#' ploteq(brp,obs=TRUE)
 #' ploteq(brp,obs=TRUE,refpts="msy",rel=T)
+#' brp.pa = computeFbrp(stock=ple4,sr=srr,proxy=c("msy","sprx","f0.1"),blim=0.1,bpa=Fbrp(brp)["Blim"]*2,type="b0")
+#' ploteq(brp.pa,obs=TRUE,rel=T)
+
 
 ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=rpf,
                    colours="missing",panels=NULL, ncol=2){
@@ -76,7 +79,7 @@ ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=
             
             rps = FLPars(Map(function(x,y){
             drpx =  drps[drps%in%rownames(refpts(x))]
-            rp = refpts(x)[drpx %in% refpts,]
+            rp = refpts(x)[refpts,]
             dms <- dimnames(rp)
             rp[!dms$refpt %in% "mey",
                          !dms$quant %in% c("revenue", "cost", "profit")]
@@ -233,7 +236,7 @@ ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=
               rpdat <- do.call(rbind, c(rpdat, list(make.row.names = FALSE)))
               
               # reorganize
-              refpts = unique(c(refpts[grep("Blim",refpts)],refpts[grep("F",refpts)],refpts[-grep("F",refpts)]))
+              #refpts = unique(c(refpts[grep("Blim",refpts)],refpts[grep("F",refpts)],refpts[-grep("F",refpts)]))
               rpdat$refpt = factor(rpdat$refpt,levels=refpts)
               
               
@@ -395,7 +398,7 @@ return(p)
 #' @examples
 #' data(ple4)
 #' srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
-#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
+#' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","fe40"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
 plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
@@ -411,10 +414,14 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
   }
   if(!missing(rpts)){
   if(class(rpts) == "FLBRP"){
-  brp = rpts
-  rp = refpts(brp)
-  if(model(brp)=="rec ~ a") pr = TRUE
-  }
+  if(model(rpts)=="rec ~ a"){
+    pr = TRUE
+    brp = rpts
+    rp = refpts(brp)
+  } else {
+    brp = rpts
+    rp = refpts(brp)
+  }}
   if(class(rpts)=="FLPar") rp = rpts   
   }
 
@@ -431,7 +438,6 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
          collapse="-"),")")
   
   p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
-  
   }
   if(!pr){
     fls = FLQuants("Recruitment"=rec(stock),
@@ -460,8 +466,10 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
              params=paste0(rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],""))
   rownames(Ys) = gsub("F","Y",rownames(Ys))
   if(any(rownames(Ys)%in%"Y0.1")) rownames(Ys)[rownames(Ys)%in%"Y0.1"] = "Yf0.1" 
+  R0 = FLPar(R0=rp["virgin","rec"])
   
   if(pr){
+  rownames(Bs)[grep("B0",rownames(Bs))] = "SPR0" 
     Bs = Bs/b0
     Ys = Ys/yref    
   }
@@ -481,6 +489,7 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
     C = FLPar(an(rp[rownames(rp)[grep("C",rownames(rp))]]),
                 params=paste0(rownames(rp)[grep("C",rownames(rp))],""))
     
+    R0 = FLPar(R0=an(rp[rownames(rp)[grep("R0",rownames(rp))]]))
     if(!is.na(an(MSY))) Ys= rbind(Ys,MSY)
     if(!is.na(an(MSY))) Ys= rbind(Ys,C)
     
@@ -489,16 +498,15 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
   
   
   if(plotrefs){
-  if(!pr){  
     
     Bsc = data.frame(red =  rownames(Bs)%in%c("Bcrit","Blim"),
     orange = rownames(Bs)%in%c("Bpa","Bthr","Btri","Btrigger"),
-    green = !rownames(Bs)%in%c("B0","Bpa","Bthr","Btri","Btrigger","Bcrit","Blim"),
-    blue = rownames(Bs)%in%c("B0")
+    green = !rownames(Bs)%in%c("B0","SPR0","Bpa","Bthr","Btri","Btrigger","Bcrit","Blim"),
+    blue = rownames(Bs)%in%c("B0","SPR0")
     )
     Fsc = data.frame(red =  rownames(Fs)%in%c("Flim","Fext","Fcrash","Fcrit"),
-                     orange = rownames(Fs)%in%c("Fpa","Ftrh","Fthresh","Ftri"),
-                     green = !rownames(Fs)%in%c("Fpa","Ftrh","Fcrit","Flim","Fext","Fcrash")
+                     orange = rownames(Fs)%in%c("Fpa","Fthr","Fthresh","Ftri"),
+                     green = !rownames(Fs)%in%c("Fpa","Fthr","Fcrit","Flim","Fext","Fcrash")
     )
     
     bcol = NULL 
@@ -506,36 +514,19 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
     fcol = NULL 
     for(i in 1:length(Fs))  fcol = c(fcol,c("red","orange","darkgreen")[which(Fsc[i,]==TRUE)])
     ycol = rep("darkgreen",length(Ys))
-    colo = c(bcol,fcol,ycol)
-    posx = c(xy[1:length(Bs)],xy[1:length(Ys)],xy[1:length(Fs)])
+    colo = c(bcol,fcol,ycol,"blue")
+    posx = c(xy[1:length(Bs)],xy[1:length(Ys)],xy[1:length(Fs)],xy[1])
       
     fps =FLPars(SSB  =Bs,
            F    =Fs,
-           Catch    =Ys)
-    fps@names = names(fls)[c(2,4,3)] 
+           Catch    =Ys,
+           Rec=R0)
+    fps@names = names(fls)[c(2,4,3,1)] 
     ggp = ggplotFL::geom_flpar(data=fps,x=posx,colour=colo)
   
     ggp[[2]]$aes_params$size=label.size
     p = p +ggp 
   }
-    if(pr){  
-      
-      rownames(Bs)[grep("B0",rownames(Bs))] = "SPR0"  
-      fps = FLPars(SSB  =Bs,
-                   F    =Fs,
-                   Catch    =Ys,
-                   Rec=FLPar(R0=refpts(brp)["virgin","rec"]))    
-      
-      
-      fps@names = names(fls)[c(2,4,3,1)] 
-      ggp = ggplotFL::geom_flpar(data=fps,
-                                 x=c(c(xy,xy[1],xy[1]),c(xy,xy[1]),c(xy),xy[1]),colour = c(c(rep("darkgreen",nf),"red","blue"),c(rep("darkgreen",nf),"red"),c(rep("darkgreen",nf),"blue")))
-      ggp[[2]]$aes_params$size=label.size
-      p = p +ggp 
-    }  
-    
-    
-    }  
   
   return(p)
 }

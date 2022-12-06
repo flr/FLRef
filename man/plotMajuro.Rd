@@ -6,12 +6,12 @@
 Plots the new proposed ICES advice rule}
 \usage{
 plotMajuro(
-  ftrg = 1,
+  ftgt = 1,
   fthresh = 1.1,
-  btrg = 1,
+  btgt = 1,
   blim = 0.1,
-  btrigger = 0.8 * btrg,
-  bthresh = 0.5 * btrg,
+  btrigger = 0.8 * btgt,
+  bthresh = 0.5 * btgt,
   bclose = 0,
   fmin = 0,
   obs = "missing",
@@ -28,9 +28,9 @@ plotMajuro(
 )
 }
 \arguments{
-\item{ftrg}{Target F = min(Fbrp,Fp0.5)}
+\item{ftgt}{Target F = min(Fbrp,Fp0.5)}
 
-\item{btrg}{Biomass target corresponding to Fbrp}
+\item{btgt}{Biomass target corresponding to Fbrp}
 
 \item{blim}{biomass limit}
 
@@ -56,7 +56,7 @@ plotMajuro(
 
 \item{xlab}{option customize xlab}
 
-\item{rel}{option to denote x,y labs as relative B/Btrg and F/Ftrg}
+\item{rel}{option to denote x,y labs as relative B/Btgt and F/Ftgt}
 
 \item{expand}{option to expand the plot area to border - default TRUE}
 

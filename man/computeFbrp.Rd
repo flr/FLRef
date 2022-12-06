@@ -14,8 +14,9 @@ computeFbrp(
   type = c("b0", "btgt", "value"),
   btri = "missing",
   bpa = "missing",
+  bthresh = "missing",
   verbose = T,
-  fmax = 5
+  fmax = 10
 )
 }
 \arguments{
@@ -38,6 +39,8 @@ computeFbrp(
 
 \item{bpa}{Bpa can specified as absolute value}
 
+\item{bthresh}{Bthresh (GFCM) interchangeable use with Bpa}
+
 \item{verbose}{}
 
 \item{fmax}{maximum Flim = max(Flim,fmax*Fbrp)}
@@ -47,6 +50,7 @@ computeFbrp(
   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
   \item "bx" SSB as fraction xSSB0
   \item "f0.1" 10% slope of yield-per-recruit curve
+  \item "fe40" Patterns estimator for Fmsy
   \item "msy"  maximum surplus production (not defined for segreg)
 }}
 }

@@ -11,6 +11,7 @@
 #'   \item "sprx"  spawning potential ratio spr/spr0 with basis x 
 #'   \item "bx" SSB as fraction xSSB0
 #'   \item "f0.1" 10% slope of yield-per-recruit curve
+#'   \item "fe40" Patterns estimator for Fmsy
 #'   \item "msy"  maximum surplus production (not defined for segreg)
 #' }    
 #' @param x basis in percent for sprx and bx, e.g. 40 for spr40
@@ -23,6 +24,7 @@
 #' }
 #' @param btri Btrigger can specified as absolute value
 #' @param bpa Bpa can specified as absolute value
+#' @param bthresh Bthresh (GFCM) interchangeable use with Bpa
 #' @param fmax maximum Flim = max(Flim,fmax*Fbrp)
 #' @param verbose   
 #' @return brp object of class FLBRP with computed Fbrp reference points   
@@ -33,7 +35,7 @@
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
 #' ploteq(brp,obs=TRUE,refpts="msy")
 
-computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",verbose=T,fmax=5){
+computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",bthresh="missing",verbose=T,fmax=10){
  
   
   
@@ -45,10 +47,10 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     srmod = SRModelName(model(sr))
  
     if(srmod%in%c("bevholtSV","rickerSV")){
-        if(is.null(proxy)) proxy=c("bx","f0.1","msy")
+        if(is.null(proxy)) proxy=c("bx","f0.1","fe40","msy")
         if(is.null(x)) x=35
     } else {
-      if(is.null(proxy)) proxy=c("sprx","f0.1","msy")
+      if(is.null(proxy)) proxy=c("sprx","f0.1","fe40","msy")
       if(is.null(x)) x=40
     }
     
@@ -78,6 +80,11 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     if(verbose)cat(paste0("Computing F0.1 with Btgt = B[F.01]"),"\n")
   }
   
+  if(c("fe40")%in%proxy){
+    Fbrp = rbind(Fbrp,FLPar(Fe40=Fe40(stock)))
+    if(verbose)cat(paste0("Computing Fe40 with Btgt = B[Fe40]"),"\n")
+  }
+  
   if(c("msy")%in%proxy){
     if(SRModelName(model(sr))%in%c("mean")){
       if(verbose)cat(paste0("Warning: Fmsy = Fmax is not unambiguously defined for ",SRModelName(model(sr))," SR model","\n"))
@@ -94,7 +101,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     }
   }
   
-  ord = c("Fspr","Fb","F0.1","Fmsy")[match(proxy,c("sprx","bx","f0.1","msy"))]
+  ord = c("Fspr","Fb","F0.1","Fe40","Fmsy")[match(proxy,c("sprx","bx","f0.1","fe40","msy"))]
   Fbrp = Fbrp[-1]
   Fbrp = Fbrp[match(rownames(Fbrp),ord)]
   }
@@ -149,6 +156,10 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
     refs= rbind(refs,FLPar(Btri=btri))
   }
   
+  if(!missing(bthresh)){
+  refs= rbind(refs,FLPar(Bthr=bthresh))
+  }
+  
   if(!missing(bpa)){
     refs= rbind(refs,FLPar(Bpa=bpa))
   }
@@ -165,6 +176,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   refpts(brp)["B0"] = refpts(brp)["virgin"]
   #if(fmax*refpts(check)["Fbrp","harvest"]>max(fbar(brp))){
     fl = min(c(fmax*refpts(check)[paste(fref),"harvest"],refpts(check)["Blim","harvest"]*1.5))
+    fl = max(fbar(stock),fl,na.rm=TRUE)
     fbar(brp) = seq(0,fl,fl/100)
   #} 
   
@@ -245,7 +257,8 @@ computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALS
   refpts(brp)["B0"] =   refpts(brp)["virgin"] 
   
   
-  fl = min(c(fmax*refpts(brp)[paste(fref),"harvest"]))
+  fl = min(c(fmax*refpts(brp)[paste(fref),"harvest"]),na.rm=TRUE)
+  fl = max(fbar(stock),fl,na.rm=TRUE)
   fbar(brp) = seq(0,fl,fl/100)
   
   
@@ -271,7 +284,8 @@ Fbrp <- function(brp){
         Blim=rpt["Blim","ssb"],
         Flim=rpt["Blim","harvest"],
         Yeq = rpt[ref,"yield"],
-        B0 = rpt["virgin","ssb"] 
+        B0 = rpt["virgin","ssb"], 
+        R0= rpt["virgin","rec"]
         )
   rownames(out)[1] = ref
   if("Fp.05"%in%rownames(rpt)){
@@ -281,9 +295,31 @@ Fbrp <- function(brp){
     out = rbind(out,FLPar(Btri=rpt["Btri","ssb"]))
   }
  
+  if("Bpa"%in%rownames(rpt)){
+    out = rbind(out,FLPar(Bpa=rpt["Bpa","ssb"],Fpa=rpt["Bpa","harvest"]))
+  }
   
+  
+  if("Bthr"%in%rownames(rpt)){
+    out = rbind(out,FLPar(Bthr=rpt["Bthr","ssb"],Fthr=rpt["Bthr","harvest"]))
+  }
   
   return(out)
 }
 #}}}
 
+
+#{{{
+#' Fe40()
+#
+#' Patterson estimator for Fmsy
+#' @param stock input of class FLStock     
+#' @param nyears number of years to average      
+#' @return value  
+#' @export
+Fe40 = function(stock,nyears=3){
+  fbar.range = range(stock)[c("minfbar")]:range(stock)[c("maxfbar")]
+  Mbar = apply(m(stock)[fbar.range,],2:6,mean)
+  return(mean(tail(0.4/0.6*Mbar,nyears)))
+  }
+#}}}
