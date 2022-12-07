@@ -476,18 +476,18 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
   }
   
   if(is.null(brp)){
-    Fs = FLPar(an(rp[rownames(rp)[grep("F",rownames(rp))]]),
-               params=rownames(rp)[grep("F",rownames(rp))])
+    Fs = FLPar(an(rp[substr(rownames(rp),1,1)%in%"F"]),
+               params=rownames(rp)[substr(rownames(rp),1,1)%in%"F"])
     nf = length(Fs)
-    Bs = FLPar(an(rp[rownames(rp)[grep("B",rownames(rp))]]),
-               params=paste0(rownames(rp)[grep("B",rownames(rp))],""))
+    Bs = FLPar(an(rp[substr(rownames(rp),1,1)%in%"B"]),
+               params=paste0(rownames(rp)[substr(rownames(rp),1,1)%in%"B"],""))
 
-    Ys = FLPar(an(rp[rownames(rp)[grep("Y",rownames(rp))]]),
-               params=paste0(rownames(rp)[grep("Y",rownames(rp))],""))
-    MSY = FLPar(an(rp[rownames(rp)[grep("MSY",rownames(rp))]]),
-               params=paste0(rownames(rp)[grep("MSY",rownames(rp))],""))
-    C = FLPar(an(rp[rownames(rp)[grep("C",rownames(rp))]]),
-                params=paste0(rownames(rp)[grep("C",rownames(rp))],""))
+    Ys = FLPar(an(rp[substr(rownames(rp),1,1)%in%"Y"]),
+               params=paste0(rownames(rp)[substr(rownames(rp),1,1)%in%"Y"],""))
+    MSY = FLPar(an(rp[substr(rownames(rp),1,1)%in%"M"]),
+               params=paste0(rownames(rp)[substr(rownames(rp),1,1)%in%"M"],""))
+    C = FLPar(an(rp[substr(rownames(rp),1,1)%in%"C"]),
+                params=paste0(rownames(rp)[substr(rownames(rp),1,1)%in%"C"],""))
     
     R0 = FLPar(R0=an(rp[rownames(rp)[grep("R0",rownames(rp))]]))
     if(!is.na(an(MSY))) Ys= rbind(Ys,MSY)
@@ -663,7 +663,8 @@ plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missi
   if(!missing(fpa)) ylim <- max(ftgt * ymax,fpa*1.1)
   # GET observations
   if(!missing(obs)) {
-    if(class(obs)=="FLStock")
+    
+    if(class(obs)%in%c("FLStock","FLStockR"))
       obs <- model.frame(metrics(obs, list(met=get(metric), out=get(output))))
     
     if(class(obs)=="FLQuants"){
@@ -880,7 +881,7 @@ plotWKREF <- function(ftgt = 1,btgt=1,blim=0.2,btrigger=0.9*btgt,bthresh=0.8*btg
   
   # GET observations
   if(!missing(obs)) {
-    if(class(obs)=="FLStock")
+    if(class(obs)%in%c("FLStock","FLStockR"))
       obs <- model.frame(metrics(obs, list(met=get(metric), out=get(output))))
     
     if(class(obs)=="FLQuants"){
