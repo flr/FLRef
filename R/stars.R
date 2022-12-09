@@ -1,5 +1,5 @@
 
-#' jabba2stars()
+#' flr2stars()
 #' @param object of class FLStockR  
 #' @param quantities default is 95CIs as c(0.025,0.975)
 #' @return STARS list with $timeseris and $refpts

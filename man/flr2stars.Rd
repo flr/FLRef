@@ -2,7 +2,7 @@
 % Please edit documentation in R/stars.R
 \name{flr2stars}
 \alias{flr2stars}
-\title{jabba2stars()}
+\title{flr2stars()}
 \usage{
 flr2stars(object, quantiles = c(0.025, 0.975))
 }
@@ -15,5 +15,5 @@ flr2stars(object, quantiles = c(0.025, 0.975))
 STARS list with $timeseris and $refpts
 }
 \description{
-jabba2stars()
+flr2stars()
 }
