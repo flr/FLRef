@@ -78,3 +78,444 @@ huecol <- function(n,alpha=1) {
 }
 
 # }}}# color options
+
+
+#' stockMedians
+#' @param stock class FLStock or FLStockR
+#' @return medians of all FLstock FlQuants 
+#' @export
+stockMedians <- function(stock){
+  stk = stock
+  stk@catch.n = iterMedians(stk@catch.n)  
+  stk@stock.n = iterMedians(stk@stock.n)  
+  stock@landings.n =iterMedians(stk@catch.n)
+  stock@discards.n =iterMedians(stk@discards.n)
+  stk@catch.wt = iterMedians(stk@catch.wt)  
+  stk@stock.wt = iterMedians(stk@stock.wt)  
+  stock@landings.wt =iterMedians(stk@landings.wt)
+  stock@discards.wt =iterMedians(stk@discards.wt)
+  stock@m =iterMedians(stk@m)
+  stock@mat =iterMedians(stk@mat)
+  stock@harvest = iterMedians(stk@harvest)
+  stock@harvest.spwn = iterMedians(stk@harvest.spwn)
+  stock@m.spwn = iterMedians(stk@m.spwn)
+  if(class(stock)=="FLStockR"){
+    stk@refpts = iterMedians(stk@refpts)
+  }
+  stk@catch = computeCatch(stk)
+  stk@discards = computeDiscards(stk)
+  stk@landings = computeLandings(stk)
+  stk@stock = computeStock(stk)
+  return(iter(stk,1))
+}
+
+
+#' ssmvln()
+#'
+#' function to generate uncertainty for Stock Synthesis 
+#'
+#' @param ss3rep from r4ss::SS_output
+#' @param out choice c("iters","mle")
+#' @param Fref  Choice of Fratio c("MSY","Btgt","SPR","F01"), correponding to F_MSY and F_Btgt                                                               
+#' @param years single year or vector of years for mvln   
+#' @param virgin if FALSE (default) the B0 base for Bratio is SSB_unfished
+#' @param mc number of monte-carlo simulations   
+#' @param weight weighting option for model ensembles weight*mc 
+#' @param run qualifier for model run
+#' @param plot option to show plot
+#' @param ymax ylim maximum
+#' @param xmax xlim maximum
+#' @param addprj include forecast years
+#' @param legendcex=1 Allows to adjust legend cex
+#' @param verbose Report progress to R GUI?
+#' @param seed retains interannual correlation structure like MCMC 
+#' @return output list of quant posteriors and mle's
+#' @author Henning Winker (JRC-EC)
+#' @export
+#' @examples 
+#' mvn = SSdeltaMVLN(ss3sma,plot=TRUE) 
+
+ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
+                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123){
+  
+  
+  status=c('Bratio','F')
+  quants =c("SSB","Recr")
+  mc = round(weight*mc,0)
+  hat = ss3rep$derived_quants
+  cv = cv1 = ss3rep$CoVar
+  
+  
+  
+  if(is.null(cv)) stop("CoVar from Hessian required")
+  # Get years
+  allyrs = unique(as.numeric(gsub(paste0(status[1],"_"),"",hat$Label[grep(paste0(status[1],"_"), hat$Label)])))[-1]
+  allyrs = allyrs[!is.na(allyrs)] 
+  
+  if(is.null(years) & addprj==TRUE) yrs = allyrs   
+  if(is.null(years) & addprj==FALSE) yrs = allyrs[allyrs<=ss3rep$endyr]
+  if(is.null(years)==FALSE) yrs = years[years%in%allyrs==TRUE]
+  estimate = ifelse(yrs<=ss3rep$endyr,"fit","forecast")
+  
+  # brp checks for starter file setting
+  refyr = max(yrs)
+  endyr = ss3rep$endyr
+  bt = hat[hat$Label==paste0("SSB_",endyr),2]
+  ft = hat[hat$Label==paste0("F_",endyr),2]
+  # virgin
+  bv =hat[hat$Label%in%c("SSB_virgin","SSB_Virgin"),2]
+  # unfished
+  b0 =hat[hat$Label%in%c("SSB_unfished","SSB_Unfished"),2]
+  fmsy = hat[hat$Label%in%c("Fstd_MSY","annF_MSY"),2]
+  fspr = hat[hat$Label%in%c("Fstd_SPR","annF_SPR"),2]
+  bmsy = hat[hat$Label==paste0("SSB_MSY"),2]
+  
+  bf01= f01=option.btgt = FALSE
+  
+  if("SSB_Btgt"%in%hat$Label){
+    btgt = hat[hat$Label==paste0("SSB_Btgt"),2]
+    if(!is.null(Fref)) if(Fref=="F01") stop("F01 not defined: choose Fref = MSY or Btgt ")
+  }
+  if("SSB_F01"%in%hat$Label){
+    f01=TRUE
+    if(is.null(Fref)) Fref = "Btgt"
+    btgt = hat[hat$Label==paste0("SSB_F01"),2]*b0 #  Why SSB_F01 ratio???
+    if(round(hat[hat$Label%in%c("annF_F01"),2],2)==round(fmsy,2)){
+      option.btgt=TRUE 
+      if(!is.null(Fref))if(Fref=="MSY") stop("FMSY not defined: choose Fref = F01 ")
+      bf01= TRUE}
+  }
+  
+  
+  bratio = hat[hat$Label==paste0("Bratio_",refyr),2]
+  bb.check = c(bt/bv,bt/bmsy,bt/btgt)
+  
+  option.btgt = FALSE
+  if(btgt==bmsy){
+    option.btgt = TRUE
+    if(is.null(Fref)) Fref = "Btgt"
+    if(Fref=="MSY") stop("FMSY not defined: choose Fref = Btgt ")
+    
+  }
+  if(fmsy==fspr){
+    if(is.null(Fref)) Fref = "SPR"
+    if(Fref=="MSY") stop("FMSY not defined: choose Fref = SPR")
+  }
+  
+  # bratio definition
+  bb = max(which(abs(bratio-bb.check)==min(abs(bratio-bb.check))))   
+  if(bf01) bb=4
+  
+  bbasis  = c("SSB/SSB0","SSB/SSBMSY","SSB/SSBtgt","SSB/SSBF01")[bb]
+  fbasis = strsplit(ss3rep$F_report_basis,";")[[1]][1]
+  if(is.na(ss3rep$btarg)) ss3rep$btarg=0
+  gettrg = ifelse(ss3rep$btarg>0,ss3rep$btarg,round(btgt/b0,2))
+  if(fbasis%in%c("_abs_F","(F)/(Fmsy)",paste0("(F)/(F_at_B",ss3rep$btarg*100,"%)"),paste0("(F)/(F",ss3rep$btarg*100,"%SPR)"))){
+    fb = which(c("_abs_F","(F)/(Fmsy)",paste0("(F)/(F_at_B",ss3rep$btarg*100,"%)"),
+                 paste0("(F)/(F",ss3rep$btarg*100,"%SPR)"))%in%fbasis)
+  } else { stop("F_report_basis is not defined, please rerun Stock Synthesis with recommended starter.ss option for F_report_basis: 1")}
+  
+  if(is.null(Fref) & fb%in%c(1,2)) Fref = "MSY"
+  if(is.null(Fref) & fb%in%c(3)) Fref = "Btgt"
+  if(is.null(Fref) & fb%in%c(4)) Fref = "SPR"
+  if(Fref=="F01") Fref="Btgt" # hack to avoid redundancy later
+  
+  if(verbose) cat("\n","starter.sso with Bratio:",bbasis,"and F:",fbasis,"\n","\n")
+  
+  bref  = gettrg
+  
+  if(fb==4 & Fref[1] %in% c("Btgt","MSY")) stop("Fref = ",Fref[1]," option conflicts with ",fbasis," in starter.sso, please choose Fref = SPR")
+  if(fb==2 & Fref[1] %in% c("Btgt","SPR")) stop("Fref = ",Fref[1]," option conflicts with ",fbasis," in starter.sso, please choose Fref = MSY")
+  if(fb==3 & Fref[1] %in% c("Btgt","MSY")) stop("Fref = ",Fref[1]," option conflicts with ",fbasis,", in starter.sso, please choose Fref = Btgt")
+  if(fb%in%c(1,2) &  Fref[1] =="MSY") Fquant = "MSY"
+  if(fb%in%c(1,3) & Fref[1] =="Btgt") Fquant = "Btgt"
+  if(fb%in%c(1,4) & Fref[1] =="SPR") Fquant = "SPR"
+  if(Fquant == "Btgt" & f01) Fquant = "F01"
+  
+  # check ss3 version
+  if("Fstd_MSY"%in%hat$Label){Fname = "Fstd_"} else {Fname="annF_"}
+  cv <- cv[cv$label.i %in% paste0(status,"_",yrs),]
+  cv1 = cv1[cv1$label.i%in%paste0(Fname,Fquant) & cv1$label.j%in%paste0(status,"_",yrs),]
+  fref = hat[hat$Label==paste0(Fname,Fquant),]
+  cv$label.j[cv$label.j=="_"] <- cv$label.i[cv$label.j=="_"]
+  
+  if(is.null(hat$Label)){ylabel = hat$LABEL} else {ylabel=hat$Label}
+  kb=mle = NULL
+  for(yi in 1:length(yrs)){ 
+    set.seed(seed)
+    yr = yrs[yi]
+    x <- cv[cv$label.j %in% paste0(status[2],"_",c(yr-1,yr,yr+1)) & cv$label.i %in% paste0(status[1],"_",c(yr-1,yr,yr+1)),]
+    x1 = cv1[cv1$label.j %in% paste0(status[1],"_",c(yr-1,yr,yr+1)),] 
+    x2 = cv1[cv1$label.j %in% paste0(status[2],"_",c(yr-1,yr,yr+1)),] 
+    y = hat[ylabel %in% paste0(status,"_",yr),] # old version Label not LABEL
+    y$Value[1] = ifelse(y$Value[1]==0,0.001,y$Value[1])
+    varF = log(1+(y$StdDev[1]/y$Value[1])^2) # variance log(F/Fmsy)  
+    varB = log(1+(y$StdDev[2]/y$Value[2])^2) # variance log(SSB/SSBmsy)  
+    varFref = log(1+(fref$StdDev[1]/fref$Value)^2) # variance log(F/Fmsy)  
+    cov = log(1+mean(x$corr)*sqrt(varF*varB)) # covxy
+    cov1 = log(1+mean(x1$corr)*sqrt(varB*varFref)) # covxy
+    cov2 = log(1+mean(x2$corr)*sqrt(varF*varFref)) # covxy
+    # MVN means of SSB/SBBmsy, Fvalue and Fref (Ftgt or Fmsy) 
+    mvnmu = log(c(y$Value[2],y$Value[1],fref$Value)) # Assume order F_ then Bratio_ 
+    # Create MVN-cov-matrix
+    mvncov = matrix(NA,ncol=3,nrow=3)
+    diag(mvncov) = c(varB,varF,varFref)
+    mvncov[1,2] = mvncov[2,1] = cov 
+    mvncov[2,3] = mvncov[3,2] = cov1 
+    mvncov[1,3] = mvncov[3,1] = cov2 
+    kb.temp = data.frame(year=yr,run=run,type=estimate[yi],iter=1:mc,exp(mvtnorm::rmvnorm(mc ,mean = mvnmu,sigma = mvncov,method=c( "svd")))) # random  MVN generator
+    colnames(kb.temp) = c("year","run","type","iter","stock","harvest","F")
+    if(length(quants)>0){
+      quant=NULL
+      for(qi in 1:length(quants)){
+        qy = hat[ylabel %in% paste0(quants[qi],"_",yr),]
+        qsd = sqrt(log(1+(qy$StdDev[1]/qy$Value[1])^2))
+        quant = cbind(quant,rlnorm(mc,log(qy$Value[1])-0.5*qsd*qsd,qsd))
+      }     
+      colnames(quant) = quants    
+      kb.temp = cbind(kb.temp,quant)
+    }
+    kb = rbind(kb,cbind(kb.temp))
+    mle = rbind(mle,data.frame(year=yr,run=run,type=estimate[yi],stock=y$Value[2],harvest=y$Value[1],F=fref$Value[1])) 
+  }
+  # add mle quants
+  qmles = NULL
+  for(qi in 1:length(quants)){
+    qmles = cbind(qmles, hat[ylabel %in% paste0(quants[qi],"_",yrs),]$Value)
+  } 
+  colnames(qmles) = quants    
+  mle = cbind(mle,qmles)
+  
+  mle = mle[,c(1:5,7,6,8)]
+  kb = kb[,c(1:6,8,7,9)]
+  
+  # virgin or unfished?
+  if(!virgin){
+    if(bb%in%c(1,3)){
+      if(bb==1 | bb==3 & !option.btgt){
+        kb[,"stock"] = kb[,"stock"]*(bv/b0)
+        mle[,"stock"] = mle[,"stock"]*(bv/b0)
+      }}}
+  if(virgin){ # reverse correction
+    if(bb==3 & option.btgt){
+      kb[,"stock"] = kb[,"stock"]*(b0/bv)
+      mle[,"stock"] = mle[,"stock"]*(b0/bv)
+    }}
+  
+  
+  # Take ratios
+  if(bb==1){
+    kb[,"stock"] = kb[,"stock"]/bref  
+    mle[,"stock"] = mle[,"stock"]/bref
+  }
+  
+  if(fb> 1){
+    kb[,"F"] = kb[,"F"]*kb[,"harvest"] 
+    mle[,"F"] = mle[,"F"]*mle[,"harvest"] 
+    
+  } else {
+    fi = kb[,"harvest"]
+    fm = mle[,"harvest"]
+    kb[,"harvest"] = kb[,"harvest"]/kb[,"F"]
+    kb[,"F"] = fi
+    mle[,"harvest"] = mle[,"harvest"]/mle[,"F"]
+    mle[,"F"] = fm
+  }    
+  
+  
+  # Add catch
+  C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
+  #colnames(C_obs) = c("Yr","Obs")
+  Cobs = C_obs[C_obs$Yr%in%yrs,]
+  foreyrs = unique(as.numeric(gsub(paste0("ForeCatch_"),"",hat$Label[grep(paste0("ForeCatch_"), hat$Label)])))
+  Cfore = data.frame(Yr=foreyrs,Obs=hat$Value[hat$Label%in%paste0("ForeCatch_",foreyrs)] )
+  Catch = rbind(Cobs,Cfore)
+  Catch = Catch[Catch$Yr%in%yrs,]
+  kb$Catch = rep(Catch$Obs,each=max(kb$iter))
+  mle$Catch = Catch$Obs
+  trg =round(bref*100,0)
+  spr = round(ss3rep$sprtarg*100,0)
+  xlab = c(bquote("SSB/SSB"[.(trg)]),expression(SSB/SSB[MSY]),bquote("SSB/SSB"[.(trg)]),expression(SSB/SSB[F0.1]))[bb] 
+  ylab = c(expression(F/F[MSY]),
+           bquote("F/F"[SB~.(trg)]),
+           bquote("F/F"[SPR~.(spr)]),
+           expression(F/F[0.1])
+  )[which(c("MSY","Btgt","SPR","F01")%in%Fquant)] 
+  
+  labs = ifelse(quants=="Recr","Recruits",quants)
+  refB = c(paste0("B",trg),"Bmsy",paste0("B",trg),"BF0.1")[bb] 
+  refF = c("Fmsy",
+           paste0("Fb",trg),
+           paste0("F",spr),
+           "F0.1")[which(c("MSY","Btgt","SPR","F01")%in%Fquant)] 
+  refpts = data.frame(RefPoint=c("Ftgt","Btgt","MSY","B0","R0"),value=c((mle$F/mle$harvest)[1],
+                      (mle$SSB/mle$stock)[1],
+                      MSY=hat$Value[hat$Label=="Dead_Catch_MSY"],
+                      B0=b0,
+                      MSY=hat$Value[hat$Label=="Recr_unfished"]))
+  
+  return(list(kb=kb,mle=mle,refpts=refpts, quants=c("stock","harvest","SSB","F","Recr","Catch"),
+              labels=c(xlab,ylab,labs[1],"F",labs[2],"Catch"),Btgtref = bref))
+} # End 
+
+
+#' ss2FLStockR()
+#' @param mvln output from ssmvln() 
+#' @param output choice c("iters","mle")[1]
+#' @param iters maximum iters retained
+#' @return FLStockR with refpts
+#' @export
+ss2FLStockR <- function(mvln,iters=2000, output=c("iters","mle")[1]){
+  kbinp = FALSE
+if(is.null(mvln$kb)){
+  if(output=="mle")
+    stop("Output option mle requires to load the mvln object, not only $kb")
+  
+  kbinp=TRUE
+  kb = mvln
+  
+  
+  }  else {
+  kb = mvln$kb
+  mle = mvln$mle
+  
+  
+  }
+
+
+if(output=="iters"){
+  df = kb
+  df = df[df$iter<=iters,]
+  df = df[order(df$year),]
+  
+    N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                            season="all",area="unique",iter=df$iter,data=df$Recr))
+  C = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                            season="all",area="unique",iter=df$iter,data=df$Catch))
+  Mat = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=df$SSB/df$Recr))
+  H = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                            season="all",area="unique",iter=df$iter,data=df$F))
+  year = unique(df$year)
+} else {
+  N = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
+                            season="all",area="unique",iter=1,data=mle$Recr))
+  C = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
+                            season="all",area="unique",iter=1,data=mle$Catch))
+  Mat = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
+                              season="all",area="unique",iter=1,data=mle$SSB/mle$Recr))
+  H = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
+                            season="all",area="unique",iter=1,data=mle$F)) 
+  year = unique(mle$year)
+  
+}
+ 
+  stk = FLStockR(
+  stock.n=N,
+  catch.n = C,
+  landings.n = C,
+  discards.n = FLQuant(0, dimnames=list(age="1", year = year)),
+  stock.wt=FLQuant(1, dimnames=list(age="1", year = year )),
+  landings.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+  discards.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+  catch.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+  mat=Mat,
+  m=FLQuant(0.0001, dimnames=list(age="1", year = (year))),
+  harvest = H,
+  m.spwn = FLQuant(0, dimnames=list(age="1", year = (year))),
+  harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = (year)))
+  )
+  units(stk) = standardUnits(stk)
+  stk@catch = computeCatch(stk)
+  stk@landings = computeLandings(stk)
+  stk@discards = computeStock(stk)
+  stk@stock = computeStock(stk)
+
+ if(kbinp){
+  stk@refpts = FLPar(
+  Ftgt = median(kb$F/kb$harvest),
+  Btgt = median(kb$SSB/kb$stock)
+  )
+  } else {
+  stk@refpts = FLPar(
+    Ftgt = mvln$refpts[1,2],
+    Btgt = mvln$refpts[2,2],
+    MSY = mvln$refpts[3,2],
+    B0 = mvln$refpts[4,2],
+    R0 = mvln$refpts[5,2]
+  )
+  }
+return(stk)
+}
+
+#' jb2FLStockR()
+#' @param jabba fit from JABBA fit_jabba() or jabba$kbtrj  
+#' @return FLStockR with refpts
+#' @export
+jb2FLStockR <- function(jabba,bfrac=0.3,iters=2000){
+  kbinp = FALSE
+  if(is.null(jabba$assessment)){
+    kbinp=TRUE
+    kb = jabba$kbtrj
+  }  else {
+    kb = jabba$kbtrj
+  }
+  
+  df = kb
+  df = df[df$iter<=iters,]
+  df = df[order(df$year),]
+  
+
+    N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=exp(df$Bdev)))
+    C = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=df$Catch))
+    Mat = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                                season="all",area="unique",iter=df$iter,data=df$B/exp(df$Bdev)))
+    H = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=df$H))
+    B= as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=(df$B)))
+  year = unique(df$year)
+    
+  stk = FLStockR(
+    stock.n=N,
+    catch.n = C,
+    landings.n = C,
+    discards.n = FLQuant(0, dimnames=list(age="1", year = (year))),
+    stock.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+    landings.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    discards.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    catch.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    mat=Mat,
+    m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+    harvest = H,
+    m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
+    harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+  )
+  units(stk) = standardUnits(stk)
+  stk@catch = computeCatch(stk)
+  stk@landings = computeLandings(stk)
+  stk@discards = computeStock(stk)
+  stk@stock = B
+  
+  if(kbinp){
+    stk@refpts = FLPar(
+      Ftgt = median(kb$H/kb$harvest),
+      Btgt = median(kb$B/kb$stock),
+      MSY = NA,
+      Blim= median(bfrac*kb$B/kb$stock),
+      B0 = median(kb$B/kb$BB0),
+    )
+  } else {
+    stk@refpts = FLPar(
+      Ftgt = median(kb$H/kb$harvest),
+      Btgt = median(kb$B/kb$stock),
+      MSY = jabba$refpts$msy[1],
+      Blim= median(bfrac*kb$B/kb$stock),
+      B0 = median(kb$B/kb$BB0),
+    )
+  }
+  return(stk)
+}
+

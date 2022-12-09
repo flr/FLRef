@@ -12,6 +12,8 @@
 #' plotdyn(ple4)
 
 plotdyn <- function(stk,ncol=2){
+  stk = simplify(stockMedians(stk))
+  
   dat = as.data.frame(
     FLQuants(Biomass=stock.n(stk)*stock.wt(stk), Vuln.Bio=stock.n(stk)*stock.wt(stk)*catch.sel(stk),SSB=stock.n(stk)*stock.wt(stk)*mat(stk),
              Catch = catch.n(stk),F=harvest(stk),
@@ -43,6 +45,8 @@ plotdyn <- function(stk,ncol=2){
 #' plotbioyr(ple4)
 
 plotbioyr <- function(stk,ncol=2){
+  stk = simplify(stockMedians(stk))
+  
   flqs = metrics(stk,metrics=list(Numbers=stock.n, Weight=catch.wt,M=m,Maturity=mat))
   dat=as.data.frame(flqs)
 
@@ -74,6 +78,8 @@ plotbioyr <- function(stk,ncol=2){
 #' plotbioage(ple4)
 
 plotbioage = function(stk,ncol=2){
+  stk = simplify(stockMedians(stk))
+  
   dat = as.data.frame(
     FLQuants(Weight=stock.wt(stk),Maturity=mat(stk),M=m(stk),Selectivity=catch.sel(stk))
   )
@@ -103,7 +109,8 @@ plotbioage = function(stk,ncol=2){
 #' plotbioage(ple4)
 
 plotspr = function(stk,nyears=3){ 
-  flqs = sprFy(stk)/spr0y(stk)
+  stk = stockMedians(stk)
+  flqs = sprFy(stk[,,1])/spr0y(stk[,,1])
   df = as.data.frame(flqs)
   Fcur = round(mean(tail(fbar(stk),nyears)),2)
   

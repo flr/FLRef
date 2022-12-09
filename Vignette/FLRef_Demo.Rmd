@@ -1,13 +1,13 @@
 ---
-title: "FLRef Demo: Reference Point estimation and visualization in FLR "
+title: "FLRef User Guide: Reference Point estimation and visualization in FLR"
 author: 
  - Hennig Winker (JRC-European Commission)
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
-  html_document:
+  pdf_document:
     number_sections: yes
-    toc: yes
-    keep_tex: false
+    toc: true
+    keep_tex: true
 vignette: >
   %\VignetteIndexEntry{ss3daigs Vignetted}
   %\VignetteEngine{knitr::rmarkdown}
@@ -134,7 +134,7 @@ ploteq(fbrps)
 $Yield$ and $SSB$ are in this case as yield- and spawning biomass per-recruit, respectively. $B0$ is the product of $R_0$ and $SPR_0$, where $SPR_0$ is a function of weight-at-age ($w_a$), maturity-at-age ($mat_a$) and natural mortality at age ($M_a$). Because $R_0$ is one (per-recruit), $B0$ equals $SPR_0$.   
 It is also possible to add some of the "default" reference points that are inbuilt in `FLBRP`. 
  
-```{r fig3, fig.height=4.5, fig.cap = "Estimated per-recruit reference points corresponding to the $F_{BPR}$, $F_{spr35-50}$ and $F_{0.1}$."}
+```{r fig3, fig.height=4.5, fig.cap = "Estimated per-recruit reference points corresponding to the $F_{BPR}$, $F_{spr35-50}$ and $F_{0.1}$, adding the inbuilt default reference point $F_{max}$."}
 
 ploteq(fbrps,refpts = "fmax")
 
@@ -181,6 +181,8 @@ plotAdvice(stk,fbrp)
 
 <br>
 
+\pagebreak
+
 # Integrating stock recruitment (S-R) functions into reference point computations
 
 The simplest S-R model is assuming a that the expected recruitment is constant with $R_0$ estimated in the form of the geometric mean. This `geomean` can therefore be interpreted as Null model S-R functions. To set this up in `FLSRTMB`, it is only required to create a standard `FLSR` object as input to the function `srrTMB()`:
@@ -224,7 +226,10 @@ plotAdvice(stk,fbrp)
 ``` 
 
 <br>
+
 \newpage
+
+\pagebreak
 
 The next step is to set fit alternative S-R functions with `srrTBM()`
 
@@ -444,5 +449,3 @@ ggarrange(p1, p2, p3, p4, ncol=2, nrow=2)
 
 ```
 
-
-# TO BE FINISHED

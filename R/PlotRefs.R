@@ -391,7 +391,7 @@ return(p)
 #' @param  refpts as FLPar or Fbrp() if FLStockR is not provided or should be overwritten 
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
-#' @param ncol number of plot panel columns
+#' @param probs determine credibility intervals, default 80th, 90th percentiles   #' @param ncol number of plot panel columns
 #' @param label.size size of refpts labels 
 #' @return ggplot  
 #' @export
@@ -401,7 +401,7 @@ return(p)
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","fe40"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
-plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
+plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=2,label.size=3){
 
   landings = stock@landings 
   stock@landings =computeLandings(stock)
@@ -410,7 +410,7 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
   pr = FALSE
   brp = NULL
   if(class(stock)[1]=="FLStockR" & missing(rpts)){
-  rp = refpts(stk)   
+  rp = refpts(stock)   
   }
   if(!missing(rpts)){
   if(class(rpts) == "FLBRP"){
@@ -439,16 +439,22 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,ncol=2,label.size=3){
   
   p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
   }
+  
+  
   if(!pr){
-    fls = FLQuants("Recruitment"=rec(stock),
-                   "SSB"=ssb(stock),"Landings"=landings(stock),"F"=fbar(stock))
+    fls = FLQuants("Recruitment"=unitSums(rec(stock)),
+                   "SSB"=unitSums(ssb(stock)),"Landings"=unitSums(landings(stock)),"F"=unitMeans(fbar(stock)))
     names(fls)[names(fls)=="F"] =  paste0("F(",paste0(range(stock, c("minfbar", "maxfbar")),
                                                       collapse="-"),")")
     p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
-    
+    p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
+      ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
   }
+
+
      
-  
+  mets <- list(Rec=function(x) unitSums(rec(x)), SB=function(x) unitSums(ssb(x)),
+               C=function(x) unitSums(catch(x)), F=function(x) unitMeans(fbar(x)))
   xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
   
   if(!is.null(brp)){
@@ -593,6 +599,7 @@ plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missi
     pars=Fbrp(pars)
   }
   
+  
   fbrp = pars[[1]]
   ftgt = fbrp*ftgt
   btgt = an(pars["Btgt"])
@@ -665,7 +672,11 @@ plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missi
   if(!missing(obs)) {
     
     if(class(obs)%in%c("FLStock","FLStockR"))
-      obs <- model.frame(metrics(obs, list(met=get(metric), out=get(output))))
+      obs = stockMedians(obs)
+      obs = metrics(obs, list(met=(get(metric)), out=get(output)))
+      obs$met = unitSums(obs$met)
+      obs$out = unitMeans(obs$out)
+      obs <- model.frame(obs)
     
     if(class(obs)=="FLQuants"){
       obs=obs[1:2]
@@ -874,7 +885,8 @@ plotWKREF <- function(ftgt = 1,btgt=1,blim=0.2,btrigger=0.9*btgt,bthresh=0.8*btg
   #Define axis
   metric="ssb"
   output="fbar"
-  
+ 
+     
   # SET args
   xlim <- btgt * xmax
   ylim <- ftgt * ymax
@@ -882,7 +894,12 @@ plotWKREF <- function(ftgt = 1,btgt=1,blim=0.2,btrigger=0.9*btgt,bthresh=0.8*btg
   # GET observations
   if(!missing(obs)) {
     if(class(obs)%in%c("FLStock","FLStockR"))
-      obs <- model.frame(metrics(obs, list(met=get(metric), out=get(output))))
+      
+    obs = stockMedians(obs)
+    obs = metrics(obs, list(met=(get(metric)), out=get(output)))
+    obs$met = unitSums(obs$met)
+    obs$out = unitMeans(obs$out)
+    obs <- model.frame(obs)
     
     if(class(obs)=="FLQuants"){
       obs=obs[1:2]

@@ -5,20 +5,28 @@
 \title{plotAdvice
 Plots stochastic stock dynamics against refpts for constant Fsim()}
 \usage{
-plotAdvice(stock, rpts = "missing", plotrefs = TRUE, ncol = 2, label.size = 3)
+plotAdvice(
+  stock,
+  rpts = "missing",
+  plotrefs = TRUE,
+  probs = c(0.05, 0.2, 0.5, 0.8, 0.95),
+  colour = "dodgerblue",
+  ncol = 2,
+  label.size = 3
+)
 }
 \arguments{
 \item{stock}{FLStock or FLStockR}
 
 \item{plotrefs}{if TRUE reference points are plotted}
 
-\item{ncol}{number of plot panel columns}
+\item{probs}{determine credibility intervals, default 80th, 90th percentiles   #' @param ncol number of plot panel columns}
+
+\item{colour}{color of CIs}
 
 \item{label.size}{size of refpts labels}
 
 \item{refpts}{as FLPar or Fbrp() if FLStockR is not provided or should be overwritten}
-
-\item{colour}{color of CIs}
 }
 \value{
 ggplot
