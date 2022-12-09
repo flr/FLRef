@@ -36,8 +36,7 @@
 #' ploteq(brp,obs=TRUE,refpts="msy")
 
 computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",bthresh="missing",verbose=T,fmax=10){
- 
-  
+  if(type=="btrg") type=="btgt"
   
   if(missing(sr)){
     if(verbose)cat(paste0("Computing Per-Recruit Quantities"),"\n")

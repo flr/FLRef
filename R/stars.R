@@ -140,7 +140,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
       Fcur  = timeseries$F[endyr],
       Bcur  = timeseries$SSB[endyr],
       B0.33= quantile(timeseries$SSB,0.33),
-      B0.66= quantile(timeseries$SSB1,0.66))),3)
+      B0.66= quantile(timeseries$SSB,0.66))),3)
     
   }
   if(output=="mle"){
@@ -182,8 +182,8 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
       Blim= NA,
       Fcur  = timeseries$F[endyr],
       Bcur  = timeseries$SSB[endyr],
-      B0.33= quantile(timeseries$SSB,0.33),
-      B0.66= quantile(timeseries$SSB,0.66))),3)
+      B0.33= quantile(timeseries$SSB,0.33,na.rm=T),
+      B0.66= quantile(timeseries$SSB,0.66,na.rm=T))),3)
   }
   
   refpts = data.frame(RefPoint=row.names(refpts),Value=refpts[,1])
