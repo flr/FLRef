@@ -33,4 +33,5 @@ export(ss2stars)
 export(ss2FLStockR)
 export(jb2FLStockR)
 export(jabba2stars)
+export(ssmvln)
 
