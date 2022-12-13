@@ -10,10 +10,10 @@ flr2stars <- function(object,quantiles = c(0.025,0.975)){
     x= stockMedians(object)
     endyr = dims(x)$maxyear
     refpts = round(rbind(x@refpts,FLPar(
-                     Fcur = an(fbar(x)[,ac(endyr)]),
-                     Bcur=an(ssb(x)[,ac(endyr)]),
-                     B0.33 = quantile(an(ssb(x)),0.33,na.rm=T),
-                     B0.66 = quantile(an(ssb(x)),0.66,na.rm=T))),3)
+                     Fcur = an(fbar(simplify(x))[,ac(endyr)]),
+                     Bcur=an(unitSums(ssb(x)[,ac(endyr)])),
+                     B0.33 = quantile(an(unitSums(ssb(x))),0.33,na.rm=T),
+                     B0.66 = quantile(an(unitSums(ssb(x))),0.66,na.rm=T))),3)
     
     refpts = data.frame(RefPoint=row.names(refpts),Value=as.data.frame(refpts[,1])$data)
     rownames(refpts) = 1:nrow(refpts)
