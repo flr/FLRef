@@ -387,7 +387,7 @@ if(output=="iters"){
   df = kb
   df = df[seq(1,nrow(df),thin),]
   year = unique(df$year)
-    for(i in 1:length(yrs)){
+    for(i in 1:length(year)){
       df[df$year%in%year[i],]$iter = 1:nrow(df[df$year%in%year[i],]) 
     }
   df = df[order(df$year),]
@@ -471,7 +471,7 @@ jb2FLStockR <- function(jabba,bfrac=0.3,thin=10){
   df = kb
   df = df[seq(1,nrow(df),thin),]
   year = unique(df$year)
-  for(i in 1:length(yrs)){
+  for(i in 1:length(year)){
    df[df$year%in%year[i],]$iter = 1:nrow(df[df$year%in%year[i],]) 
   }
 
