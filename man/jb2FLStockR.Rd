@@ -4,10 +4,12 @@
 \alias{jb2FLStockR}
 \title{jb2FLStockR()}
 \usage{
-jb2FLStockR(jabba, bfrac = 0.3, iters = 2000)
+jb2FLStockR(jabba, bfrac = 0.3, thin = 10)
 }
 \arguments{
 \item{jabba}{fit from JABBA fit_jabba() or jabba$kbtrj}
+
+\item{thin}{thinnig rate of retained iters}
 }
 \value{
 FLStockR with refpts

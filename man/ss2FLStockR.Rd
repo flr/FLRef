@@ -4,12 +4,12 @@
 \alias{ss2FLStockR}
 \title{ss2FLStockR()}
 \usage{
-ss2FLStockR(mvln, iters = 2000, output = c("iters", "mle")[1])
+ss2FLStockR(mvln, thin = 10, output = c("iters", "mle")[1])
 }
 \arguments{
 \item{mvln}{output from ssmvln()}
 
-\item{iters}{maximum iters retained}
+\item{thin}{thinnig rate of retained iters}
 
 \item{output}{choice c("iters","mle")[1]}
 }

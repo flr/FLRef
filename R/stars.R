@@ -205,7 +205,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
     kbinp = FALSE
     if(is.null(jabba$assessment)){
       kbinp=TRUE
-      kb = jabba$kbtrj
+      kb = jabba
     }  else {
       kb = jabba$kbtrj
     }

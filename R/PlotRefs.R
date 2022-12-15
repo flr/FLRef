@@ -112,6 +112,8 @@ ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=
                 }
               }
             
+         
+            
             
             # SUBSET panels if not NULL
             if(!is.null(panels))

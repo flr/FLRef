@@ -362,10 +362,10 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
 #' ss2FLStockR()
 #' @param mvln output from ssmvln() 
 #' @param output choice c("iters","mle")[1]
-#' @param iters maximum iters retained
+#' @param thin thinnig rate of retained iters
 #' @return FLStockR with refpts
 #' @export
-ss2FLStockR <- function(mvln,iters=2000, output=c("iters","mle")[1]){
+ss2FLStockR <- function(mvln,thin=10, output=c("iters","mle")[1]){
   kbinp = FALSE
 if(is.null(mvln$kb)){
   if(output=="mle")
@@ -385,10 +385,16 @@ if(is.null(mvln$kb)){
 
 if(output=="iters"){
   df = kb
-  df = df[df$iter<=iters,]
+  df = df[seq(1,nrow(df),thin),]
+  year = unique(df$year)
+    for(i in 1:length(yrs)){
+      df[df$year%in%year[i],]$iter = 1:nrow(df[df$year%in%year[i],]) 
+    }
   df = df[order(df$year),]
   
-    N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+  
+  
+  N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
                             season="all",area="unique",iter=df$iter,data=df$Recr))
   C = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
                             season="all",area="unique",iter=df$iter,data=df$Catch))
@@ -449,21 +455,28 @@ return(stk)
 }
 
 #' jb2FLStockR()
-#' @param jabba fit from JABBA fit_jabba() or jabba$kbtrj  
+#' @param jabba fit from JABBA fit_jabba() or jabba$kbtrj 
+#' @param thin thinnig rate of retained iters 
 #' @return FLStockR with refpts
 #' @export
-jb2FLStockR <- function(jabba,bfrac=0.3,iters=2000){
+jb2FLStockR <- function(jabba,bfrac=0.3,thin=10){
   kbinp = FALSE
   if(is.null(jabba$assessment)){
     kbinp=TRUE
-    kb = jabba$kbtrj
+    kb = jabba
   }  else {
     kb = jabba$kbtrj
   }
   
   df = kb
-  df = df[df$iter<=iters,]
-  df = df[order(df$year),]
+  df = df[seq(1,nrow(df),thin),]
+  year = unique(df$year)
+  for(i in 1:length(yrs)){
+   df[df$year%in%year[i],]$iter = 1:nrow(df[df$year%in%year[i],]) 
+  }
+
+  
+  
   
 
     N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
@@ -475,9 +488,10 @@ jb2FLStockR <- function(jabba,bfrac=0.3,iters=2000){
     H = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
                               season="all",area="unique",iter=df$iter,data=df$H))
     B= as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
-                              season="all",area="unique",iter=df$iter,data=(df$B)))
-  year = unique(df$year)
-    
+                              season="all",area="unique",iter=df$iter,data=df$B))
+  
+
+
   stk = FLStockR(
     stock.n=N,
     catch.n = C,
