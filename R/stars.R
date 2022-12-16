@@ -144,31 +144,34 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
     
   }
   if(output=="mle"){
+    quants=c("SSB","F","Catch","stock","harvest","Recr")
     
+    mu = aggregate(cbind(stock,harvest,SSB,F,Catch,Recr)~year+run,kb,
+                   quantile,c(0.5,quantiles))
     
     timeseries =  data.frame(year=mle$year,
-                             Rec_lower=NA,
+                             Rec_lower=mu[,quants[6]][,2],
                              Rec=mle$Recr,
-                             Rec_upper=NA,
-                             SSB_lower=,
+                             Rec_upper=mu[,quants[6]][,3],
+                             SSB_lower=mu[,quants[1]][,2],
                              SSB=mle$SSB,
-                             SSB_upper=NA,
+                             SSB_upper=mu[,quants[1]][,3],
                              
-                             Bratio_lower=NA,
+                             Bratio_lower=mu[,quants[4]][,2],
                              Bratio=mle$stock,
-                             Bratio_upper=NA,
+                             Bratio_upper=mu[,quants[6]][,3],
                              
                              Catches=mle$Catch,
                              Landings=NA,
                              Discards=NA,
                              
-                             F_lower=NA,
+                             F_lower=mu[,quants[2]][,2],
                              F=mle$F,
-                             F_upper=NA,
+                             F_upper=mu[,quants[2]][,3],
                              
-                             Fratio_lower=NA,
+                             Fratio_lower=mu[,quants[5]][,2],
                              Fratio=mle$harvest,
-                             Fratio_upper=NA
+                             Fratio_upper=mu[,quants[5]][,3]
     )
     
     
