@@ -170,7 +170,6 @@ newselex<- function(object,selexpars){
   Smax =pars[[3]]
   Dcv =pars[[4]]
   Dmin =pars[[5]]
-  
   psel_a = 1/(1+exp(-log(19)*(age-S50)/(S95-S50)))
   psel_b = dnorm(age,Smax,Dcv*Smax)/max(dnorm(age,Smax,Dcv*Smax))
   psel_c = 1+(Dmin-1)*(psel_b-1)/-1

@@ -358,3 +358,30 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
               labels=c(xlab,ylab,labs[1],"F",labs[2],"Catch"),Btgtref = bref))
 } # End 
 
+# {{{
+#' Mlorenzen
+#' 
+#' computes Lorenzen M with scaling option
+#' @param object weight-at-age of class *FLQuant* 
+#' @param Mref reference M for scaling  
+#' @param Aref reference Age for scaling                                       
+#' @return FLQuant m()
+#' @export
+#' @examples 
+#' data(ple4)
+#' Ml = Mlorenzen(stock.wt(ple4))
+#' # Scale
+#' Ms = Mlorenzen(stock.wt(ple4),Mref=0.2,Aref=2)
+#' flqs = FLQuants(Lorenzen=Ml,Scaled=Ms)
+
+Mlorenzen = function(object,Mref="missing",Aref=2){
+  Ml = 3*((1000*object)^(-0.288))
+  if(missing("Mref"))
+    out = Ml
+  if(!missing("Mref"))
+    out = Ml*an(Mref/Ml[ac(Aref),])
+  
+  units(out) =  "m"
+  return(out)
+} 
+#}}}

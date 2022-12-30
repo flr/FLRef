@@ -41,4 +41,5 @@ export(rffwd)
 export(newselex)
 export(bioidx.sim)
 export(asem2spm)
-
+export(stock2ratios)
+export(Mlorenzen)

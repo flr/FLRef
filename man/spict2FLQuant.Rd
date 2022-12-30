@@ -6,7 +6,7 @@
 \usage{
 spict2FLQuant(
   x,
-  val = c("logB", "logFnotS", "logCpred", "logBBmsy", "logFFmsynotS")[5]
+  val = c("logB", "logFnotS", "logCpred", "logBBmsy", "logFFmsynotS")[1]
 )
 }
 \arguments{

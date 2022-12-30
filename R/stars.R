@@ -200,7 +200,7 @@ jb2FLStockR <- function(jabba,bfrac=0.3,thin=10,rel=FALSE){
 #' @return FLQuant  
 #' @author adopted from Laurie Kell (biodyn)
 #' @export
-spict2FLQuant <- function(x,val=c("logB","logFnotS","logCpred","logBBmsy","logFFmsynotS")[5]){
+spict2FLQuant <- function(x,val=c("logB","logFnotS","logCpred","logBBmsy","logFFmsynotS")[1]){
   if(val=="logB"){
     vec = x$par.random         
   } else {
@@ -554,3 +554,62 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
   }
   
   
+  
+  #' spict2stock2ratios()
+  #' @param object of class *FLStockR*  
+  #' @param bfrac biomass limit reference point as fraction of Bmsy
+  #' @return FLStockR with ratios F/Ftgt and B/Btgt
+  #' @export
+  stock2ratios <- function(object,bfrac=0.3,rel=FALSE){
+      stk = object  
+      B = as.FLQuant(ssb(object)/object@refpts[[2]])
+      H = fbar(object)/object@refpts[[1]]
+      C = catch(object)
+      dimnames(B)$age = "1"
+      dimnames(C)$age = "1"
+      dimnames(H)$age = "1"
+      
+      df = as.data.frame(B)
+       year = unique(df$year)
+       iters = an(unique(df$iter))
+      
+      
+      
+      stk = FLStockR(stock.n=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
+      catch.n = C,
+      landings.n = C,
+      discards.n = FLQuant(0, dimnames=list(age="1", year = (year),iter=iters)),
+      stock.wt=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
+      landings.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+      discards.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+      catch.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+      mat=B,
+      m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+      harvest = H,
+      m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
+      harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+    )
+    units(stk) = standardUnits(stk)
+    stk@catch = computeCatch(stk)
+    stk@landings = computeLandings(stk)
+    stk@discards = computeStock(stk)
+    stk@stock = B
+    
+    stk@refpts = FLPar(
+      Fmsy = res$report$Fmsy,
+      Bmsy = res$report$Bmsy,
+      MSY = res$report$MSY,
+      Blim= res$report$Bmsy*bfrac,
+      B0 = res$value["K"],
+    )
+    
+      stk@refpts[1:2] =1 
+      stk@refpts["Blim"] = bfrac
+      stk@refpts["B0"] = res$value["K"]/res$report$Bmsy
+    
+    
+    
+    return(stk)
+  }
+
+
