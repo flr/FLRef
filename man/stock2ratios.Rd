@@ -2,9 +2,9 @@
 % Please edit documentation in R/stars.R
 \name{stock2ratios}
 \alias{stock2ratios}
-\title{spict2stock2ratios()}
+\title{stock2ratios()}
 \usage{
-stock2ratios(object, bfrac = 0.3, rel = FALSE)
+stock2ratios(object, bfrac = 0.3)
 }
 \arguments{
 \item{object}{of class *FLStockR*}
@@ -15,5 +15,5 @@ stock2ratios(object, bfrac = 0.3, rel = FALSE)
 FLStockR with ratios F/Ftgt and B/Btgt
 }
 \description{
-spict2stock2ratios()
+stock2ratios()
 }

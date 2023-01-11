@@ -555,12 +555,12 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
   
   
   
-  #' spict2stock2ratios()
+  #' stock2ratios()
   #' @param object of class *FLStockR*  
   #' @param bfrac biomass limit reference point as fraction of Bmsy
   #' @return FLStockR with ratios F/Ftgt and B/Btgt
   #' @export
-  stock2ratios <- function(object,bfrac=0.3,rel=FALSE){
+  stock2ratios <- function(object,bfrac=0.3){
       stk = object  
       B = as.FLQuant(ssb(object)/object@refpts[[2]])
       H = fbar(object)/object@refpts[[1]]
@@ -594,20 +594,8 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
     stk@landings = computeLandings(stk)
     stk@discards = computeStock(stk)
     stk@stock = B
-    
-    stk@refpts = FLPar(
-      Fmsy = res$report$Fmsy,
-      Bmsy = res$report$Bmsy,
-      MSY = res$report$MSY,
-      Blim= res$report$Bmsy*bfrac,
-      B0 = res$value["K"],
-    )
-    
-      stk@refpts[1:2] =1 
-      stk@refpts["Blim"] = bfrac
-      stk@refpts["B0"] = res$value["K"]/res$report$Bmsy
-    
-    
+    stk@refpts = FLPar(Ftgt=1,Btgt=1,Yeq=object@refpts["Yeq"],Blim=bfrac,B0=object@refpts["B0"]/object@refpts[2])
+    row.names(stk@refpts)[1:2] = row.names(object@refpts)[1:2] 
     
     return(stk)
   }

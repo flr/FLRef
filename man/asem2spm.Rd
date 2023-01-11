@@ -4,12 +4,22 @@
 \alias{asem2spm}
 \title{asem2spm()}
 \usage{
-asem2spm(object, sr)
+asem2spm(
+  object,
+  quant = c("vb", "ssb"),
+  fmsy = NULL,
+  rel = FALSE,
+  spcurve = FALSE
+)
 }
 \arguments{
-\item{object}{An *FLStock*}
+\item{object}{An *FLBRP*}
 
-\item{sr}{A stock-recruit relationship, *FLSR* or *predictModel*.}
+\item{quant}{choose between vb and ssb}
+
+\item{rel}{if TRUE ratios are produced for spcurve}
+
+\item{spcurve}{if TRUE a data.frame is added}
 }
 \value{
 prior means for r and m *FLPar*
@@ -20,8 +30,8 @@ asem2spm()
 \examples{
 data(ple4)
 sr <- srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=mean(spr0y(ple4)))
-asem2spm(ple4,sr)
-sr085 <- srrTMB(as.FLSR(ple4,model=bevholtSV),s=0.85,s.est=F,r0=NULL,spr0=mean(spr0y(ple4)))
-plotsrs(FLSRs(s.est=sr,s0.85=sr075))
-asem2spm(ple4,sr075)
+brp = FLBRP(ple4,sr)
+asem2spm(brp)[1:4]
+plotpf(brp)
+plotpf(brp,rel=T)
 }
