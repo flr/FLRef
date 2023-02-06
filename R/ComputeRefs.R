@@ -38,6 +38,9 @@
 computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",bthresh="missing",verbose=T,fmax=10){
   if(type[1]=="btrg") type="btgt"
   
+  if(class(stock)=="FLStockR") stock = as(stock,"FLStock")
+      
+  
   if(missing(sr)){
     if(verbose)cat(paste0("Computing Per-Recruit Quantities"),"\n")
     sr = FLSR(params=FLPar(1, params='a'),model=formula(rec~a))
