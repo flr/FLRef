@@ -187,7 +187,7 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   }
   
   
-  bratio = hat[hat$Label==paste0("Bratio_",refyr),2]
+  bratio = hat[hat$Label==paste0("Bratio_",endyr),2]
   bb.check = c(bt/bv,bt/bmsy,bt/btgt)
   
   option.btgt = FALSE
