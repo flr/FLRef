@@ -324,7 +324,7 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   
   
   # Add catch
-  C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
+  C_obs = aggregate(kill_bio~Yr,ss3rep$catch,sum)
   #colnames(C_obs) = c("Yr","Obs")
   Cobs = C_obs[C_obs$Yr%in%yrs,]
   foreyrs = unique(as.numeric(gsub(paste0("ForeCatch_"),"",hat$Label[grep(paste0("ForeCatch_"), hat$Label)])))
