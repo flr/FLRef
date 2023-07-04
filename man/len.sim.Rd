@@ -9,7 +9,7 @@ len.sim(
   params,
   model = vonbert,
   ess = 250,
-  timing = seq(1/12, 1, 1/12),
+  timing = seq(0, 11/12, 1/12),
   unit = "cm",
   scale = TRUE,
   reflen = NULL,
@@ -27,7 +27,7 @@ len.sim(
 
 \item{ess}{effective sample size}
 
-\item{timing}{default seq(1/12,1,1/12), but can be single event 0.5}
+\item{timing}{t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5}
 
 \item{unit}{default is "cm"}
 

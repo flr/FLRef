@@ -258,6 +258,7 @@ idx.sim <- function(object,sel=catch.sel(object),ages=NULL,ess=200,sigma=0.2,q=0
   idx@index.var[] = sigma
   fac = apply(index@index,2:6,sum)/apply(res,2:6,sum)
   res = res%*%fac
+  units(idx@index.q) = "1"
   idx@index = idx@index.q*res
   return(idx)
 }
@@ -418,16 +419,16 @@ applyALK <- function(len,alks){
 #' @param lmax maximum upper length specified lmax*linf
 #' @param bin length bin size, dafault 1
 #' @param ess effective sample size
-#' @param timing default seq(1/12,1,1/12), but can be single event 0.5
+#' @param timing t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5
 #' @param unit default is "cm"
 #' @return FLQuant for length
 #' @export
 
-len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(1/12,1,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmax = 1.2){
+len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmax = 1.2){
   gp = c(params) 
   age = an(dimnames(N_a)$age)
   lenls = FLQuants(lapply(as.list(timing),function(x){
-  ialk <- FLCore::invALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x-0.5),
+  ialk <- FLCore::invALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
                  model=model, age=age, lmax=lmax,reflen=reflen)
   lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))                 
   })) 
@@ -438,7 +439,7 @@ len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(1/12,1,1/12),un
   units(out) = unit
   if(scale){
     fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
-    out = out%*%fac*an(units(N_a))/1000
+    out = out%*%fac #*an(units(N_a))/1000
   }
   
   return(out)
