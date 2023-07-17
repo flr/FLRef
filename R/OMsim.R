@@ -429,7 +429,7 @@ len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),u
   age = an(dimnames(N_a)$age)
   lenls = FLQuants(lapply(as.list(timing),function(x){
   ialk <- FLCore::invALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
-                 model=model, age=age, lmax=lmax,reflen=reflen)
+                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin)
   lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))                 
   })) 
   if(length(lenls)>1){
