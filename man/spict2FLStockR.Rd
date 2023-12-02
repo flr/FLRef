@@ -12,6 +12,8 @@ spict2FLStockR(res, bfrac = 0.3, rel = FALSE, forecast = NULL)
 \item{bfrac}{biomass limit reference point as fraction of Bmsy}
 
 \item{rel}{if TRUE ratios BBmsy and FFmsy are stored}
+
+\item{forecast}{extract forecast TRUE/FALSE}
 }
 \value{
 FLStockR with refpts

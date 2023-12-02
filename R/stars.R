@@ -259,6 +259,7 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
 #' @param res fit from SPICT  
 #' @param bfrac biomass limit reference point as fraction of Bmsy
 #' @param rel if TRUE ratios BBmsy and FFmsy are stored
+#' @param forecast extract forecast TRUE/FALSE
 #' @return FLStockR with refpts
 #' @export
 spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
@@ -346,7 +347,8 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
    }))
   
   stks@desc ="spm"
-
+  if(length(stks)==1) stks = stks[[1]] 
+  
   return(stks)
 }
 
@@ -624,7 +626,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
       stk = object  
       B = as.FLQuant(ssb(object)/object@refpts[[2]])
       H = fbar(object)/object@refpts[[1]]
-      C = catch(object)
+      C = landings(object)
       dimnames(B)$age = "1"
       dimnames(C)$age = "1"
       dimnames(H)$age = "1"
@@ -654,7 +656,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
     stk@landings = computeLandings(stk)
     stk@discards = computeStock(stk)
     stk@stock = B
-    stk@refpts = FLPar(Ftgt=1,Btgt=1,Yeq=object@refpts["Yeq"],Blim=bfrac,B0=object@refpts["B0"]/object@refpts[2])
+    stk@refpts = FLPar(Ftgt=1,Btgt=1,Yeq=object@refpts[[3]],Blim=bfrac,B0=object@refpts["B0"]/object@refpts[2])
     row.names(stk@refpts)[1:2] = row.names(object@refpts)[1:2] 
     
     return(stk)
