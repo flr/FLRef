@@ -118,9 +118,6 @@ jb2FLStockR <- function(jabba,bfrac=0.3,thin=10,rel=FALSE){
   }
   
   
-  
-  
-  
   N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
                             season="all",area="unique",iter=df$iter,data=exp(df$Bdev)))
   C = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
@@ -196,32 +193,63 @@ jb2FLStockR <- function(jabba,bfrac=0.3,thin=10,rel=FALSE){
 
 
 #' spict2FLQuant()
-#' @param res fit from SPICT
+#' @param x fit from SPICT
+#' @param forecast TRUE/FALSE
 #' @return FLQuant  
 #' @author adopted from Laurie Kell (biodyn)
 #' @export
-spict2FLQuant <- function(x,val=c("logB","logFnotS","logCpred","logBBmsy","logFFmsynotS")[1]){
+spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],forecast=F){
+  
+    
+  vals=c("logB","logFnotS","logCpred","logBBmsy","logFFmsynotS")
+  metrics=c("ssb","fbar","catch","stock","harvest")
+  
+  val = vals[which(metrics%in%metric)]
+  
   if(val=="logB"){
     vec = x$par.random         
   } else {
     vec = x$value
   }  
+  
   quant= an(exp(vec[which(names(vec)==val)]))
   if(val=="logCpred"){
     season = x$inp$dtc[1]
   } else {
     season = round(1/x$inp$dteuler)
   }
-  year  =c(rep(seq(x$inp$timerange[1],x$inp$timerange[2]),each=season))
-  quant = quant[1:length(year)]
-  dat=data.frame(age=1,year  =c(rep(seq(x$inp$timerange[1],x$inp$timerange[2]),each=season)),
-                 season=c(rep(seq(season),x$inp$timerange[2]-x$inp$timerange[1]+1)),
+  
+  timerange = c(x$inp$timerange[1],x$inp$timerange[2])
+  if(forecast) timerange[2] = x$inp$maninterval[2]
+  
+  year.obs  =c(rep(seq(x$inp$timerange[1],x$inp$timerange[2]),each=season))
+  year  =c(rep(seq(timerange[1],timerange[2]),each=season))
+  seas=c(rep(seq(season),timerange[2]-timerange[1]+1))
+  
+  if(forecast == TRUE){
+    year = year[1:length(quant)]
+    seas = seas[1:length(quant)]
+    seas[length(seas)] = season
+  } else {
+     quant = quant[1:length(year)]
+   }         
+    
+  if(forecast == TRUE & val=="logCpred"){
+    if(length(year.obs)<length(year))
+            quant[(length(year.obs)+1):length(year)] = NA
+   }
+
+
+  dat=data.frame(age=1,year  =year,
+                 season=seas,
                  data  =quant)
   if(val=="logCpred"){
     out= seasonSums(as.FLQuant(dat))} else {
       out= as.FLQuant(dat)[,,,season]
       dimnames(out)$season="all"
     }
+  if(!forecast) out = window(out,end=floor(max(x$inp$timeC)))
+  
   return(out)
 } # End
 
@@ -233,16 +261,44 @@ spict2FLQuant <- function(x,val=c("logB","logFnotS","logCpred","logBBmsy","logFF
 #' @param rel if TRUE ratios BBmsy and FFmsy are stored
 #' @return FLStockR with refpts
 #' @export
-spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE){
-  if(!rel){
-    B = spict2FLQuant(res,val="logB")
-    H = spict2FLQuant(res,val="logFnotS")
-  } else {
-    B = spict2FLQuant(res,val="logBBmsy")
-    H = spict2FLQuant(res,val="logFFmsynotS")
+spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
+  
+  if(is.null(res$man)) fw = FALSE
+  if(!is.null(res$man)) fw = TRUE
+  
+  if(is.null(res$value)){
+    runs = ref
+  }
+  if(!is.null(res$value) & is.null(res$man) & is.null(res$retro)){
+     runs = list(run=res)
+  }
+  if(!is.null(res$man)){
+    runs = res$man
   }
   
-  C = spict2FLQuant(res,val="logCpred")
+  if(!is.null(res$retro)){
+    runs = res$retro
+  }
+  
+  # start 
+  stks =  FLStocks(lapply(runs,function(res){
+  
+  
+  b = spict2FLQuant(res,metric="ssb",forecast=fw)
+  f = spict2FLQuant(res,metric="fbar",forecast=fw)
+  
+  if(!rel){
+    B = spict2FLQuant(res,metric="ssb",forecast=fw)
+    H = spict2FLQuant(res,metric="fbar",forecast=fw)
+  } else {
+    B = spict2FLQuant(res,metric="stock",forecast=fw)
+    H = spict2FLQuant(res,metric="harvest",forecast=fw)
+  }
+  
+  endyr = max(an(dimnames(B)$year))
+  C = spict2FLQuant(res,metric="catch",forecast=fw)
+  C =window(C,end=endyr)
+  C[,is.na(C)] = b[is.na(C)]*f[is.na(C)]
   df = as.data.frame(B)
   year = unique(df$year)
   N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
@@ -285,9 +341,13 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE){
     stk@refpts["Blim"] = bfrac
     stk@refpts["B0"] = res$value["K"]/res$report$Bmsy
   }
+   stk@desc = "spm"
+   stk
+   }))
   
-  
-  return(stk)
+  stks@desc ="spm"
+
+  return(stks)
 }
 
 

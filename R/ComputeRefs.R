@@ -325,3 +325,40 @@ Fe40 = function(stock,nyears=3){
   return(mean(tail(0.4/0.6*Mbar,nyears)))
   }
 #}}}
+
+
+#{{{
+#' ABItgt()
+#
+#' Computes ABI for target F, e.g. ABImsy (Griffith et al. 2023)
+#'
+#' @param stock object of class FLStock 
+#' @param ftgt target F at equilibrium, e.g. Fmsy
+#' @param thresh quantile ageref treshold, default 0.9
+#' @return *FLQuant* 
+#' @export
+#' @examples
+#' data(ple4)
+#' ABImsy = ABItgt(ple4,ftgt=0.22,thresh=0.9)
+#' plot(ABImsy)+ylim(0,2)+
+#'  geom_hline(yintercept = 1)+ylab(expression(ABI[MSY]))
+
+ABItgt <- function(stock,ftgt=0.2,thresh=0.9){
+  eqstk = brp(FLBRP(stock))
+  fbar(eqstk)[,1][] = 0.00001 # compute for eq Fmsy
+  fbar(eqstk)[,1:101][] = ftgt # compute for equilibrium Fmsy
+  eqstk = brp(eqstk)
+  eqstk = window(as(eqstk, "FLStock"),start=2,end=2) # year1 F=0, year2=Fmsy
+  eqstk@name = stock@name # name stk
+  n_a = stock.n(eqstk)[-1,] # remove first age
+  ages = dims(n_a)$min:dims(n_a)$max
+  cums = apply(n_a,2:6,cumsum)
+  n_thresh = sum(n_a*thresh)
+  aref = min(ages[which((n_thresh-cums)^2==min((n_thresh-cums)^2))]+1,range(eqstk)["plusgroup"]-1)
+  rp = sum(n_a[ac(aref:max(ages)),])/sum(n_a) # ref proportion
+  flq= quantSums(stock.n(stock)[ac(aref:range(stock)[2]),])/quantSums(stock.n(stock)[-1,])/rp
+  
+  return(flq)
+}
+#}}}
+

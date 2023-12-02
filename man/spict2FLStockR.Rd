@@ -4,7 +4,7 @@
 \alias{spict2FLStockR}
 \title{spict2FLStockR()}
 \usage{
-spict2FLStockR(res, bfrac = 0.3, rel = FALSE)
+spict2FLStockR(res, bfrac = 0.3, rel = FALSE, forecast = NULL)
 }
 \arguments{
 \item{res}{fit from SPICT}

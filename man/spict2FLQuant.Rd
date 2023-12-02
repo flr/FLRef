@@ -6,11 +6,14 @@
 \usage{
 spict2FLQuant(
   x,
-  val = c("logB", "logFnotS", "logCpred", "logBBmsy", "logFFmsynotS")[1]
+  metric = c("ssb", "fbar", "catch", "stock", "harvest")[1],
+  forecast = F
 )
 }
 \arguments{
-\item{res}{fit from SPICT}
+\item{x}{fit from SPICT}
+
+\item{forecast}{TRUE/FALSE}
 }
 \value{
 FLQuant
