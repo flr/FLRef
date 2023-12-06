@@ -6,17 +6,18 @@
 Plots stochastic stock dynamics against refpts for constant Fsim()}
 \usage{
 plotAdvice(
-  stock,
+  object,
   rpts = "missing",
+  type = NULL,
   plotrefs = TRUE,
   probs = c(0.05, 0.2, 0.5, 0.8, 0.95),
   colour = "dodgerblue",
-  ncol = 2,
-  label.size = 3
+  ncol = NULL,
+  label.size = 2.5
 )
 }
 \arguments{
-\item{stock}{FLStock or FLStockR}
+\item{type}{age-structured "asm" or surplus production "spm" plotting style}
 
 \item{plotrefs}{if TRUE reference points are plotted}
 
@@ -25,6 +26,8 @@ plotAdvice(
 \item{colour}{color of CIs}
 
 \item{label.size}{size of refpts labels}
+
+\item{stock}{FLStock or FLStockR}
 
 \item{refpts}{as FLPar or Fbrp() if FLStockR is not provided or should be overwritten}
 }

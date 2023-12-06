@@ -187,7 +187,7 @@ jb2FLStockR <- function(jabba,bfrac=0.3,thin=10,rel=FALSE){
     stk@refpts["Blim"] = bfrac
     stk@refpts["B0"] = median(kb$B/kb$BB0)/median(kb$B/kb$stock)
   }
-  
+  stk@desc = "spm"
   return(stk)
 }
 
@@ -299,7 +299,11 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
   endyr = max(an(dimnames(B)$year))
   C = spict2FLQuant(res,metric="catch",forecast=fw)
   C =window(C,end=endyr)
-  C[,is.na(C)] = b[is.na(C)]*f[is.na(C)]
+  if(fw){
+  intyr = dims(C[,!is.na(C)])$maxyear
+  finyr = dims(C)$maxyear
+  C[,ac(intyt:finyr)] = b[,ac(intyt:finyr)]*f[,ac(intyt:finyr)]
+  }
   df = as.data.frame(B)
   year = unique(df$year)
   N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",

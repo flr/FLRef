@@ -391,6 +391,7 @@ return(p)
 #'
 #' @param stock FLStock or FLStockR 
 #' @param  refpts as FLPar or Fbrp() if FLStockR is not provided or should be overwritten 
+#' @param type age-structured "asm" or surplus production "spm" plotting style
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
 #' @param probs determine credibility intervals, default 80th, 90th percentiles   #' @param ncol number of plot panel columns
@@ -403,16 +404,38 @@ return(p)
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","fe40"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
-plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=2,label.size=3){
+plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,label.size=2.5){
 
+  
+  if(class(object)%in%c("FLStock","FLStockR"))
+             object = FLStocks(object)
+    
+  stks <- FLStocks(lapply(object,function(stock){ 
   landings = stock@landings 
   stock@landings =computeLandings(stock)
   stock@landings[is.na(stock@landings)] = landings[is.na(stock@landings)]
+  stock
+  }))
+  
+  if(stks[[1]]@desc=="spm"){
+    if(is.null(type)) type="spm"
+    if(is.null(ncol)) ncol=1
+  } else {
+    ncol=2
+    type="asm"
+  }
+  
+  styr = endyr = NULL
+  for(i in 1:length(stks)){
+    styr = min(styr, range(stks[[i]])["minyear"])
+    endyr = max(endyr, range(stks[[i]])["maxyear"])
+  }
+  iv = ceiling(length(styr:endyr)/8)
   
   pr = FALSE
   brp = NULL
-  if(class(stock)[1]=="FLStockR" & missing(rpts)){
-  rp = refpts(stock)   
+  if(class(stks[[1]])[1]=="FLStockR" & missing(rpts)){
+  rp = refpts(stks[[1]])   
   }
   if(!missing(rpts)){
   if(class(rpts) == "FLBRP"){
@@ -427,6 +450,8 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,probs=c(0.05,0.2,0.50,
   if(class(rpts)=="FLPar") rp = rpts   
   }
 
+  if(length(stks)==1) stks = stks[[1]]
+  
   if(pr){
   b0 = c(rp["B0",c("ssb")])
   r0 = exp(mean(log(rec(stock))))
@@ -444,19 +469,43 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,probs=c(0.05,0.2,0.50,
   
   
   if(!pr){
-    fls = FLQuants("Recruitment"=unitSums(rec(stock)),
-                   "SSB"=unitSums(ssb(stock)),"Landings"=unitSums(landings(stock)),"F"=unitMeans(fbar(stock)))
-    names(fls)[names(fls)=="F"] =  paste0("F(",paste0(range(stock, c("minfbar", "maxfbar")),
-                                                      collapse="-"),")")
-    p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
+    
+   leg = theme(legend.key.size = unit(0.3, 'cm'), #change legend key size
+          legend.key.height = unit(0.5, 'cm'), #change legend key height
+          legend.key.width = unit(0.3, 'cm'), #change legend key width
+          legend.title = element_blank(), #change legend title font size
+          legend.text = element_text(size=7),
+          axis.text.x= element_text(size=7)) #change legend text font size
+    
+   
+    if(!type=="spm"){
+    
+    p = ggplotFL::plot(stks,
+                   metrics=list(Recruitment=rec,SSB=ssb,F=fbar,Landings=landings))+                                                
+         ylim(c(0, NA))+ theme_bw()+leg+
+      xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
     p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
       ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
+    
+    
+    } else {
+      
+      
+      p = ggplotFL::plot(stks,
+                         metrics=list(Biomass=ssb,F=fbar,Landings=landings))+                                                
+        ylim(c(0, NA))+ theme_bw()+leg+
+        xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
+      p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
+        ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
+    }
+    
+    
   }
 
 
      
   mets <- list(Rec=function(x) unitSums(rec(x)), SB=function(x) unitSums(ssb(x)),
-               C=function(x) unitSums(catch(x)), F=function(x) unitMeans(fbar(x)))
+               C=function(x) unitSums(landings(x)), F=function(x) unitMeans(fbar(x)))
   xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
   
   if(!is.null(brp)){
@@ -525,11 +574,21 @@ plotAdvice <- function(stock,rpts="missing",plotrefs=TRUE,probs=c(0.05,0.2,0.50,
     colo = c(bcol,fcol,ycol,"blue")
     posx = c(xy[1:length(Bs)],xy[1:length(Ys)],xy[1:length(Fs)],xy[1])
       
+    if(!type=="spm"){
+      selq = 4
+      qn = c("SSB","F","Landings","Recruitment")
+    }   
+    if(type=="spm"){
+      selq = 3
+      qn = c("Biomass","F","Landings")
+      posx = posx[-8]
+      colo = colo[-8]
+    }
     fps =FLPars(SSB  =Bs,
            F    =Fs,
-           Catch    =Ys,
-           Rec=R0)
-    fps@names = names(fls)[c(2,4,3,1)] 
+           Landings   =Ys,
+           Rec=R0)[1:selq]
+    fps@names = qn
     ggp = ggplotFL::geom_flpar(data=fps,x=posx,colour=colo)
   
     ggp[[2]]$aes_params$size=label.size
