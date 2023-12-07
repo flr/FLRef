@@ -302,7 +302,7 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
   if(fw){
   intyr = dims(C[,!is.na(C)])$maxyear
   finyr = dims(C)$maxyear
-  C[,ac(intyt:finyr)] = b[,ac(intyt:finyr)]*f[,ac(intyt:finyr)]
+  C[,ac(intyr:finyr)] = b[,ac(intyr:finyr)]*f[,ac(intyr:finyr)]
   }
   df = as.data.frame(B)
   year = unique(df$year)
@@ -366,10 +366,17 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
 flr2stars <- function(object,quantiles = c(0.025,0.975)){
   
   
+  
     x= stockMedians(object)
+    if((dims(object)$season+dims(object)$unit+dims(object)$area)>3){
+      y = simplify(x)
+    } else {
+      y= x
+    }
+    
     endyr = dims(x)$maxyear
     refpts = round(rbind(x@refpts,FLPar(
-                     Fcur = an(fbar(simplify(x))[,ac(endyr)]),
+                     Fcur = an(fbar(y)[,ac(endyr)]),
                      Bcur=an(unitSums(ssb(x)[,ac(endyr)])),
                      B0.33 = quantile(an(unitSums(ssb(x))),0.33,na.rm=T),
                      B0.66 = quantile(an(unitSums(ssb(x))),0.66,na.rm=T))),3)

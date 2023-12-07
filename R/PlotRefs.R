@@ -503,10 +503,14 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
   }
 
 
-     
+  if(class(stks)%in%c("FLStockR","FLStock")){
+    stk=stks
+  } else {
+    stk = stks[[1]]
+  }   
   mets <- list(Rec=function(x) unitSums(rec(x)), SB=function(x) unitSums(ssb(x)),
                C=function(x) unitSums(landings(x)), F=function(x) unitMeans(fbar(x)))
-  xy =quantile(dims(stock)$minyear:dims(stock)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
+  xy =quantile(dims(stk)$minyear:dims(stk)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
   
   if(!is.null(brp)){
   Fs = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"harvest"]),
