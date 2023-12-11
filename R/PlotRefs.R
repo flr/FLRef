@@ -419,12 +419,14 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
   
   if(stks[[1]]@desc=="spm"){
     if(is.null(type)) type="spm"
-    if(is.null(ncol)) ncol=1
   } else {
-    ncol=2
-    type="asm"
+    if(is.null(type)) type="asm"
   }
   
+  if(is.null(ncol)){
+   if(type=="spm") ncol=1
+   if(type=="asm") ncol=2
+  }
   styr = endyr = NULL
   for(i in 1:length(stks)){
     styr = min(styr, range(stks[[i]])["minyear"])
@@ -435,7 +437,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
   pr = FALSE
   brp = NULL
   if(class(stks[[1]])[1]=="FLStockR" & missing(rpts)){
-  rp = refpts(stks[[1]])   
+  rp = stks[[1]]@refpts   
   }
   if(!missing(rpts)){
   if(class(rpts) == "FLBRP"){

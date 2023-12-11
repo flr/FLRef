@@ -4,12 +4,12 @@
 \alias{flr2stars}
 \title{flr2stars()}
 \usage{
-flr2stars(object, quantiles = c(0.025, 0.975))
+flr2stars(object, quantiles = c(0.05, 0.95))
 }
 \arguments{
 \item{object}{of class FLStockR}
 
-\item{quantities}{default is 95CIs as c(0.025,0.975)}
+\item{quantities}{default is 90CIs as c(0.05,0.95)}
 }
 \value{
 STARS list with $timeseris and $refpts

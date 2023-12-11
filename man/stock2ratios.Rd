@@ -4,12 +4,10 @@
 \alias{stock2ratios}
 \title{stock2ratios()}
 \usage{
-stock2ratios(object, bfrac = 0.3)
+stock2ratios(object)
 }
 \arguments{
 \item{object}{of class *FLStockR*}
-
-\item{bfrac}{biomass limit reference point as fraction of Bmsy}
 }
 \value{
 FLStockR with ratios F/Ftgt and B/Btgt

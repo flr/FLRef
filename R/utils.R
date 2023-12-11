@@ -324,15 +324,16 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   
   
   # Add catch
-  C_obs = aggregate(kill_bio~Yr,ss3rep$catch,sum)
+  C_obs = aggregate(Exp~Yr,ss3rep$catch,sum)
   #colnames(C_obs) = c("Yr","Obs")
   Cobs = C_obs[C_obs$Yr%in%yrs,]
   foreyrs = unique(as.numeric(gsub(paste0("ForeCatch_"),"",hat$Label[grep(paste0("ForeCatch_"), hat$Label)])))
   Cfore = data.frame(Yr=foreyrs,Obs=hat$Value[hat$Label%in%paste0("ForeCatch_",foreyrs)] )
+  names(Cfore) = names(Cobs)
   Catch = rbind(Cobs,Cfore)
   Catch = Catch[Catch$Yr%in%yrs,]
-  kb$Catch = rep(Catch$Obs,each=max(kb$iter))
-  mle$Catch = Catch$Obs
+  kb$Catch = rep(Catch[,2],each=max(kb$iter))
+  mle$Catch = Catch[,2]
   trg =round(bref*100,0)
   spr = round(ss3rep$sprtarg*100,0)
   xlab = c(bquote("SSB/SSB"[.(trg)]),expression(SSB/SSB[MSY]),bquote("SSB/SSB"[.(trg)]),expression(SSB/SSB[F0.1]))[bb] 

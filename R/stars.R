@@ -1,12 +1,20 @@
 
 #' ss2FLStockR()
 #' @param mvln output from ssmvln() 
-#' @param output choice c("iters","mle")[1]
+#' @param output expected outputs presented as "mle" or median of "iters"
 #' @param thin thinnig rate of retained iters
 #' @return FLStockR with refpts
 #' @export
-ss2FLStockR <- function(mvln,thin=10, output=c("iters","mle")[1]){
+ss2FLStockR <- function(mvln,thin=10, output=NULL){
   kbinp = FALSE
+  
+  if(!is.null(mvln$mle)){
+    if(is.null(output)) output ="mle"
+  } else {
+    output = "iters"
+  }
+  
+  
   if(is.null(mvln$kb)){
     if(output=="mle")
       stop("Output option mle requires to load the mvln object, not only $kb")
@@ -94,14 +102,73 @@ ss2FLStockR <- function(mvln,thin=10, output=c("iters","mle")[1]){
   return(stk)
 }
 
-#' jb2FLStockR()
+
+#' Function to summarise forecast results
+#' @param object *FLStocks* with list of *FLStockR* objects 
+#' @param eval.yrs evaluation years of forecast 
+#' @param rel if TRUE ratios B/Btgt and F/Ftgt are shown
+#' @return data.frame
+#' @export
+fwd2stars <- function(object,eval.yrs=NULL, rel=FALSE){
+  if(!class(object)=="FLStocks"){
+    object = FLStocks(forecast=object)
+  }
+  if(is.null(eval.yrs)){
+    eval.yrs = an(range(object[[1]])["maxyear"])
+  }
+  if(!rel){
+    df = do.call(rbind,Map(function(x,y){
+      stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
+      flqs = FLQuants(
+        Cy = round(landings(x)[,ac(eval.yrs)],3),
+        By = round(ssb(x)[,ac(eval.yrs)],3),
+        Fy = round(fbar(x)[,ac(eval.yrs)],3)
+      )
+      out = as.data.frame(flqs)
+      data.frame(scenario=y, t(as.matrix(out$data)))
+    },x=object,y=names(object))
+    )
+    names(df) = c("scenario",paste0("C",eval.yrs),
+                  paste0("B",eval.yrs),
+                  paste0("F",eval.yrs))
+  }
+  if(rel){
+    
+    df = do.call(rbind,Map(function(x,y){
+      if(!class(x)=="FLStockR") 
+        stop("input must be FLStockR object with @ref
+            pts")
+      
+      stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
+      flqs = FLQuants(
+        Cy = round(landings(x)[,ac(eval.yrs)],3),
+        By = round(ssb(x)[,ac(eval.yrs)],3)/stk@refpts[[2]],
+        Fy = round(fbar(x)[,ac(eval.yrs)]/stk@refpts[[1]],3)
+      )
+      out = as.data.frame(flqs)
+      data.frame(scenario=y, t(as.matrix(out$data)))
+    },x=object,y=names(object))
+    )
+    refn = rownames(object[[1]]@refpts)[1:2]
+    names(df) = c("scenario",paste0("C",eval.yrs),
+                  paste0("B",eval.yrs,"/",refn[2]),
+                  paste0("F",eval.yrs,"/",refn[1]))
+  }    
+  rownames(df) = 1:nrow(df)
+  return(df)  
+} # End of function
+
+
+
+#' jabba2FLStockR()
 #' @param jabba fit from JABBA fit_jabba() or jabba$kbtrj 
-#' @param bfrac biomass limit reference point as fraction of Bmsy
+#' @param blim biomass limit reference point as fraction of Bmsy
+#' @param bpa biomass precautionary reference point as fraction of Bmsy
 #' @param thin thinnig rate of retained iters 
 #' @param rel if TRUE ratios BBmsy and FFmsy are stored
 #' @return FLStockR with refpts
 #' @export
-jb2FLStockR <- function(jabba,bfrac=0.3,thin=10,rel=FALSE){
+jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
   kbinp = FALSE
   if(is.null(jabba$assessment)){
     kbinp=TRUE
@@ -178,13 +245,15 @@ jb2FLStockR <- function(jabba,bfrac=0.3,thin=10,rel=FALSE){
       Fmsy = median(kb$H/kb$harvest),
       Bmsy = median(kb$B/kb$stock),
       MSY = jabba$refpts$msy[1],
-      Blim= median(bfrac*kb$B/kb$stock),
+      Blim= median(blim*kb$B/kb$stock),
+      Bthr= median(bthr*kb$B/kb$stock),
       B0 = median(kb$B/kb$BB0),
     )
   }
   if(rel){
     stk@refpts[1:2] = 1
-    stk@refpts["Blim"] = bfrac
+    stk@refpts["Blim"] = blim
+    stk@refpts["Bthr"] = bthr
     stk@refpts["B0"] = median(kb$B/kb$BB0)/median(kb$B/kb$stock)
   }
   stk@desc = "spm"
@@ -257,12 +326,13 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
 
 #' spict2FLStockR()
 #' @param res fit from SPICT  
-#' @param bfrac biomass limit reference point as fraction of Bmsy
+#' @param blim biomass limit reference point as fraction of Bmsy
+#' @param bthr biomass precautionary reference point as fraction of Bmsy
 #' @param rel if TRUE ratios BBmsy and FFmsy are stored
 #' @param forecast extract forecast TRUE/FALSE
 #' @return FLStockR with refpts
 #' @export
-spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
+spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,forecast=NULL){
   
   if(is.null(res$man)) fw = FALSE
   if(!is.null(res$man)) fw = TRUE
@@ -337,13 +407,15 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
     Fmsy = res$report$Fmsy,
     Bmsy = res$report$Bmsy,
     MSY = res$report$MSY,
-    Blim= res$report$Bmsy*bfrac,
+    Blim= res$report$Bmsy*blim,
+    Bthr= res$report$Bmsy*bthr,
     B0 = res$value["K"],
   )
   
   if(rel){
     stk@refpts[1:2] =1 
-    stk@refpts["Blim"] = bfrac
+    stk@refpts["Blim"] = blim
+    stk@refpts["Bthr"] = bthr
     stk@refpts["B0"] = res$value["K"]/res$report$Bmsy
   }
    stk@desc = "spm"
@@ -360,10 +432,10 @@ spict2FLStockR <- function(res,bfrac=0.3,rel=FALSE,forecast=NULL){
 
 #' flr2stars()
 #' @param object of class FLStockR  
-#' @param quantities default is 95CIs as c(0.025,0.975)
+#' @param quantities default is 90CIs as c(0.05,0.95)
 #' @return STARS list with $timeseris and $refpts
 #' @export
-flr2stars <- function(object,quantiles = c(0.025,0.975)){
+flr2stars <- function(object,quantiles = c(0.05,0.95)){
   
   
   
@@ -388,14 +460,14 @@ flr2stars <- function(object,quantiles = c(0.025,0.975)){
 
     timeseries =  data.frame(Year=dims(x)$minyear:dims(x)$maxyear,
                              Rec_lower=NA,
-                             Rec=round(an(rec(x)),0),Rec_upper=NA,
+                             Rec=round(an(rec(x)),1),Rec_upper=NA,
                              SSB_lower=NA,
                              SSB=round(an(ssb(x)),1),
                              SSB_upper=NA,
                              
-                             TSB_lower=NA,
-                             TSB=round(an(computeStock(x)),1),
-                             TSB_upper=NA,
+                             Bratio_lower=NA,
+                             Bratio=round(an(ssb(x))/x@refpts[[2]],3),
+                             Bratio_upper=NA,
                              
                              Catches=round(an(catch(x)),2),
                              Landings = round(an(landings(x)),2),
@@ -405,9 +477,9 @@ flr2stars <- function(object,quantiles = c(0.025,0.975)){
                              F = round(an(fbar(x)),3),
                              F_upper=NA,
                              
-                             Fishing2_lower=NA,
-                             Fishing2=NA,
-                             Fishing2_upper=NA)
+                             Fratio_lower=NA,
+                             Fratio=round(an(fbar(x))/x@refpts[[1]],3),
+                             Fratio_upper=NA)
     } 
     
     if(dim(object)[6]>1){
@@ -415,15 +487,15 @@ flr2stars <- function(object,quantiles = c(0.025,0.975)){
       timeseries =  data.frame(Year=dims(object)$minyear:dims(object)$maxyear,
                                
                                Rec_lower=round(an(quantile(rec(object),quantiles[1])),0),
-                               Rec=round(an(quantile(rec(object),0.5)),0),
+                               Rec=round(an(quantile(rec(object),0.5)),1),
                                Rec_upper=round(an(quantile(rec(object),quantiles[2])),0),
                                SSB_lower=round(an(quantile(ssb(object),quantiles[1])),1),
                                SSB=round(an(quantile(ssb(object),0.5)),1),
                                SSB_upper=round(an(quantile(ssb(object),quantiles[2])),1),
                                
-                               TSB_lower=an(round(quantile(computeStock(object),quantiles[1]),1)),
-                               TSB=an(round(quantile(computeStock(object),0.5),1)),
-                               TSB_upper=an(round(quantile(computeStock(object),quantiles[2]),1)),
+                               Bratio_lower=round(an(quantile(ssb(object),quantiles[1]))/object@refpts[[2]],3),
+                               Bratio=round(an(quantile(ssb(object),0.5))/object@refpts[[2]],3),
+                               Bratio_upper=round(an(quantile(ssb(object),quantiles[2]))/object@refpts[[2]],3),
                                
                                Catches=round(an(quantile(catch(object),0.5)),2),
                                Landings = an(round(quantile(landings(object),0.5),2)),
@@ -433,15 +505,33 @@ flr2stars <- function(object,quantiles = c(0.025,0.975)){
                                F = round(an(quantile(fbar(object),0.5)),3),
                                F_upper=an(round(quantile(fbar(object),quantiles[2]),3)),
                                
-                               Fishing2_lower=NA,
-                               Fishing2=NA,
-                               Fishing2_upper=NA)   
+                               Fratio_lower=an(round(quantile(fbar(object),quantiles[1])/object@refpts[[1]],3)),
+                               Fratio=round(an(quantile(fbar(object),0.5)/object@refpts[[1]]),3),
+                               Fratio_upper=an(round(quantile(fbar(object),quantiles[2])/object@refpts[[1]],3)))   
       } 
     
     
     return(list(timeseries=timeseries,refpts=refpts))
   } 
   
+
+#' updstars()
+#' @param star output of star list 
+#' @param newrefpts manually adjusted reference points
+#' @return STARS list with $timeseris and $refpts
+#' @export
+
+updstars <- function(star,newrefpts){
+  newts = star$timeseries
+  bmsyr = star$refpts[2,2]/newrefpts[2,2]
+  fmsyr = star$refpts[1,2]/newrefpts[1,2]
+  newts[,8:10] = newts[,8:10]*bmsyr 
+  newts[,8:10] = newts[,17:19]*fmsyr 
+  out = star
+  out$timeseries = newts
+  out$refpts = newrefpts
+  return(out)
+}
 
 
 #' ss2stars()
@@ -565,12 +655,13 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
   
   #' jabba2stars()
   #' @param jabba fit from JABBA fit_jabba() or jabba$kbtrj 
-  #' @param quantiles default is 95CIs as c(0.025,0.975)
-  #' @param bfrac biomass fraction of Bmsy, default 0.3Bmsy (ICES) 
+  #' @param quantiles default is 90CIs as c(0.05,0.95)
+  #' @param blim biomass limit point as fraction of Bmsy, default 0.3Bmsy (ICES) 
+  #' @param bthr biomass precautionary point as fraction of Bmsy, default 0.5Bmsy (ICES) 
   #' @return STARS list with $timeseris and $refpts
   #' @export
-  jabba2stars <- function(jabba,quantiles = c(0.025,0.975),
-                          bfrac = 0.3){
+  jabba2stars <- function(jabba,quantiles = c(0.05,0.95),
+                          blim = 0.3,bthr=0.5){
     kbinp = FALSE
     if(is.null(jabba$assessment)){
       kbinp=TRUE
@@ -613,8 +704,8 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
       refpts = round(t(data.frame(
         Ftgt = median(kb$H/kb$harvest),
         Btgt = median(kb$B/kb$stock),
-        Bthr= NA,
-        Blim= median(bfrac*kb$B/kb$stock),
+        Bthr= median(bthr*kb$B/kb$stock),
+        Blim= median(blim*kb$B/kb$stock),
         Fcur  = timeseries$F[endyr],
         Bcur  = timeseries$Biomass[endyr],
         B0.33= quantile(timeseries$Biomass,0.33),
@@ -626,14 +717,67 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
       return(list(timeseries=timeseries,refpts=refpts))
   }
   
+  #' spict2stars()
+  #' @param spict fit from  fit.spict()  
+  #' @param blim biomass limit point as fraction of Bmsy, default 0.3Bmsy (ICES) 
+  #' @param bthr biomass precautionary point as fraction of Bmsy, default 0.5Bmsy (ICES) 
+  #' @return STARS list with $timeseris and $refpts
+  #' @export
+  spict2stars <- function(spict,
+                          blim = 0.3,bthr=0.5){
+    
+    stk = spict2FLStockR(spict)
+    stkr = spict2FLStockR(spict,rel=TRUE)
+    yrs = an(dimnames(stk)$year)
+    # TODO add uncertainty
+    timeseries =  data.frame(year=yrs,
+                             Rec_lower=NA,Rec=NA,Rec_upper=NA,
+                             Biomass_lower=NA,
+                             Biomass=an(ssb(stk)),
+                             Biomass_upper=NA,
+                             
+                             Bratio_lower=NA,
+                             Bratio=an(ssb(stkr)),
+                             Bratio_upper=NA,
+                             
+                             Catches=an(catch(stk)),
+                             Landings=an(landings(stk)),
+                             Discards=NA,
+                             
+                             F_lower=NA,
+                             F=an(fbar(stk)),
+                             F_upper=NA,
+                             
+                             Fratio_lower=NA,
+                             Fratio=an(fbar(stkr)),
+                             Fratio_upper=NA
+    )
+    
+    timeseries[-1] =     round(timeseries[-1],3)                     
+    endyr = which(max(yrs)==yrs)
+   # TODO change system to relative
+    refpts = round(t(data.frame(
+      Ftgt = stk@refpts[[1]],
+      Btgt = stk@refpts[[2]],
+      Bthr= bthr*stk@refpts[[2]],
+      Blim= blim*stk@refpts[[2]],
+      Fcur  = timeseries$F[endyr],
+      Bcur  = timeseries$Biomass[endyr],
+      B0.33= quantile(timeseries$Biomass,0.33),
+      B0.66= quantile(timeseries$Biomass,0.66))),3)
+    
+    refpts = data.frame(RefPoint=row.names(refpts),Value=refpts[,1])
+    rownames(refpts) = 1:nrow(refpts)
+    
+    return(list(timeseries=timeseries,refpts=refpts))
+  }
   
   
   #' stock2ratios()
   #' @param object of class *FLStockR*  
-  #' @param bfrac biomass limit reference point as fraction of Bmsy
   #' @return FLStockR with ratios F/Ftgt and B/Btgt
   #' @export
-  stock2ratios <- function(object,bfrac=0.3){
+  stock2ratios <- function(object){
       stk = object  
       B = as.FLQuant(ssb(object)/object@refpts[[2]])
       H = fbar(object)/object@refpts[[1]]
@@ -667,8 +811,9 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
     stk@landings = computeLandings(stk)
     stk@discards = computeStock(stk)
     stk@stock = B
-    stk@refpts = FLPar(Ftgt=1,Btgt=1,Yeq=object@refpts[[3]],Blim=bfrac,B0=object@refpts["B0"]/object@refpts[2])
+    stk@refpts = FLPar(Ftgt=1,Btgt=1,MSY=object@refpts[[3]])
     row.names(stk@refpts)[1:2] = row.names(object@refpts)[1:2] 
+    stk@desc = object@desc
     
     return(stk)
   }
