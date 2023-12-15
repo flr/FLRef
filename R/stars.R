@@ -234,20 +234,21 @@ jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
   
   if(kbinp){
     stk@refpts = FLPar(
-      Fmsy = median(kb$H/kb$harvest),
-      Bmsy = median(kb$B/kb$stock),
+      Fmsy = median(kb$H)/median(kb$harvest),
+      Bmsy = median(kb$B)/median(kb$stock),
       MSY = NA,
-      Blim= median(bfrac*kb$B/kb$stock),
-      B0 = median(kb$B/kb$BB0),
+      Bthr= median(bthr*kb$B)/median(kb$stock),
+      Blim= median(blim*kb$B)/median(kb$stock),
+      B0 = median(kb$B)/median(kb$BB0),
     )
   } else {
     stk@refpts = FLPar(
-      Fmsy = median(kb$H/kb$harvest),
-      Bmsy = median(kb$B/kb$stock),
+      Fmsy = median(kb$H)/median(kb$harvest),
+      Bmsy = median(kb$B)/median(kb$stock),
       MSY = jabba$refpts$msy[1],
-      Blim= median(blim*kb$B/kb$stock),
-      Bthr= median(bthr*kb$B/kb$stock),
-      B0 = median(kb$B/kb$BB0),
+      Blim= median(blim*kb$B)/median(kb$stock),
+      Bpa= median(bthr*kb$B)/median(kb$stock),
+      B0 = median(kb$B)/median(kb$BB0),
     )
   }
   if(rel){
@@ -573,7 +574,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
                              Bratio_upper=mu[,quants[4]][,3],
                              
                              Catches=mu[,quants[3]][,1],
-                             Landings=NA,
+                             Landings=mu[,quants[3]][,1],
                              Discards=NA,
                              
                              F_lower=mu[,quants[2]][,2],
@@ -589,8 +590,8 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
     
     
     refpts = round(t(data.frame(
-      Ftgt = median(kb$F/kb$harvest),
-      Btgt = median(kb$SSB/kb$stock),
+      Ftgt = median(kb$F)/median(kb$harvest),
+      Btgt = median(kb$SSB)/median(kb$stock),
       Bthr= NA,
       Blim= NA,
       Fcur  = timeseries$F[endyr],
@@ -702,10 +703,10 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
    
    
       refpts = round(t(data.frame(
-        Ftgt = median(kb$H/kb$harvest),
-        Btgt = median(kb$B/kb$stock),
-        Bthr= median(bthr*kb$B/kb$stock),
-        Blim= median(blim*kb$B/kb$stock),
+        Ftgt = median(kb$H)/median(kb$harvest),
+        Btgt = median(kb$B)/median(kb$stock),
+        Bthr= median(bthr*kb$B)/median(kb$stock),
+        Blim= median(blim*kb$B)/median(kb$stock),
         Fcur  = timeseries$F[endyr],
         Bcur  = timeseries$Biomass[endyr],
         B0.33= quantile(timeseries$Biomass,0.33),

@@ -586,9 +586,15 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
     }   
     if(type=="spm"){
       selq = 3
-      qn = c("Biomass","F","Landings")
-      posx = posx[-8]
-      colo = colo[-8]
+      qn = c("Biomass","F","Landings")[1:3]
+      if(is.na(Ys)){
+      posx = posx[-c(7:8)]
+      colo = colo[-c(7:8)]
+      } else {
+        posx = posx[-c(8)]
+        colo = colo[-c(8)]
+        
+      }
     }
     fps =FLPars(SSB  =Bs,
            F    =Fs,
