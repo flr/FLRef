@@ -554,7 +554,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
     
     R0 = FLPar(R0=an(rp[rownames(rp)[grep("R0",rownames(rp))]]))
     if(!is.na(an(MSY))) Ys= rbind(Ys,MSY)
-    if(!is.na(an(MSY))) Ys= rbind(Ys,C)
+    if(!any(is.na(C))) Ys= rbind(Ys,C)
     
     
   }
@@ -585,16 +585,19 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
       qn = c("SSB","F","Landings","Recruitment")
     }   
     if(type=="spm"){
+      
       selq = 3
       qn = c("Biomass","F","Landings")[1:3]
-      if(is.na(Ys)){
-      posx = posx[-c(7:8)]
-      colo = colo[-c(7:8)]
-      } else {
-        posx = posx[-c(8)]
-        colo = colo[-c(8)]
+      
+      posx = posx[-length(posx)] #if(any(!is.na(Ys))){
+      colo = colo[-length(colo)]
+      #posx = posx[-c(8)]
+      #colo = colo[-c(8)]
+      #} else {
+      #  posx = posx[-c(7:8)]
+      #  colo = colo[-c(7:8)]
         
-      }
+      #}
     }
     fps =FLPars(SSB  =Bs,
            F    =Fs,
