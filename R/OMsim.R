@@ -598,6 +598,7 @@ p = ggplot(df,aes(Biomass,SP,linetype=method,col=quant))+
 #' updates sr in brp after changing biology 
 #' @param object An *FLBRP*
 #' @param s assumed steepness s
+#' @param v input option new SB0
 #' @return FLBRP
 #' @export
 #' @examples
@@ -611,9 +612,11 @@ p = ggplot(df,aes(Biomass,SP,linetype=method,col=quant))+
 #' brpupd =updsr(brp,s)
 #' params(brp)
 
-updsr <- function(object,s=0.7){
+updsr <- function(object,s=0.7,v=NULL){
+  if(is.null(v))
+    v = refpts(object)["virgin","ssb"]
   sr=SRModelName(model(object))
-  par=FLPar(s=s,v = refpts(object)["virgin","ssb"])
+  par=FLPar(s=s,v = v)
   params(object)=FLCore::ab(par[c("s","v")],sr,spr0=spr0(eql))[c("a","b")]
   return(object)
 }  

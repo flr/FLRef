@@ -4,12 +4,14 @@
 \alias{updsr}
 \title{updsr()}
 \usage{
-updsr(object, s = 0.7)
+updsr(object, s = 0.7, v = NULL)
 }
 \arguments{
 \item{object}{An *FLBRP*}
 
 \item{s}{assumed steepness s}
+
+\item{v}{input option new SB0}
 }
 \value{
 FLBRP

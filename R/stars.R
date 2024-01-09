@@ -782,7 +782,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975))
       stk = object  
       B = as.FLQuant(ssb(object)/object@refpts[[2]])
       H = fbar(object)/object@refpts[[1]]
-      C = landings(object)
+      C = computeLandings(object)
       dimnames(B)$age = "1"
       dimnames(C)$age = "1"
       dimnames(H)$age = "1"
