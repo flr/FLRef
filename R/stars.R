@@ -7,7 +7,6 @@
 #' @export
 ss2FLStockR <- function(mvln,thin=10, output=NULL){
   kbinp = FALSE
-  
   if(!is.null(mvln$mle)){
     if(is.null(output)) output ="mle"
   } else {
