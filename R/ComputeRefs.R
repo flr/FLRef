@@ -339,7 +339,7 @@ Fe40 = function(stock,nyears=3){
 #' @export
 #' @examples
 #' data(ple4)
-#' ABImsy = ABItgt(ple4,ftgt=0.22,thresh=0.9)
+#' ABImsy = ABItgt(ple4,ftgt=0.22,thresh=0.8)
 #' plot(ABImsy)+ylim(0,2)+
 #'  geom_hline(yintercept = 1)+ylab(expression(ABI[MSY]))
 
