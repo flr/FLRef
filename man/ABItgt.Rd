@@ -23,7 +23,7 @@ Computes ABI for target F, e.g. ABImsy (Griffith et al. 2023)
 }
 \examples{
 data(ple4)
-ABImsy = ABItgt(ple4,ftgt=0.22,thresh=0.8)
+ABImsy = ABItgt(ple4,ftgt=0.22,thresh=0.9)
 plot(ABImsy)+ylim(0,2)+
  geom_hline(yintercept = 1)+ylab(expression(ABI[MSY]))
 }
