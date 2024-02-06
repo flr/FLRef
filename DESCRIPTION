@@ -1,7 +1,7 @@
 Package: FLRef
 Title: Reference point computation for advice rules
-Version: 1.10.1.9001
-Authors@R: 
+Version: 1.10.3
+Authors@R:
     c(person(given = "Henning",
            family = "Winker",
            role = c("aut", "cre"),

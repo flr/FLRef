@@ -4,7 +4,14 @@
 \alias{spict2FLStockR}
 \title{spict2FLStockR()}
 \usage{
-spict2FLStockR(res, blim = 0.3, bthr = 0.5, rel = FALSE, forecast = NULL)
+spict2FLStockR(
+  res,
+  blim = 0.3,
+  bthr = 0.5,
+  rel = FALSE,
+  osa = FALSE,
+  forecast = NULL
+)
 }
 \arguments{
 \item{res}{fit from SPICT}
@@ -14,6 +21,8 @@ spict2FLStockR(res, blim = 0.3, bthr = 0.5, rel = FALSE, forecast = NULL)
 \item{bthr}{biomass precautionary reference point as fraction of Bmsy}
 
 \item{rel}{if TRUE ratios BBmsy and FFmsy are stored}
+
+\item{osa}{add one-step-ahead forecast}
 
 \item{forecast}{extract forecast TRUE/FALSE}
 }

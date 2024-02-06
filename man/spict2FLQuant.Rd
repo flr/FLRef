@@ -7,11 +7,14 @@
 spict2FLQuant(
   x,
   metric = c("ssb", "fbar", "catch", "stock", "harvest")[1],
+  osa = FALSE,
   forecast = F
 )
 }
 \arguments{
 \item{x}{fit from SPICT}
+
+\item{osa}{add one-step-ahead forecast}
 
 \item{forecast}{TRUE/FALSE}
 }

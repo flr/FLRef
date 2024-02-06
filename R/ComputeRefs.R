@@ -342,7 +342,7 @@ Fe40 = function(stock,nyears=3){
 #' data(ple4)
 #' ABImsy = ABItgt(ple4,ftgt=0.22,thresh=0.9)
 #' plot(ABImsy)+ylim(0,2)+
-#'  geom_hline(yintercept = 1)+ylab(expression(ABI[MSY]))
+#'  geom_hline(yintercept = c(0.8,1),col=c(2,1),linetype=c(2,1))+ylab(expression(ABI[MSY]))
 
 ABItgt <- function(stock,ftgt=0.2,thresh=0.9, ...){
   eqstk = brp(FLBRP(stock, ...))

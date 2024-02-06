@@ -437,7 +437,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
   pr = FALSE
   brp = NULL
   if(class(stks[[1]])[1]=="FLStockR" & missing(rpts)){
-  rp = stks[[1]]@refpts   
+  rp = iterMedians(stks[[1]]@refpts)   
   }
   if(!missing(rpts)){
   if(class(rpts) == "FLBRP"){
@@ -486,9 +486,15 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
                    metrics=list(Recruitment=rec,SSB=ssb,F=fbar,Landings=landings))+                                                
          ylim(c(0, NA))+ theme_bw()+leg+
       xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
+    if(length(stks)==1){
     p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
       ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
-    
+    } else {
+      p = p +ggplotFL::geom_flquantiles(colour=NA, probs=probs[c(1,3,5)], alpha=0.2) +
+        ggplotFL::geom_flquantiles(colour=NA, probs=probs[c(2,3,4)], alpha=0.4)+
+        ggplotFL::geom_flquantiles( probs=probs[c(3)])
+      
+    }
     
     } else {
       
@@ -497,9 +503,18 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
                          metrics=list(Biomass=ssb,F=fbar,Landings=landings))+                                                
         ylim(c(0, NA))+ theme_bw()+leg+
         xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
+      if(length(stks)==1){
       p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
         ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
-    }
+      }  else {
+        p = p +ggplotFL::geom_flquantiles(colour=NA, probs=probs[c(1,3,5)], alpha=0.2) +
+          ggplotFL::geom_flquantiles(colour=NA, probs=probs[c(2,3,4)], alpha=0.4)+
+          ggplotFL::geom_flquantiles( probs=probs[c(3)])
+        
+      }
+      
+      
+     }
     
     
   }

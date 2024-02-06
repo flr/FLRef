@@ -263,11 +263,12 @@ jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
 
 #' spict2FLQuant()
 #' @param x fit from SPICT
+#' @param osa add one-step-ahead forecast
 #' @param forecast TRUE/FALSE
 #' @return FLQuant  
 #' @author adopted from Laurie Kell (biodyn)
 #' @export
-spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],forecast=F){
+spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],osa=FALSE,forecast=F){
   
     
   vals=c("logB","logFnotS","logCpred","logBBmsy","logFFmsynotS")
@@ -317,7 +318,7 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
       out= as.FLQuant(dat)[,,,season]
       dimnames(out)$season="all"
     }
-  if(!forecast) out = window(out,end=floor(max(x$inp$timeC)))
+  if(!forecast & !osa) out = window(out,end=floor(max(x$inp$timeC)))
   
   return(out)
 } # End
@@ -329,14 +330,18 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
 #' @param blim biomass limit reference point as fraction of Bmsy
 #' @param bthr biomass precautionary reference point as fraction of Bmsy
 #' @param rel if TRUE ratios BBmsy and FFmsy are stored
+#' @param osa add one-step-ahead forecast 
 #' @param forecast extract forecast TRUE/FALSE
 #' @return FLStockR with refpts
 #' @export
-spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,forecast=NULL){
+spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NULL){
   
+  if(!is.null(forecast)){
+    fw = forecast
+  } else {
   if(is.null(res$man)) fw = FALSE
   if(!is.null(res$man)) fw = TRUE
-  
+  }
   if(is.null(res$value)){
     runs = ref
   }
@@ -355,19 +360,19 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,forecast=NULL){
   stks =  FLStocks(lapply(runs,function(res){
   
   
-  b = spict2FLQuant(res,metric="ssb",forecast=fw)
-  f = spict2FLQuant(res,metric="fbar",forecast=fw)
+  b = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa)
+  f = spict2FLQuant(res,metric="fbar",forecast=fw,osa=osa)
   
   if(!rel){
-    B = spict2FLQuant(res,metric="ssb",forecast=fw)
-    H = spict2FLQuant(res,metric="fbar",forecast=fw)
+    B = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa)
+    H = spict2FLQuant(res,metric="fbar",forecast=fw,osa=osa)
   } else {
-    B = spict2FLQuant(res,metric="stock",forecast=fw)
-    H = spict2FLQuant(res,metric="harvest",forecast=fw)
+    B = spict2FLQuant(res,metric="stock",forecast=fw,osa=osa)
+    H = spict2FLQuant(res,metric="harvest",forecast=fw,osa=osa)
   }
   
   endyr = max(an(dimnames(B)$year))
-  C = spict2FLQuant(res,metric="catch",forecast=fw)
+  C = spict2FLQuant(res,metric="catch",forecast=fw,osa=osa)
   C =window(C,end=endyr)
   if(fw){
   intyr = dims(C[,!is.na(C)])$maxyear
