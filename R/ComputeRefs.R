@@ -35,7 +35,7 @@
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1"),blim=0.1,type="b0")
 #' ploteq(brp,obs=TRUE,refpts="msy")
 
-computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",bthresh="missing",verbose=T,fmax=10){
+computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0","btgt","value"),btri="missing",bpa="missing",bthresh="missing",verbose=T,fmax=10, ...){
   if(type[1]=="btrg") type="btgt"
   
   if(class(stock)=="FLStockR") stock = as(stock,"FLStock")
@@ -60,7 +60,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
   
  
   type = type[1]
-  brp = brp(FLBRP(stock,sr))
+  brp = brp(FLBRP(stock,sr, ...))
   
   if(is.numeric(proxy)){
     Fbrp = FLPar(Fref=proxy)
@@ -186,7 +186,8 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
 }
 #}}}
 
-#{{{
+# {{{
+
 #' computeFbrps()
 #
 #' Computes biological reference points corresponding to the proxy Fbrp
@@ -206,7 +207,7 @@ computeFbrp <- function(stock,sr='missing',proxy=NULL,x=NULL,blim=0.1,type=c("b0
 #' @return brp object of class FLBRP with computed Fbrp reference points   
 #' @export
 
-computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALSE,f0.1=TRUE,fmax=5,verbose=T){
+computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALSE,f0.1=TRUE,fmax=5,verbose=T, ...){
   
     
     # use geomean sr if sr = NULL (only growth overfishing)
@@ -218,7 +219,7 @@ computeFbrps <- function(stock,sr="missing",proxy=c("sprx","bx","all"),fmsy=FALS
     
   proxy=proxy[1] 
  
-  brp = brp(FLBRP(stock,sr))
+  brp = brp(FLBRP(stock,sr, ...))
   if(proxy%in%c("sprx","all")){
     pr = brp(FLBRP(stock)) # per-recruit
     Fsprs = FLPar(
@@ -343,8 +344,8 @@ Fe40 = function(stock,nyears=3){
 #' plot(ABImsy)+ylim(0,2)+
 #'  geom_hline(yintercept = 1)+ylab(expression(ABI[MSY]))
 
-ABItgt <- function(stock,ftgt=0.2,thresh=0.9){
-  eqstk = brp(FLBRP(stock))
+ABItgt <- function(stock,ftgt=0.2,thresh=0.9, ...){
+  eqstk = brp(FLBRP(stock, ...))
   fbar(eqstk)[,1][] = 0.00001 # compute for eq Fmsy
   fbar(eqstk)[,1:101][] = ftgt # compute for equilibrium Fmsy
   eqstk = brp(eqstk)
