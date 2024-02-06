@@ -12,7 +12,8 @@ computeFbrps(
   fmsy = FALSE,
   f0.1 = TRUE,
   fmax = 5,
-  verbose = T
+  verbose = T,
+  ...
 )
 }
 \arguments{

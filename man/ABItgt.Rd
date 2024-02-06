@@ -5,7 +5,7 @@
 \title{ABItgt()
 Computes ABI for target F, e.g. ABImsy (Griffith et al. 2023)}
 \usage{
-ABItgt(stock, ftgt = 0.2, thresh = 0.9)
+ABItgt(stock, ftgt = 0.2, thresh = 0.9, ...)
 }
 \arguments{
 \item{stock}{object of class FLStock}

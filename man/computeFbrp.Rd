@@ -16,7 +16,8 @@ computeFbrp(
   bpa = "missing",
   bthresh = "missing",
   verbose = T,
-  fmax = 10
+  fmax = 10,
+  ...
 )
 }
 \arguments{

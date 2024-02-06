@@ -206,7 +206,7 @@ newselex<- function(object,selexpars){
 #' ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+theme(legend.position = "none")+ylab("Index")
 
 bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
-  idx = survey(object,sel=sel,biomass=T)
+  idx = survey(object,sel=sel,biomass=TRUE)
   
   idx@index.q[] =  rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
   idx@index.var[] = sigma
@@ -484,7 +484,7 @@ for(i in seq(dims(object)$age)){
 #' brp = FLBRP(ple4,sr)
 #' asem2spm(brp)[1:4]
 #' plotpf(brp)
-#' plotpf(brp,rel=T)
+#' plotpf(brp,rel=TRUE)
 
 asem2spm <- function(object,quant=c("vb","ssb"),fmsy=NULL,rel=FALSE,spcurve=FALSE){
   quant = quant[1]
@@ -541,7 +541,7 @@ asem2spm <- function(object,quant=c("vb","ssb"),fmsy=NULL,rel=FALSE,spcurve=FALS
 #' brp = FLBRP(ple4,sr)
 #' asem2spm(brp)[1:4]
 #' plotpf(brp)
-#' plotpf(brp,rel=T)
+#' plotpf(brp,rel=TRUE)
 plotpf <- function(object,quant=c("vb","ssb"),fmsy=NULL,rel=FALSE){
 
 pf = function(asem,quant,rel=FALSE){

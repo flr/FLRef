@@ -33,5 +33,5 @@ sr <- srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=mean(spr0y(ple4)))
 brp = FLBRP(ple4,sr)
 asem2spm(brp)[1:4]
 plotpf(brp)
-plotpf(brp,rel=T)
+plotpf(brp,rel=TRUE)
 }
