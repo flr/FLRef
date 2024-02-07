@@ -1,11 +1,11 @@
 Package: FLRef
 Title: Reference point computation for advice rules
-Version: 1.10.3
+Version: 1.10.4
 Authors@R:
-    c(person(given = "Henning",
-           family = "Winker",
-           role = c("aut", "cre"),
-           email = "henning.winker@ec.europa.com"))
+  c(person(given = "Henning",
+    family = "Winker",
+    role = c("aut", "cre"),
+    email = "henning.winker@gmail.com"))
 Maintainer: Henning Winker <Henning.Winker@gmail.com>
 Description: Blah
 Depends:
