@@ -57,9 +57,6 @@ output list of quant posteriors and mle's
 \description{
 function to generate uncertainty for Stock Synthesis
 }
-\examples{
-mvn = SSdeltaMVLN(ss3sma,plot=TRUE) 
-}
 \author{
 Henning Winker (JRC-EC)
 }

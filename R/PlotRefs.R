@@ -26,9 +26,9 @@
 #' srr = srrTMB(as.FLSR(ple4,model=rickerSV),spr0=spr0y(ple4))
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","msy"),blim=0.1,type="b0")
 #' ploteq(brp,obs=TRUE)
-#' ploteq(brp,obs=TRUE,refpts="msy",rel=T)
+#' ploteq(brp,obs=TRUE,refpts="msy",rel=TRUE)
 #' brp.pa = computeFbrp(stock=ple4,sr=srr,proxy=c("msy","sprx","f0.1"),blim=0.1,bpa=Fbrp(brp)["Blim"]*2,type="b0")
-#' ploteq(brp.pa,obs=TRUE,rel=T)
+#' ploteq(brp.pa,obs=TRUE,rel=TRUE)
 
 
 ploteq <- function(brps, refpts="missing", obs=FALSE,rel=FALSE,rpf=TRUE ,dashed=rpf,
@@ -672,11 +672,11 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
 #' # Use Bpa as trigger (ICES style)
 #' plotAR(rpt,obs=ple4,bpa=1.4)
 #' # Change kobe to greyscale
-#' plotAR(rpt,obs=ple4,bpa=1.4,kobe=F)
+#' plotAR(rpt,obs=ple4,bpa=1.4,kobe=FALSE)
 #' # add fishing closure with minimum unavoidable F and Btrigger
-#' plotAR(rpt,obs=ple4,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.01)
+#' plotAR(rpt,obs=ple4,bpa=1.4,btrigger=0.7,kobe=TRUE,bclose=1,fmin=0.01)
 #' # show a relative
-#' plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.02)
+#' plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=TRUE,bclose=1,fmin=0.02)
 
 plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missing",fpa="missing",fthresh="missing",bclose=0,fmin=0, obs="missing", kobe=TRUE,
                    alpha=1,xmax=1.2,ymax=1.5,ylab="missing",xlab="missing",rel=FALSE,expand=TRUE,labels=TRUE,label.cex=3.5,critical=TRUE) {
@@ -934,9 +934,9 @@ plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missi
 
 
 
-#{{{
+# plotWKREF {{{
+
 #' plotWKREF
-#
 #' Plots the new proposed ICES advice rule
 #'
 #' @param ftgt Target F = min(Fbrp,Fp0.5) 
@@ -966,7 +966,7 @@ plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missi
 #' # Close fishery at Blim, but allow fmin (e.g. bycatch)
 #' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,rel=TRUE)
 #' # Change Btrigger above Btgt
-#' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=btresh,rel=TRUE)
+#' plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=0.80,rel=TRUE)
 #' # Plot stock data
 #' data(ple4)
 #' plotWKREF(ftgt=0.25,btgt=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)
@@ -1132,9 +1132,8 @@ plotWKREF <- function(ftgt = 1,btgt=1,blim=0.2,btrigger=0.9*btgt,bthresh=0.8*btg
 }  
 #}}}
 
-#{{{
-#' plotMAjuro
-#
+# plotMAjuro {{{
+
 #' Plots the new proposed ICES advice rule
 #'
 #' @param ftgt Target F = min(Fbrp,Fp0.5) 

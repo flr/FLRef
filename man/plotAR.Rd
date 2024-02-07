@@ -91,9 +91,9 @@ plotAR(rpt,btrigger=an(0.8*rpt["Btgt"]))
 # Use Bpa as trigger (ICES style)
 plotAR(rpt,obs=ple4,bpa=1.4)
 # Change kobe to greyscale
-plotAR(rpt,obs=ple4,bpa=1.4,kobe=F)
+plotAR(rpt,obs=ple4,bpa=1.4,kobe=FALSE)
 # add fishing closure with minimum unavoidable F and Btrigger
-plotAR(rpt,obs=ple4,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.01)
+plotAR(rpt,obs=ple4,bpa=1.4,btrigger=0.7,kobe=TRUE,bclose=1,fmin=0.01)
 # show a relative
-plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=T,bclose=1,fmin=0.02)
+plotAR(rpt,obs=ple4,rel=TRUE,bpa=1.4,btrigger=0.7,kobe=TRUE,bclose=1,fmin=0.02)
 }

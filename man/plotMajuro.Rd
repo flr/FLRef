@@ -2,8 +2,7 @@
 % Please edit documentation in R/PlotRefs.R
 \name{plotMajuro}
 \alias{plotMajuro}
-\title{plotMAjuro
-Plots the new proposed ICES advice rule}
+\title{Plots the new proposed ICES advice rule}
 \usage{
 plotMajuro(
   ftgt = 1,
@@ -68,7 +67,6 @@ plotMajuro(
 ggplot
 }
 \description{
-plotMAjuro
 Plots the new proposed ICES advice rule
 }
 \examples{

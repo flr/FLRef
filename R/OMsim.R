@@ -215,9 +215,8 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
 }
 # }}}
 
-# {{{
-# idx.sim()
-#
+# idx.sim {{{
+
 #' generates FLIndex with lognormal annual and multinomial age composition observation error 
 #' @param object FLStock
 #' @param sel FLQuant with selectivity.pattern 
@@ -229,6 +228,7 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
 #' @export 
 #' @examples 
 #' data(ple4)
+#' sel <- catch.sel(ple4)
 #' ggplot(sel)+geom_line(aes(age,data))+ylab("Selectivity")+xlab("Age")
 #' object = propagate(ple4,10)
 #' idx = idx.sim(object,sel=sel,ess=200,sigma=0.2,q=0.01)
@@ -617,7 +617,7 @@ updsr <- function(object,s=0.7,v=NULL){
     v = refpts(object)["virgin","ssb"]
   sr=SRModelName(model(object))
   par=FLPar(s=s,v = v)
-  params(object)=FLCore::ab(par[c("s","v")],sr,spr0=spr0(eql))[c("a","b")]
+  params(object)=FLCore::ab(par[c("s","v")],sr,spr0=spr0(object))[c("a","b")]
   return(object)
 }  
 #}}}

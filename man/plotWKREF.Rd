@@ -77,7 +77,7 @@ plotWKREF(blim=0.2,bclose=0.2,rel=TRUE)
 # Close fishery at Blim, but allow fmin (e.g. bycatch)
 plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,rel=TRUE)
 # Change Btrigger above Btgt
-plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=btresh,rel=TRUE)
+plotWKREF(blim=0.2,bclose=0.2,fmin=0.1,btrigger=0.80,rel=TRUE)
 # Plot stock data
 data(ple4)
 plotWKREF(ftgt=0.25,btgt=8e+05,btrigger = 0.9*8e+05, blim=2e5,bclose=3e5,fmin=0.03,obs=ple4)

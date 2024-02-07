@@ -132,8 +132,6 @@ stockMedians <- function(stock){
 #' @return output list of quant posteriors and mle's
 #' @author Henning Winker (JRC-EC)
 #' @export
-#' @examples 
-#' mvn = SSdeltaMVLN(ss3sma,plot=TRUE) 
 
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
                        addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123){
