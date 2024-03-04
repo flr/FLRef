@@ -222,7 +222,8 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
 #' @param sel FLQuant with selectivity.pattern 
 #' @param ess effective sample size for age composition sample
 #' @param sigma annual observation error for log(q)
-#' @param age define age range 
+#' @param ages define age range 
+#' @param years define year range
 #' @param q catchability coefficient for scaling
 #' @return FLIndex
 #' @export 
@@ -231,17 +232,22 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
 #' sel = newselex(catch.sel(ple4),FLPar(S50=1.5,S95=2.1,Smax=4.5,Dcv=1,Dmin=0.1))
 #' ggplot(sel)+geom_line(aes(age,data))+ylab("Selectivity")+xlab("Age")
 #' object = propagate(ple4,10)
-#' idx = idx.sim(object,sel=sel,ess=200,sigma=0.2,q=0.01)
+#' idx = idx.sim(object,sel=sel,ess=200,sigma=0.2,q=0.01,years=1994:2017)
 #' # Checks
 #' ggplot(idx@sel.pattern)+geom_line(aes(age,data))+ylab("Selectivity")+xlab("Age")
 #' ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age,scales="free_y")+
 #' theme(legend.position = "none")+ylab("Index")
 
-idx.sim <- function(object,sel=catch.sel(object),ages=NULL,ess=200,sigma=0.2,q=0.01){
+idx.sim <- function(object,sel=catch.sel(object),ages=NULL,years=NULL,ess=200,sigma=0.2,q=0.01){
   if(is.null(ages)){
     ages = an(dimnames(object)$age)
   }
-  idx = index = survey(object,ages=ac(ages),sel=sel,biomass=F)
+  if(is.null(years)){
+    years = an(dimnames(object)$year)
+  }
+  sel = trim(sel,age=ages,year=years)
+  object = trim(object,age=ages,year=years)
+  idx = index = trim(survey(object,ages=ac(ages),sel=sel,biomass=F))
   devs = rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
   for(i in seq(ages)){
     idx@index.q[i,] = devs 
