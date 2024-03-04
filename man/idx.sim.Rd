@@ -34,12 +34,12 @@ generates FLIndex with lognormal annual and multinomial age composition observat
 }
 \examples{
 data(ple4)
-sel <- catch.sel(ple4)
+sel = newselex(catch.sel(ple4),FLPar(S50=1.5,S95=2.1,Smax=4.5,Dcv=1,Dmin=0.1))
 ggplot(sel)+geom_line(aes(age,data))+ylab("Selectivity")+xlab("Age")
 object = propagate(ple4,10)
 idx = idx.sim(object,sel=sel,ess=200,sigma=0.2,q=0.01)
 # Checks
 ggplot(idx@sel.pattern)+geom_line(aes(age,data))+ylab("Selectivity")+xlab("Age")
-ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
+ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age,scales="free_y")+
 theme(legend.position = "none")+ylab("Index")
 }

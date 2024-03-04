@@ -25,6 +25,16 @@ computeFbrp(
 
 \item{sr}{stock recruitment model of class FLSR}
 
+\item{proxy}{choice of Fmsy proxies (combinations permitted) 
+\itemize{
+  \item "sprx"  spawning potential ratio spr/spr0 with basis x 
+  \item "bx" SSB as fraction xSSB0
+  \item "f0.1" 10% slope of yield-per-recruit curve
+  \item "fe40" Patterns estimator for Fmsy
+  \item "msy"  maximum surplus production (not defined for segreg)
+  \item  numeric user value 
+}}
+
 \item{x}{basis in percent for sprx and bx, e.g. 40 for spr40}
 
 \item{blim}{values < 1 are taken as fraction to B0 and blim > 1 as absolute values unless specified otherwise}
@@ -45,15 +55,6 @@ computeFbrp(
 \item{verbose}{}
 
 \item{fmax}{maximum Flim = max(Flim,fmax*Fbrp)}
-
-\item{proxies}{choice of Fmsy proxies (combinations permitted) 
-\itemize{
-  \item "sprx"  spawning potential ratio spr/spr0 with basis x 
-  \item "bx" SSB as fraction xSSB0
-  \item "f0.1" 10% slope of yield-per-recruit curve
-  \item "fe40" Patterns estimator for Fmsy
-  \item "msy"  maximum surplus production (not defined for segreg)
-}}
 }
 \value{
 brp object of class FLBRP with computed Fbrp reference points

@@ -7,6 +7,7 @@ Simulates stochastic stock dynamics under under constant Fbrp}
 \usage{
 Fsim(
   brp,
+  Ftgt = NULL,
   sigmaR = 0.5,
   rho = 0,
   nyears = 100,

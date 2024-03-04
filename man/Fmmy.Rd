@@ -53,4 +53,7 @@ brp = computeFbrp(ple4,bh,proxy=c("bx","msy"),x=35,blim=0.1)
 fmmy = Fmmy(brp,sigmaR=0.7,rho=0.3)
 getF(fmmy) # FMMY value 
 plotFsim(fmmy)
+brpfmmy = computeFbrp(ple4,bh,proxy=getF(fmmy),blim=0.1)
+fsim = Fsim(brpfmmy,sigmaR=0.7,rho=0.3)
+plotFsim(fsim)
 }

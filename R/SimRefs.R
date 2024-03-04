@@ -22,7 +22,7 @@
 #' plotFsim(fsim)
 #' plotFsim(fsim,panels=2)
 
-Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbose=TRUE){
+Fsim <- function(brp,Ftgt=NULL,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbose=TRUE){
   fbar(brp)[] = 0.01
   stock=as(brp,"FLStock")
   ref = rownames(refpts(brp))[grep("F",rownames(refpts(brp)))][1]
@@ -36,7 +36,11 @@ Fsim <- function(brp,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=NULL,verbos
   sr = as(brp,"FLSR")
   stock = propagate(stock,iters)
   stock.n(stock)[1:(dim(stock)[1]-1),1] = stock.n(stock)[1:(dim(stock)[1]-1),1]*rlnorm(iters*(dim(stock)[1]-1),0-0.5*sigmaR^2,sigmaR)
+  if(is.null(Ftgt)){
   Fbrp = an(refpts(brp)[ref,"harvest"])
+  } else {
+  Fbrp = Ftgt  
+  }
   devs = ar1rlnorm(rho=rho, years=1:(nyears+1), iters=iters,meanlog= 0, sdlog=sigmaR)
   
   
@@ -329,7 +333,9 @@ opt.bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics,
 #' fmmy = Fmmy(brp,sigmaR=0.7,rho=0.3)
 #' getF(fmmy) # FMMY value 
 #' plotFsim(fmmy)
-
+#' brpfmmy = computeFbrp(ple4,bh,proxy=getF(fmmy),blim=0.1)
+#' fsim = Fsim(brpfmmy,sigmaR=0.7,rho=0.3)
+#' plotFsim(fsim)
 
 Fmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range="missing",tol=0.001,maxit=15,verbose=TRUE){
   fbar(brp)[] = 0.01
