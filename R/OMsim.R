@@ -672,3 +672,115 @@ fudc = function(object,fref=0.2,fhi=2.5,flo=0.8,sigmaF=0.2){
   return(flq[,-1])
 }
 
+
+#' schaefer.sim()
+#' 
+#' generates a Schafer surplus production model with process and observation error
+#' @param k carrying capacity
+#' @param r intrinsic rate of population increase
+#' @param q catchability coefficient 
+#' @param pe process error 
+#' @param oe process error 
+#' @param bk initial fraction of b/k
+#' @param years time horizon 
+#' @param f0 factor for initial year as f0 = f/fmsy
+#' @param fhi factor for high F as fhi = f/fmsy
+#' @param flo factor for low F as flo = fbar/fmsy
+#' @param sigmaF variation on f trajectory
+#' @param iters number of iterations
+#' @param rel if TRUE metrics B/Bmsy and F/Fmsy are produced
+#' @return FLQuants
+#' @export
+#' @examples
+#' stk = schaefer.sim(iters=100,q=0.5) 
+#' plotAdvice(stk)
+#' plot(FLIndex(index=iter(stk@stock,1))) # index
+
+schaefer.sim <- function(k=10000,r=0.3,q=0.5,pe=0.1,oe=0.2,bk=0.9,
+                         years=1980:2022,f0=0.2,fhi=2.2,flo=0.8,sigmaF=0.15,iters=1,
+                         blim=0.3,bthr=0.5,rel=FALSE){
+  fmsy= fref= r/2
+  bmsy = k/2
+  f0 = f0*fmsy
+  f = propagate(FLQuant(f0,dimnames=list(year= years,age=1),units="f"),iters)
+  x = an(dimnames(f)$year)
+  steps = length(x)
+  y0 = x[1]
+  y1 = x[floor(steps/2)]
+  y2 = x[ceiling(3*steps/4)]
+  f[,x > y0 & x <= y1] = ((fhi*fref-f0)/(y1-y0))*(x[x > y0 & x <= y1] - y0) +f0
+  f[,x > y1 & x <= y2] = (-(fhi*fref-flo*fref)/(y2-y1))*(x[x > y1 & x <= y2]-y1) +fhi*fref
+  f[,x > y2] = fref*flo
+  f=f*rlnorm(f,0,sigmaF)
+  units(f) ="f"
+  b = propagate(FLQuant(k*bk,dimnames=list(year= c(years,max(years)+1),age=1),units="t"),iters)
+  pdevs = rlnorm(b,0,pe)
+  b[,1] = b[,1]*pdevs[,1] 
+  for(y in 2:(steps+1)){
+    b[,y] = (b[,y-1]+r*b[,y-1]*(1-b[,y-1]/k)-b[,y-1]*f[,y-1])*pdevs[,y-1] 
+  }
+  B = b[,ac(years)]
+  C = b[,ac(years)]*f 
+  units(C) = "t"
+  H = f
+  if(rel){
+    B = B/bmsy
+    H = H/fmsy
+  }
+  
+  df = as.data.frame(B)
+  year = unique(df$year)
+  N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                            season="all",area="unique",iter=df$iter,data=1))
+  Mat = B
+  
+  stk = FLStockR(
+    stock.n=N,
+    catch.n = C,
+    landings.n = C,
+    discards.n = FLQuant(0, dimnames=list(age="1", year = (year))),
+    stock.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+    landings.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    discards.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    catch.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    mat=Mat,
+    m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+    harvest = H,
+    m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
+    harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+  )
+  units(stk) = standardUnits(stk)
+  stk@catch = computeCatch(stk)
+  stk@landings = computeLandings(stk)
+  stk@discards = computeStock(stk)
+  stk@stock = B
+  
+  stk@refpts = FLPar(
+    Fmsy = fmsy,
+    Bmsy = bmsy,
+    MSY = r*k/4,
+    Blim= bmsy*blim,
+    Bthr= bmsy*bthr,
+    B0 = k,
+  )
+  
+  # index
+  obsdev = rlnorm(b[,ac(years)],0,oe)
+  index = b[,ac(years)]*q*obsdev
+  
+  stk@stock = index
+  
+  if(rel){
+    stk@refpts[1:2] =1 
+    stk@refpts["Blim"] = blim
+    stk@refpts["Bthr"] = bthr
+    stk@refpts["B0"] = k/bmsy
+  }
+  stk@desc = "spm"
+  
+  
+  
+  
+  return(stk)
+}       
+
