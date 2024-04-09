@@ -108,7 +108,7 @@ ss2FLStockR <- function(mvln,thin=10, output=NULL){
 #' @param rel if TRUE ratios B/Btgt and F/Ftgt are shown
 #' @return data.frame
 #' @export
-fwd2stars <- function(object,eval.yrs=NULL, rel=FALSE){
+fwd2stars <- function(object,eval.yrs=NULL, rel=TRUE){
   if(!class(object)=="FLStocks"){
     object = FLStocks(forecast=object)
   }
@@ -120,8 +120,8 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=FALSE){
       stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
       flqs = FLQuants(
         Cy = round(landings(x)[,ac(eval.yrs)],3),
-        By = round(ssb(x)[,ac(eval.yrs)],3),
-        Fy = round(fbar(x)[,ac(eval.yrs)],3)
+        Fy = round(fbar(x)[,ac(eval.yrs)],3),
+        By = round(ssb(x)[,ac(eval.yrs)],3)
       )
       out = as.data.frame(flqs)
       data.frame(scenario=y, t(as.matrix(out$data)))
@@ -133,6 +133,8 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=FALSE){
   }
   if(rel){
     
+  
+    
     df = do.call(rbind,Map(function(x,y){
       if(!class(x)=="FLStockR") 
         stop("input must be FLStockR object with @ref
@@ -141,18 +143,42 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=FALSE){
       stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
       flqs = FLQuants(
         Cy = round(landings(x)[,ac(eval.yrs)],3),
-        By = round(ssb(x)[,ac(eval.yrs)],3)/stk@refpts[[2]],
-        Fy = round(fbar(x)[,ac(eval.yrs)]/stk@refpts[[1]],3)
-      )
+        Fy = round(fbar(x)[,ac(eval.yrs)]/stk@refpts[[1]],3),
+        By = round(ssb(x)[,ac(eval.yrs)]/stk@refpts[[2]],3))
+    
+      if("Bpa"%in%rownames(object[[1]]@refpts)){
+        flqs = FLQuants(c(flqs,FLQuants(Bpa=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts["Bpa"]),3))))
+      }
+      if("Bthr"%in%rownames(object[[1]]@refpts)){
+        flqs = FLQuants(c(flqs,FLQuants(Bthr=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts["Bthr"]),3))))
+      }
+      if("Blim"%in%rownames(object[[1]]@refpts)){
+        flqs = FLQuants(c(flqs,FLQuants(Blim=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts["Blim"]),3))))
+      }
+      
       out = as.data.frame(flqs)
       data.frame(scenario=y, t(as.matrix(out$data)))
     },x=object,y=names(object))
     )
+    
     refn = rownames(object[[1]]@refpts)[1:2]
-    names(df) = c("scenario",paste0("C",eval.yrs),
-                  paste0("B",eval.yrs,"/",refn[2]),
-                  paste0("F",eval.yrs,"/",refn[1]))
+    
+    nam = c("scenario",paste0("C",eval.yrs),
+                  paste0("F",eval.yrs,"/",refn[1]),
+                  paste0("B",eval.yrs,"/",refn[2])
+                  )
+    if("Bpa"%in%rownames(object[[1]]@refpts)){
+      nam = c(nam, paste0("B",eval.yrs,"/","Bpa"))
+    }
+    if("Bthr"%in%rownames(object[[1]]@refpts)){
+      nam = c(nam, paste0("B",eval.yrs,"/","Bthr"))
+    }
+    if("Blim"%in%rownames(object[[1]]@refpts)){
+      nam = c(nam, paste0("B",eval.yrs,"/","Blim"))
+    }
+    names(df) = nam  
   }    
+  
   rownames(df) = 1:nrow(df)
   return(df)  
 } # End of function

@@ -4,7 +4,7 @@
 \alias{fwd2stars}
 \title{Function to summarise forecast results}
 \usage{
-fwd2stars(object, eval.yrs = NULL, rel = FALSE)
+fwd2stars(object, eval.yrs = NULL, rel = TRUE)
 }
 \arguments{
 \item{object}{*FLStocks* with list of *FLStockR* objects}

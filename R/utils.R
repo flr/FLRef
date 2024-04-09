@@ -130,7 +130,7 @@ stockMedians <- function(stock){
 #' @param verbose Report progress to R GUI?
 #' @param seed retains interannual correlation structure like MCMC 
 #' @return output list of quant posteriors and mle's
-#' @author Henning Winker (JRC-EC)
+#' @author Henning Winker (GFCM)
 #' @export
 
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
@@ -358,6 +358,34 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
 } # End 
 
 # {{{
+#' blag()
+#'
+#' function to assign B[y+1] to B[y]. Warning correlation structure of B[y+1] and F[y] is meaningless
+#'
+#' @param mvn 
+#' @return output list of quant posteriors and mle's
+#' @author Henning Winker (GFCM)
+#' @export
+
+blag <- function(mvn,verbose=TRUE){
+  d1 = mvn$mle
+  d2 = mvn$kb
+  endyr = max(mvn$mle$year)  
+  styr = min(mvn$mle$year)
+  d1B = d1[d1$year!=styr,]
+  d2B = d2[d2$year!=styr,]
+  d1 = d1[d1$year!=endyr,] 
+  d2 = d2[d2$year!=endyr,] 
+  d1[,c("stock","SSB")] = d1B[,c("stock","SSB")] 
+  d2[,c("stock","SSB")] = d2B[,c("stock","SSB")] 
+  out = mvn
+  out$mle =d1
+  out$kb=d2
+  return(out)
+}
+# }}}
+
+# {{{
 #' Mlorenzen
 #' 
 #' computes Lorenzen M with scaling option
@@ -384,3 +412,6 @@ Mlorenzen = function(object,Mref="missing",Aref=2){
   return(out)
 } 
 #}}}
+
+
+

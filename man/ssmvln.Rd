@@ -58,5 +58,5 @@ output list of quant posteriors and mle's
 function to generate uncertainty for Stock Synthesis
 }
 \author{
-Henning Winker (JRC-EC)
+Henning Winker (GFCM)
 }
