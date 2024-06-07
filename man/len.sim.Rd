@@ -15,6 +15,7 @@ len.sim(
   reflen = NULL,
   bin = 1,
   cv = 0.1,
+  lmin = 5,
   lmax = 1.2
 )
 }
@@ -38,6 +39,8 @@ len.sim(
 \item{bin}{length bin size, dafault 1}
 
 \item{cv}{variation in L_a}
+
+\item{lmin}{minimum length}
 
 \item{lmax}{maximum upper length specified lmax*linf}
 }

@@ -4,12 +4,12 @@
 \alias{ALK}
 \title{ALK function}
 \usage{
-ALK(N_a, invALK)
+ALK(N_a, iALK)
 }
 \arguments{
 \item{N_a}{numbers at age sample for single event}
 
-\item{invALK}{from invALK() outout}
+\item{iALK}{from iALK() outout}
 }
 \value{
 FLPar of ALK

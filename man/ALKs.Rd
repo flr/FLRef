@@ -4,12 +4,12 @@
 \alias{ALKs}
 \title{annual ALK function}
 \usage{
-ALKs(object, invALK)
+ALKs(object, iALK)
 }
 \arguments{
 \item{object}{FLQuant with numbers at age}
 
-\item{invALK}{from invALK() outout}
+\item{iALK}{from iALK() outout}
 }
 \value{
 FLPars of ALK

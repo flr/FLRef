@@ -329,18 +329,77 @@ ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1]){
 }
 # }}}
 
+
+# {{{
+# iALK()
+#
+#' inverse ALK function with lmin added to FLCore::invALK 
+#' @param params growth parameter, default FLPar(linf,k,t0)
+#' @param model growth model, only option currently vonbert
+#' @param age age vector
+#' @param cv of length-at-age
+#' @param lmax maximum upper length specified lmax*linf
+#' @param max maximum size value
+#' @param lmin minimum length
+#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
+#' @param bin length bin size, dafault 1
+#' @param timing t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5
+#' @param unit default is "cm"
+#' @return FLPar age-length matrix
+#' @export 
+
+iALK <- function(params, model=vonbert, age, cv=0.1,lmin=5, lmax=1.2, bin=1,
+                   max=ceiling(linf * lmax), reflen=NULL) {
+  
+  linf <- c(params['linf'])
+  
+  # FOR each age
+  bins <- seq(lmin, max, bin)
+  
+  # METHOD
+  if(isS4(model))
+    len <- do.call(model, list(age=age,params=params))
+  else {
+    lparams <- as(FLPar(params), "list")
+    len <- do.call(model, c(list(age=age),
+                            lparams[names(lparams) %in% names(formals(model))]))
+  }
+  
+  if(is.null(reflen)) {
+    sd <- abs(len * cv)
+  } else {
+    sd <- reflen * cv
+  }
+  
+  probs <- Map(function(x, y) {
+    p <- c(pnorm(1, x, y),
+           dnorm(bins[-c(1, length(bins))], x, y),
+           pnorm(bins[length(bins)], x, y, lower.tail=FALSE))
+    return(p / sum(p))
+  }, x=len, y=sd)
+  
+  res <- do.call(rbind, probs)
+  
+  alk <- FLPar(array(res, dim=c(length(age), length(bins), 1)),
+               dimnames=list(age=age, len=bins, iter=1), units="")
+  
+  return(alk)
+} 
+# }}}
+
+
 # {{{
 # ALK()
 #
 #' ALK function
 #' @param N_a numbers at age sample for single event
-#' @param invALK from invALK() outout
+#' @param iALK from iALK() outout
 #' @return FLPar of ALK
 #' @export 
-ALK <- function(N_a,invALK){
-  alk = invALK
+ALK <- function(N_a,iALK){
+  alk = iALK
   alk[] = N_a
-  alk = alk*invALK
+  alk = alk*iALK
   alksum =apply(alk,2,sum)
   for(i in 1:dim(alk)[1]){
     alk[i,]=alk[i,]/an(alksum)
@@ -354,18 +413,18 @@ ALK <- function(N_a,invALK){
 #
 #' annual ALK function
 #' @param object FLQuant with numbers at age
-#' @param invALK from invALK() outout
+#' @param iALK from iALK() outout
 #' @return FLPars of ALK
 #' @export 
-ALKs <- function(object,invALK){
+ALKs <- function(object,iALK){
   it = dim(object)[6]
   nyr= dim(object)[2]
   year = (dimnames(object)$year)
   alks = FLPars(lapply(year,function(x){
-  alk = propagate(invALK,it)
+  alk = propagate(iALK,it)
   alk[] = object[,ac(x)]
   for(i in seq(it)){
-  iter(alk,i) = iter(alk,i) *invALK
+  iter(alk,i) = iter(alk,i) *iALK
   iter(alk,i) =  sweep(iter(alk,i),2,apply(iter(alk,i),2,sum),"/")
   }
   
@@ -422,6 +481,7 @@ applyALK <- function(len,alks){
 #' @param cv variation in L_a
 #' @param reflen evokes fixed sd for L_a at sd = cv*reflen
 #' @param scale if TRUE scaled to N_a input 
+#' @param lmin minimum length
 #' @param lmax maximum upper length specified lmax*linf
 #' @param bin length bin size, dafault 1
 #' @param ess effective sample size
@@ -430,17 +490,68 @@ applyALK <- function(len,alks){
 #' @return FLQuant for length
 #' @export
 
-len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmax = 1.2){
+len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
   gp = c(params) 
   age = an(dimnames(N_a)$age)
   lenls = FLQuants(lapply(as.list(timing),function(x){
-  ialk <- FLCore::invALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
-                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin)
-  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))                 
+  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
+                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
+  N_adj =  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))                 
   })) 
   if(length(lenls)>1){
     out= iterSums(combine(lenls))} else {
     out = lenls[[1]]
+    }
+  units(out) = unit
+  if(scale){
+    fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
+    out = out%*%fac #*an(units(N_a))/1000
+  }
+  
+  return(out)
+}
+# }}}
+
+
+# {{{
+# lfd.sim()
+#
+#' function to generate survey (pulse) and continuous LFDs
+#' @param object *FLQuant* numbers at age sample
+#' @param stock *FLStock* object 
+#' @param sel selectivity, default catch.sel(stock)
+#' @param params growth parameter, default FLPar(linf,k,t0)
+#' @param model growth model, only option currently vonbert
+#' @param cv variation in L_a
+#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
+#' @param scale if TRUE scaled to N_a input 
+#' @param lmin minimum length
+#' @param lmax maximum upper length specified lmax*linf
+#' @param bin length bin size, dafault 1
+#' @param ess effective sample size
+#' @param timing default constinoues seq(0,11/12,1/12), but can be single event 0.5
+#' @param timeref reference timing of the sample, default 0.5 (e.g. survey or catch.n)
+#' @param unit default is "cm"
+#' @return FLQuant for length
+#' @export
+
+lfd.sim <- function(object, stock, sel=catch.sel(stock),params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),timeref=0.5,unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
+  gp = c(params) 
+  age = an(dimnames(object)$age)
+  year = an(dimnames(object)$year)
+  stock = trim(stock,year=year,age=age)
+  
+  lenls = FLQuants(lapply(as.list(timing),function(x){
+    ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
+                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
+    # Adjust for timing in abundance
+    N_a =  object# * exp(-harvest(stock) * (x-timeref) - m(stock) * (x-timeref))
+    N_adj =  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))
+    #return(N_adj)
+  })) 
+  if(length(lenls)>1){
+    out= iterSums(combine(lenls))} else {
+      out = lenls[[1]]
     }
   units(out) = unit
   if(scale){
@@ -476,6 +587,9 @@ for(i in seq(dims(object)$age)){
  #out[out==0] = NA
  return(out)
 }
+
+
+
 
 #' asem2spm()
 #' @param object An *FLBRP*
