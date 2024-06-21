@@ -7,7 +7,7 @@
 ca.sim(object, ess = 200, what = c("catch", "landings", "discards")[1])
 }
 \arguments{
-\item{object}{FLStock}
+\item{object}{FLQuant}
 
 \item{ess}{effective sample size for age composition}
 
@@ -16,7 +16,7 @@ ca.sim(object, ess = 200, what = c("catch", "landings", "discards")[1])
 \item{sel}{FLQuant with selectivity.pattern e.g. catch.sel()}
 }
 \value{
-FLIndex
+FLQuant with catch.n samples
 }
 \description{
 generates catch.n with lognormal annual and multinomial age composition observation error

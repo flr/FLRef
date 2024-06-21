@@ -61,3 +61,5 @@ export(ABItgt)
 export(schaefer.sim)
 export(blag)
 export(iALK)
+export(alk.sample)
+

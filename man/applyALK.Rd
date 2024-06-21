@@ -4,12 +4,12 @@
 \alias{applyALK}
 \title{applyALK function to length to age}
 \usage{
-applyALK(len, alks)
+applyALK(lfds, alks)
 }
 \arguments{
-\item{len}{*FLQuant* with numbers at length}
-
 \item{alks}{*FLPars* annual ALKs}
+
+\item{lfd}{*FLQuant* with numbers at length}
 }
 \value{
 FLQuant for numbers at age

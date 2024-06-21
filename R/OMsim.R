@@ -211,6 +211,7 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
   idx@index.q[] =  rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
   idx@index.var[] = sigma
   idx@index = idx@index.q*idx@index
+  units(idx)[] = "NA"
   return(idx)
 }
 # }}}
@@ -292,11 +293,11 @@ pgquant <- function(object,pg){
 # ca.sim()
 #
 #' generates catch.n with lognormal annual and multinomial age composition observation error 
-#' @param object FLStock
+#' @param object FLQuant
 #' @param sel FLQuant with selectivity.pattern e.g. catch.sel()
 #' @param ess effective sample size for age composition
 #' @param what c("catch", "landings", "discards")
-#' @return FLIndex
+#' @return FLQuant with catch.n samples
 #' @export 
 #' @examples 
 #' data(ple4)
@@ -306,15 +307,7 @@ pgquant <- function(object,pg){
 #' ggplot(ca)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
 #' theme(legend.position = "none")+ylab("Index")
 ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1]){
-  if(what=="catch"){
-    res = catch.n(object)
-  }  
-  if(what=="landings"){
-    res = landings.n(object)
-  } 
-  if(what=="discards"){
-    res = discards.n(object)
-  } 
+  res=object
   ref=res
   # Sample age-comp from multinomial
   for(i in seq(dims(object)$iter)){
@@ -323,8 +316,8 @@ ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1]){
       res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob),1,sum)
     }
   }
-  fac = apply(ref,2:6,sum)/apply(res,2:6,sum)
-  res = res%*%fac
+  #fac = apply(ref,2:6,sum)/apply(res,2:6,sum)
+  #res = res%*%fac
   return(res)
 }
 # }}}
@@ -409,6 +402,38 @@ ALK <- function(N_a,iALK){
 # }}}
 
 # {{{
+# alk.sample()
+#
+#' generates annual ALK sample with length stratified sampling
+#' @param lfds length frequency *FLQuant*
+#' @param alks annual ALK proportions at age output form ALKs() *FLPars*
+#' @param nbin number of samples per length bin
+#' @param n.sample sample size of lfd 
+#' @return FLPars of sampled ALK
+#' @export 
+
+alk.sample <- function(lfds,alks,nbin = 20,n.sample=1){
+  res = alks
+  if(n.sample>1){
+    lfdn = lfds%/%apply(lfds,2:6,sum)*n.sample
+  }
+  for(i in seq(dims(lfds)$iter)){
+    for(y in seq(dims(lfds)$year)){
+      nL = pmin(lfdn[,y],nbin )  # check len samples
+      for(l in seq(dim(alks[[1]])[2])){
+        if(nL[l]>1){  
+          res[[y]][,l][] = apply(rmultinom(nL[l], 1, prob = c(alks[[y]][,l])),1,sum)
+        } else {
+          res[[y]][,l][] = 0}
+        
+      }
+    }
+  }
+  res
+}  
+
+
+# {{{
 # ALKs()
 #
 #' annual ALK function
@@ -439,13 +464,13 @@ ALKs <- function(object,iALK){
 # applyALK()
 #
 #' applyALK function to length to age
-#' @param len *FLQuant* with numbers at length
+#' @param lfd *FLQuant* with numbers at length
 #' @param alks *FLPars* annual ALKs
 #' @return FLQuant for numbers at age
 #' @export 
 
-applyALK <- function(len,alks){
-  yr = dimnames(len)$year
+applyALK <- function(lfds,alks){
+  yr = dimnames(lfds)$year
   year = an(yr)
   if(class(alks)=="FLPar"){
    alks = FLPars(lapply(yr,function(x){
@@ -455,16 +480,18 @@ applyALK <- function(len,alks){
   }
   age = ac(dimnames(alks[[1]])$age)
   
-  if(any(dimnames(len)$year !=  names(alks)))
+  if(any(dimnames(lfds)$year !=  names(alks)))
      stop("ALKs list must have the same years as length data")
-  its = dims(len)$iter
+  its = dims(lfds)$iter
   
   res <- FLQuant(NA, units="1000",
                  dimnames=list(age=age, year=year,iter=1:its))
   
   for(i in seq(its)){
   for(y in 1:length(year)){
-    iter(res,i)[,y] = apply(t(model.frame(iter(alks[[y]],i))[,seq(dim(alks[[y]])[1])])%*%c(iter(len[,y],i)),1,sum)
+    mf = (model.frame(iter(alks[[y]],i))[,seq(dim(alks[[y]])[1])])
+    mf = mf/pmax(apply(mf,1,sum),0.01)
+    iter(res,i)[,y] = apply(t(mf[,seq(dim(alks[[y]])[1])])%*%c(iter(lfds[,y],i)),1,sum)
   }
   }
   return(res)
@@ -503,11 +530,11 @@ len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),u
     out = lenls[[1]]
     }
   units(out) = unit
+  fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
   if(scale){
-    fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
-    out = out%*%fac #*an(units(N_a))/1000
+     out = out%*%fac #*an(units(N_a))/1000
   }
-  
+  #attr(out,"scaler") <- fac
   return(out)
 }
 # }}}
@@ -574,7 +601,8 @@ lfd.sim <- function(object, stock, sel=catch.sel(stock),params,model=vonbert,ess
 #' @param what type c("catch", "landings", "discards")
 #' @return FLQuant
 sops <- function(object,stock,sigma=0.1,what=c("catch","landings","discards")[1]){
-
+ dmo = dimnames(object) 
+ stock = stock[dmo$age,dmo$year]
  if(what=="catch") out = (catch(stock)/quantSums(object*catch.wt(stock)))%*%object
  if(what=="landings") out = (landings(stock)/quantSums(object*landings.wt(stock)))%*%object
  if(what=="landings") out = (discards(stock)/quantSums(object*discards.wt(stock)))%*%object
