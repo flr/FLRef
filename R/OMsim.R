@@ -416,6 +416,8 @@ alk.sample <- function(lfds,alks,nbin = 20,n.sample=1){
   res = alks
   if(n.sample>1){
     lfdn = lfds%/%apply(lfds,2:6,sum)*n.sample
+  } else {
+    lfdn = lfds
   }
   for(i in seq(dims(lfds)$iter)){
     for(y in seq(dims(lfds)$year)){
@@ -780,6 +782,7 @@ updsr <- function(object,s=0.7,v=NULL){
 #' @param fhi factor for high F as fhi = fbar/fref
 #' @param flo factor for low F as flo = fbar/fref
 #' @param sigmaF variation on fbar
+#' @param breaks relative location of directional change
 #' @return FLQuant
 #' @export
 #' @examples
@@ -796,7 +799,7 @@ updsr <- function(object,s=0.7,v=NULL){
 #' om@refpts = Fbrp(brp)
 #' plotAdvice(window(om,start=1960))
 
-fudc = function(object,fref=0.2,fhi=2.5,flo=0.8,sigmaF=0.2){
+fudc = function(object,fref=0.2,fhi=2.5,flo=0.8,sigmaF=0.2,breaks=c(0.5,0.75)){
   fref = c(fref)
   f0 = median(c(fbar(object)[,1]))
   f=(fbar(object))
@@ -804,8 +807,8 @@ fudc = function(object,fref=0.2,fhi=2.5,flo=0.8,sigmaF=0.2){
   steps = length(x)
   f[] = f0
   y0 = x[1]
-  y1 = x[floor(steps/2)]
-  y2 = x[ceiling(3*steps/4)]
+  y1 = x[floor(steps*breaks[1])]
+  y2 = x[ceiling(steps*breaks[2])]
   f[,x > y0 & x <= y1] = ((fhi*fref-f0)/(y1-y0))*(x[x > y0 & x <= y1] - y0) +f0
   f[,x > y1 & x <= y2] = (-(fhi*fref-flo*fref)/(y2-y1))*(x[x > y1 & x <= y2]-y1) +fhi*fref
   f[,x > y2] = fref*flo

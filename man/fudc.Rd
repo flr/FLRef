@@ -4,7 +4,14 @@
 \alias{fudc}
 \title{fudc()}
 \usage{
-fudc(object, fref = 0.2, fhi = 2.5, flo = 0.8, sigmaF = 0.2)
+fudc(
+  object,
+  fref = 0.2,
+  fhi = 2.5,
+  flo = 0.8,
+  sigmaF = 0.2,
+  breaks = c(0.5, 0.75)
+)
 }
 \arguments{
 \item{object}{An *FLStock*}
@@ -16,6 +23,8 @@ fudc(object, fref = 0.2, fhi = 2.5, flo = 0.8, sigmaF = 0.2)
 \item{flo}{factor for low F as flo = fbar/fref}
 
 \item{sigmaF}{variation on fbar}
+
+\item{breaks}{relative location of directional change}
 }
 \value{
 FLQuant
