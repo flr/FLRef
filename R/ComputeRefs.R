@@ -323,7 +323,7 @@ Fbrp <- function(brp){
 #' @export
 Fe40 = function(stock,nyears=3){
   fbar.range = range(stock)[c("minfbar")]:range(stock)[c("maxfbar")]
-  Mbar = apply(m(stock)[fbar.range,],2:6,mean)
+  Mbar = apply(m(stock)[ac(fbar.range),],2:6,mean)
   return(mean(tail(0.4/0.6*Mbar,nyears)))
   }
 #}}}
