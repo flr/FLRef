@@ -392,6 +392,7 @@ return(p)
 #' @param stock FLStock or FLStockR 
 #' @param  refpts as FLPar or Fbrp() if FLStockR is not provided or should be overwritten 
 #' @param type age-structured "asm" or surplus production "spm" plotting style
+#' @param yield option to select "catch" (default) or "landings" 
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
 #' @param probs determine credibility intervals, default 80th, 90th percentiles   #' @param ncol number of plot panel columns
@@ -404,16 +405,21 @@ return(p)
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","fe40"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
-plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,label.size=2.5){
+plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings")[1],plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,label.size=2.5){
 
   
   if(class(object)%in%c("FLStock","FLStockR"))
              object = FLStocks(object)
     
+  
+  what = ifelse(yield=="catch",1,0)
+  
   stks <- FLStocks(lapply(object,function(stock){ 
   landings = stock@landings 
   stock@landings =computeLandings(stock)
   stock@landings[is.na(stock@landings)] = landings[is.na(stock@landings)]
+  stock@discards = computeDiscards(stock)
+  stock@catch = computeCatch(stock)
   stock
   }))
   
@@ -481,9 +487,9 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
     
    
     if(!type=="spm"){
-    
+   
     p = ggplotFL::plot(stks,
-                   metrics=list(Recruitment=rec,SSB=ssb,F=fbar,Landings=landings))+                                                
+                   metrics=list(Recruitment=rec,SSB=ssb,F=fbar,Landings=landings,Catches=catch)[c(1:3,(4+what))])+                                                
          ylim(c(0, NA))+ theme_bw()+leg+
       xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
     if(length(stks)==1){
@@ -500,7 +506,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
       
       
       p = ggplotFL::plot(stks,
-                         metrics=list(Biomass=ssb,F=fbar,Landings=landings))+                                                
+                         metrics=list(Biomass=ssb,F=fbar,Landings=landings,Catches=catch)[c(1:2,(3+what))])+                                                
         ylim(c(0, NA))+ theme_bw()+leg+
         xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
       if(length(stks)==1){
@@ -527,7 +533,8 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
   }   
   mets <- list(Rec=function(x) unitSums(rec(x)), SB=function(x) unitSums(ssb(x)),
                C=function(x) unitSums(landings(x)), F=function(x) unitMeans(fbar(x)))
-  xy =quantile(dims(stk)$minyear:dims(stk)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
+ 
+   xy =quantile(dims(stk)$minyear:dims(stk)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
   
   if(!is.null(brp)){
   Fs = FLPar(an(refpts(brp)[rownames(refpts(brp))[grep("F",rownames(refpts(brp)))],"harvest"]),
@@ -597,12 +604,12 @@ plotAdvice <- function(object,rpts="missing",type=NULL,plotrefs=TRUE,probs=c(0.0
       
     if(!type=="spm"){
       selq = 4
-      qn = c("SSB","F","Landings","Recruitment")
+      qn = c("SSB","F","Landings","Catches","Recruitment")[c(1:2,(what+3),5)]
     }   
     if(type=="spm"){
       
       selq = 3
-      qn = c("Biomass","F","Landings")[1:3]
+      qn = c("Biomass","F","Landings","Catches")[c(1:2,(what+3))]
       
       posx = posx[-length(posx)] #if(any(!is.na(Ys))){
       colo = colo[-length(colo)]

@@ -294,21 +294,36 @@ jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
 #' @return FLQuant  
 #' @author adopted from Laurie Kell (biodyn)
 #' @export
-spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],osa=FALSE,forecast=F){
+spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],osa=FALSE,forecast=F,what=c("mle")){
   
     
   vals=c("logB","logFnotS","logCpred","logBBmsy","logFFmsynotS")
   metrics=c("ssb","fbar","catch","stock","harvest")
-  
   val = vals[which(metrics%in%metric)]
   
-  if(val=="logB"){
-    vec = x$par.random         
-  } else {
+  if(what=="mle"){
+   if(val=="logB"){
+    vec = x$par.random
+    vn = names(x$par.random)
+   } else {
     vec = x$value
-  }  
+    vn = names(x$value)
+   }  
+  } else {
+    if(val=="logB"){
+      vec = x$diag.cov.random     
+      vn = names(x$par.random)
+    } else {
+      vec = x$sd
+      vn = names(x$value)
+    } 
+  }
   
-  quant= an(exp(vec[which(names(vec)==val)]))
+  
+  quant= an((vec[which(vn==val)]))
+  if(what=="mle")
+     quant = exp(quant)
+    
   if(val=="logCpred"){
     season = x$inp$dtc[1]
   } else {
@@ -360,7 +375,7 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
 #' @param forecast extract forecast TRUE/FALSE
 #' @return FLStockR with refpts
 #' @export
-spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NULL){
+spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NULL,itsCI=1){
   
   if(!is.null(forecast)){
     fw = forecast
@@ -388,26 +403,60 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NU
   
   b = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa)
   f = spict2FLQuant(res,metric="fbar",forecast=fw,osa=osa)
+  if(itsCI>1){
+    sdb = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa,what="sd")
+    b =rlnorm(itsCI,log(b),sdb)
+    f = propagate(f,itsCI)
+  }
+  
   
   if(!rel){
     B = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa)
     H = spict2FLQuant(res,metric="fbar",forecast=fw,osa=osa)
+     if(itsCI>1){
+     sdB = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa,what="sd")
+     sdH = spict2FLQuant(res,metric="fbar",forecast=fw,osa=osa,what="sd")
+     B =rlnorm(itsCI,mean=log(B),sd=sdB)
+     H = rlnorm(itsCI,log(H),sdB)
+     }
+    
   } else {
     B = spict2FLQuant(res,metric="stock",forecast=fw,osa=osa)
     H = spict2FLQuant(res,metric="harvest",forecast=fw,osa=osa)
+     if(itsCI>1){
+      sdB = spict2FLQuant(res,metric="stock",forecast=fw,osa=osa,what="sd")
+      sdH = spict2FLQuant(res,metric="harvest",forecast=fw,osa=osa,what="sd")
+      B =rlnorm(itsCI,log(B),sdB)
+      H = rlnorm(itsCI,log(H),sdH)
+     }
   }
   
   endyr = max(an(dimnames(B)$year))
   C = spict2FLQuant(res,metric="catch",forecast=fw,osa=osa)
   C =window(C,end=endyr)
+  
+  
   if(fw){
   intyr = dims(C[,!is.na(C)])$maxyear
   finyr = dims(C)$maxyear
-  C[,ac(intyr:finyr)] = b[,ac(intyr:finyr)]*f[,ac(intyr:finyr)]
   }
+  
+  
+  if(itsCI>1){
+    C = propagate(C,itsCI)
+    sdC = spict2FLQuant(res,metric="catch",forecast=fw,osa=osa,what="sd")
+    
+    C[,(dimnames(sdC)$year)[!is.na(sdC)]] =rlnorm(itsCI,log(C)[,(dimnames(sdC)$year)[!is.na(sdC)]],sdC[,(dimnames(sdC)$year)[!is.na(sdC)]])
+  }  
+  
+  
+  if(fw){
+    C[,ac(intyr:finyr)] = b[,ac(intyr:finyr)]*f[,ac(intyr:finyr)]
+  }
+  
   df = as.data.frame(B)
   year = unique(df$year)
-  N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+  N = as.FLQuant(data.frame(age=1,year=year,unit="unique",
                             season="all",area="unique",iter=1,data=1))
   Mat = B
   
@@ -428,6 +477,7 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NU
     m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
     harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
   )
+  stk = propagate(stk,itsCI)
   units(stk) = standardUnits(stk)
   stk@catch = computeCatch(stk)
   stk@landings = computeLandings(stk)

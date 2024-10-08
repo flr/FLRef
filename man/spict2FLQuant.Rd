@@ -8,7 +8,8 @@ spict2FLQuant(
   x,
   metric = c("ssb", "fbar", "catch", "stock", "harvest")[1],
   osa = FALSE,
-  forecast = F
+  forecast = F,
+  what = c("mle")
 )
 }
 \arguments{

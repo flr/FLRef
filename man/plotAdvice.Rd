@@ -9,6 +9,7 @@ plotAdvice(
   object,
   rpts = "missing",
   type = NULL,
+  yield = c("catch", "landings")[1],
   plotrefs = TRUE,
   probs = c(0.05, 0.2, 0.5, 0.8, 0.95),
   colour = "dodgerblue",
@@ -18,6 +19,8 @@ plotAdvice(
 }
 \arguments{
 \item{type}{age-structured "asm" or surplus production "spm" plotting style}
+
+\item{yield}{option to select "catch" (default) or "landings"}
 
 \item{plotrefs}{if TRUE reference points are plotted}
 

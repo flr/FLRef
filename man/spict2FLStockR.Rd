@@ -10,7 +10,8 @@ spict2FLStockR(
   bthr = 0.5,
   rel = FALSE,
   osa = FALSE,
-  forecast = NULL
+  forecast = NULL,
+  itsCI = 1
 )
 }
 \arguments{
