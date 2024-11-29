@@ -4,7 +4,7 @@
 \alias{spict2stars}
 \title{spict2stars()}
 \usage{
-spict2stars(spict, blim = 0.3, bthr = 0.5)
+spict2stars(spict, blim = 0.3, bthr = 0.5, quantiles = c(0.05, 0.95))
 }
 \arguments{
 \item{spict}{fit from  fit.spict()}

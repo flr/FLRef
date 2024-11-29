@@ -692,7 +692,7 @@ updstars <- function(star,newrefpts){
 #' @param quantiles default is 95CIs as c(0.025,0.975)
 #' @return STARS list with $timeseris and $refpts
 #' @export
-ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95),refpts=NULL){
+ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
   kbinp = FALSE
   if(is.null(mvln$kb)){
     if(output=="mle")
@@ -876,43 +876,48 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95),re
   #' @return STARS list with $timeseris and $refpts
   #' @export
   spict2stars <- function(spict,
-                          blim = 0.3,bthr=0.5){
+                          blim = 0.3,bthr=0.5,quantiles = c(0.05,0.95)){
     
-    stk = spict2FLStockR(spict)
-    stkr = spict2FLStockR(spict,rel=TRUE)
+    stka = spict2FLStockR(spict,bthr=bthr,blim = blim)
+    stk = spict2FLStockR(spict,rel=TRUE,bthr=bthr,blim = blim)
+    stki = spict2FLStockR(final,bthr=bthr,blim = blim,rel=T,itsCI=1000)
+    stkai = spict2FLStockR(final,bthr=bthr,blim = blim,rel=F,itsCI=1000)
+    
     yrs = an(dimnames(stk)$year)
-    # TODO add uncertainty
+  
+  
+    # Added uncertainty
     timeseries =  data.frame(year=yrs,
                              Rec_lower=NA,Rec=NA,Rec_upper=NA,
-                             Biomass_lower=NA,
-                             Biomass=an(ssb(stk)),
-                             Biomass_upper=NA,
-                             
-                             Bratio_lower=NA,
-                             Bratio=an(ssb(stkr)),
-                             Bratio_upper=NA,
+                             Biomass_lower=round(an(quantile(ssb(stkai),quantiles[1])),1),
+                             Biomass=round(an(ssb(stka)),1),
+                             Biomass_upper=round(an(quantile(ssb(stkai),quantiles[2])),1),
+  
+                             Bratio_lower=round(an(quantile(ssb(stki),quantiles[1])),3),
+                             Bratio=round(an(ssb(stk)),3),
+                             Bratio_upper=round(an(quantile(ssb(stki),quantiles[2])),3),
                              
                              Catches=an(catch(stk)),
                              Landings=an(landings(stk)),
                              Discards=NA,
                              
-                             F_lower=NA,
-                             F=an(fbar(stk)),
-                             F_upper=NA,
+                             F_lower=round(an(quantile(fbar(stkai),quantiles[1])),3),
+                             F=round(an(fbar(stka)),3),
+                             F_upper=round(an(quantile(fbar(stkai),quantiles[2])),3),
                              
-                             Fratio_lower=NA,
-                             Fratio=an(fbar(stkr)),
-                             Fratio_upper=NA
+                             Fratio_lower=round(an(quantile(fbar(stki),quantiles[1])),3),
+                             Fratio=round(an(fbar(stk)),3),
+                             Fratio_upper=round(an(quantile(fbar(stki),quantiles[2])),3)
     )
     
-    timeseries[-1] =     round(timeseries[-1],3)                     
     endyr = which(max(yrs)==yrs)
+    stka@refpts[[1]] = (timeseries$F/timeseries$Fratio)[endyr] # Adjust for time-varying
    # TODO change system to relative
     refpts = round(t(data.frame(
-      Ftgt = stk@refpts[[1]],
-      Btgt = stk@refpts[[2]],
-      Bthr= bthr*stk@refpts[[2]],
-      Blim= blim*stk@refpts[[2]],
+      Ftgt = stka@refpts[[1]],
+      Btgt = stka@refpts[[2]],
+      Bthr= bthr*stka@refpts[[2]],
+      Blim= blim*stka@refpts[[2]],
       Fcur  = timeseries$F[endyr],
       Bcur  = timeseries$Biomass[endyr],
       B0.33= quantile(timeseries$Biomass,0.33),

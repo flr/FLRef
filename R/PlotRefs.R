@@ -620,6 +620,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
       #  colo = colo[-c(7:8)]
         
       #}
+      p = p+facet_wrap(~qname,scales="free_y",ncol= selq)
     }
     fps =FLPars(SSB  =Bs,
            F    =Fs,
