@@ -512,11 +512,12 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NU
 
 
 #' flr2stars()
-#' @param object of class FLStockR  
+#' @param object of class FLStockR (MLE)
+#' @param uncertainty of class FLStock with iters
 #' @param quantities default is 90CIs as c(0.05,0.95)
 #' @return STARS list with $timeseris and $refpts
 #' @export
-flr2stars <- function(object,quantiles = c(0.05,0.95)){
+flr2stars <- function(object,uncertainty,quantiles = c(0.05,0.95)){
   
   
   
@@ -564,31 +565,91 @@ flr2stars <- function(object,quantiles = c(0.05,0.95)){
     } 
     
     if(dim(object)[6]>1){
+      uncertainty = object
+      timeseries =  data.frame(Year=dims(uncertainty)$minyear:dims(uncertainty)$maxyear,
+                               
+                               Rec_lower=round(an(quantile(rec(uncertainty),quantiles[1])),0),
+                               Rec=round(an(quantile(rec(uncertainty),0.5)),1),
+                               Rec_upper=round(an(quantile(rec(uncertainty),quantiles[2])),0),
+                               SSB_lower=round(an(quantile(ssb(uncertainty),quantiles[1])),1),
+                               SSB=round(an(quantile(ssb(uncertainty),0.5)),1),
+                               SSB_upper=round(an(quantile(ssb(uncertainty),quantiles[2])),1),
+                               
+                               Bratio_lower=round(an(quantile(ssb(uncertainty),quantiles[1]))/object@refpts[[2]],3),
+                               Bratio=round(an(quantile(ssb(uncertainty)/uncertainty@refpts[[2]],0.5)),3),
+                               Bratio_upper=round(an(quantile(ssb(uncertainty),quantiles[2]))/object@refpts[[2]],3),
+                               
+                               Catches=round(an(quantile(catch(uncertainty),0.5)),2),
+                               Landings = an(round(quantile(landings(uncertainty),0.5),2)),
+                               Discards = an(round(quantile(discards(uncertainty),0.5),2)),
+                               
+                               F_lower=an(round(quantile(fbar(uncertainty),quantiles[1]),3)),
+                               F = round(an(quantile(fbar(uncertainty),0.5)),3),
+                               F_upper=an(round(quantile(fbar(uncertainty),quantiles[2]),3)),
+                               
+                               Fratio_lower=an(round(quantile(fbar(uncertainty)/uncertainty@refpts[[1]],quantiles[1]),3)),
+                               Fratio=round(an(quantile(fbar(uncertainty)/uncertainty@refpts[[1]],0.5)),3),
+                               Fratio_upper=an(round(quantile(fbar(uncertainty)/object@refpts[[1]],quantiles[2]),3)))   
+    } 
+    
       
-      timeseries =  data.frame(Year=dims(object)$minyear:dims(object)$maxyear,
+    
+    if(!is.null(uncertainty) & dim(uncertainty)[6]>1){
+      
+      timeseries =  data.frame(Year=dims(uncertainty)$minyear:dims(uncertainty)$maxyear,
                                
-                               Rec_lower=round(an(quantile(rec(object),quantiles[1])),0),
+                               Rec_lower=round(an(quantile(rec(uncertainty),quantiles[1])),0),
                                Rec=round(an(quantile(rec(object),0.5)),1),
-                               Rec_upper=round(an(quantile(rec(object),quantiles[2])),0),
-                               SSB_lower=round(an(quantile(ssb(object),quantiles[1])),1),
+                               Rec_upper=round(an(quantile(rec(uncertainty),quantiles[2])),0),
+                               SSB_lower=round(an(quantile(ssb(uncertainty),quantiles[1])),1),
                                SSB=round(an(quantile(ssb(object),0.5)),1),
-                               SSB_upper=round(an(quantile(ssb(object),quantiles[2])),1),
+                               SSB_upper=round(an(quantile(ssb(uncertainty),quantiles[2])),1),
                                
-                               Bratio_lower=round(an(quantile(ssb(object),quantiles[1]))/object@refpts[[2]],3),
-                               Bratio=round(an(quantile(ssb(object),0.5))/object@refpts[[2]],3),
-                               Bratio_upper=round(an(quantile(ssb(object),quantiles[2]))/object@refpts[[2]],3),
+                               Bratio_lower=round(an(quantile(ssb(uncertainty),quantiles[1]))/object@refpts[[2]],3),
+                               Bratio=round(an(quantile(ssb(object)/object@refpts[[2]],0.5)),3),
+                               Bratio_upper=round(an(quantile(ssb(uncertainty),quantiles[2]))/object@refpts[[2]],3),
                                
                                Catches=round(an(quantile(catch(object),0.5)),2),
                                Landings = an(round(quantile(landings(object),0.5),2)),
                                Discards = an(round(quantile(discards(object),0.5),2)),
                                
-                               F_lower=an(round(quantile(fbar(object),quantiles[1]),3)),
+                               F_lower=an(round(quantile(fbar(uncertainty),quantiles[1]),3)),
                                F = round(an(quantile(fbar(object),0.5)),3),
-                               F_upper=an(round(quantile(fbar(object),quantiles[2]),3)),
+                               F_upper=an(round(quantile(fbar(uncertainty),quantiles[2]),3)),
                                
-                               Fratio_lower=an(round(quantile(fbar(object),quantiles[1])/object@refpts[[1]],3)),
-                               Fratio=round(an(quantile(fbar(object),0.5)/object@refpts[[1]]),3),
-                               Fratio_upper=an(round(quantile(fbar(object),quantiles[2])/object@refpts[[1]],3)))   
+                               Fratio_lower=an(round(quantile(fbar(uncertainty)/object@refpts[[1]],quantiles[1]),3)),
+                               Fratio=round(an(quantile(fbar(object)/object@refpts[[1]],0.5)),3),
+                               Fratio_upper=an(round(quantile(fbar(uncertainty)/object@refpts[[1]],quantiles[2]),3)))   
+    } 
+    
+    
+    
+    if(!is.null(uncertainty) & dim(uncertainty)[6]>1){
+      
+      timeseries =  data.frame(Year=dims(uncertainty)$minyear:dims(uncertainty)$maxyear,
+                               
+                               Rec_lower=round(an(quantile(rec(uncertainty),quantiles[1])),0),
+                               Rec=round(an(quantile(rec(uncertainty),0.5)),1),
+                               Rec_upper=round(an(quantile(rec(uncertainty),quantiles[2])),0),
+                               SSB_lower=round(an(quantile(ssb(uncertainty),quantiles[1])),1),
+                               SSB=round(an(quantile(ssb(uncertainty),0.5)),1),
+                               SSB_upper=round(an(quantile(ssb(uncertainty),quantiles[2])),1),
+                               
+                               Bratio_lower=round(an(quantile(ssb(uncertainty),quantiles[1]))/object@refpts[[2]],3),
+                               Bratio=round(an(quantile(ssb(uncertainty),0.5))/object@refpts[[2]],3),
+                               Bratio_upper=round(an(quantile(ssb(uncertainty),quantiles[2]))/object@refpts[[2]],3),
+                               
+                               Catches=round(an(quantile(catch(object),0.5)),2),
+                               Landings = an(round(quantile(landings(object),0.5),2)),
+                               Discards = an(round(quantile(discards(object),0.5),2)),
+                               
+                               F_lower=an(round(quantile(fbar(uncertainty),quantiles[1]),3)),
+                               F = round(an(quantile(fbar(object),0.5)),3),
+                               F_upper=an(round(quantile(fbar(uncertainty),quantiles[2]),3)),
+                               
+                               Fratio_lower=an(round(quantile(fbar(uncertainty)/object@refpts[[1]],quantiles[1]),3)),
+                               Fratio=round(an(quantile(fbar(object)/object@refpts[[1]],0.5)),3),
+                               Fratio_upper=an(round(quantile(fbar(uncertainty)/object@refpts[[1]],quantiles[2]),3)))   
       } 
     
     
@@ -597,20 +658,30 @@ flr2stars <- function(object,quantiles = c(0.05,0.95)){
   
 
 #' updstars()
-#' @param star output of star list 
-#' @param newrefpts manually adjusted reference points
+#' @param star output of star list with new refpoints 
+#' @param newrefpts FLPar manually adjusted reference points
 #' @return STARS list with $timeseris and $refpts
 #' @export
 
 updstars <- function(star,newrefpts){
   newts = star$timeseries
-  bmsyr = star$refpts[2,2]/newrefpts[2,2]
-  fmsyr = star$refpts[1,2]/newrefpts[1,2]
+  bmsyr = star$refpts[2,2]/newrefpts[[2]]
+  fmsyr = star$refpts[1,2]/newrefpts[[1]]
+  
+  star$refpts[1,2] = newrefpts[[1]]
+  star$refpts[2,2] = newrefpts[[2]]
+  if(any(c("Bpa","Bthr")%in%rownames(newrefpts))){
+    star$refpts[3,2] =  c(newrefpts[c("Bpa","Bthr")[c("Bpa","Bthr")%in%rownames(newrefpts)]])
+  }
+  if(any(c("Blim")%in%rownames(newrefpts))){
+    star$refpts[4,2] =  c(newrefpts[c("Blim")[c("Blim")%in%rownames(newrefpts)]])
+  }
+  
   newts[,8:10] = newts[,8:10]*bmsyr 
   newts[,8:10] = newts[,17:19]*fmsyr 
   out = star
   out$timeseries = newts
-  out$refpts = newrefpts
+  out$refpts = star$refpts
   return(out)
 }
 
@@ -621,7 +692,7 @@ updstars <- function(star,newrefpts){
 #' @param quantiles default is 95CIs as c(0.025,0.975)
 #' @return STARS list with $timeseris and $refpts
 #' @export
-ss2stars <- function(mvln,output=c("iters","mle")[1],quantiles = c(0.025,0.975)){
+ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95),refpts=NULL){
   kbinp = FALSE
   if(is.null(mvln$kb)){
     if(output=="mle")
