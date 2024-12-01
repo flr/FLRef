@@ -4,10 +4,12 @@
 \alias{flr2stars}
 \title{flr2stars()}
 \usage{
-flr2stars(object, quantiles = c(0.05, 0.95))
+flr2stars(object, uncertainty, quantiles = c(0.05, 0.95))
 }
 \arguments{
-\item{object}{of class FLStockR}
+\item{object}{of class FLStockR (MLE)}
+
+\item{uncertainty}{of class FLStock with iters}
 
 \item{quantities}{default is 90CIs as c(0.05,0.95)}
 }

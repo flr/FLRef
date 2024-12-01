@@ -7,9 +7,9 @@
 updstars(star, newrefpts)
 }
 \arguments{
-\item{star}{output of star list}
+\item{star}{output of star list with new refpoints}
 
-\item{newrefpts}{manually adjusted reference points}
+\item{newrefpts}{FLPar manually adjusted reference points}
 }
 \value{
 STARS list with $timeseris and $refpts
