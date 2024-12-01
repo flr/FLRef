@@ -23,7 +23,7 @@ generates catch.n with lognormal annual and multinomial age composition observat
 }
 \examples{
 data(ple4)
-object = propagate(ple4,10)
+object = propagate(catch.sel(ple4),10)
 ca = ca.sim(object,ess=200)
 # Checks
 ggplot(ca)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
