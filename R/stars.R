@@ -115,11 +115,11 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
     object = FLStocks(forecast=object)
   }
   if(any(c("Btgt","Bmsy")%in%names(object[[1]]@refpts))){
-    if(is.null(dB)) dB = TRUE
-    if(is.null(rel)) rel = FALSE
-  } else {
-    if(is.null(dB)) dB =FALSE
+    if(is.null(dB)) dB = FALSE
     if(is.null(rel)) rel = TRUE
+  } else {
+    if(is.null(dB)) dB =TRUE
+    if(is.null(rel)) rel = FALSE
     
   }
   
@@ -134,9 +134,9 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
     df = do.call(rbind,Map(function(x,y){
       stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
       flqs = FLQuants(
-        Cy = round(catch(x)[,ac(eval.yrs)],3),
+        Cy = round(catch(x)[,ac(eval.yrs)],1),
         Fy = round(fbar(x)[,ac(eval.yrs)],3),
-        By = round(ssb(x)[,ac(eval.yrs)],3)
+        By = round(ssb(x)[,ac(eval.yrs)],1)
       )
       out = as.data.frame(flqs)
       data.frame(scenario=y, t(as.matrix(out$data)))
@@ -155,10 +155,12 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
       if(!class(x)=="FLStockR") 
         stop("input must be FLStockR object with @ref
             pts")
-      
+      if(!any(c("Btgt","Bmsy")%in%names(object[[1]]@refpts))){
+        stop("No B target (Btgt) provided to compute ratio of B/Btgt")
+      }
       stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
       flqs = FLQuants(
-        Cy = round(catch(x)[,ac(eval.yrs)],3),
+        Cy = round(catch(x)[,ac(eval.yrs)],1),
         Fy = round(fbar(x)[,ac(eval.yrs)]/stk@refpts[[1]],3),
         By = round(ssb(x)[,ac(eval.yrs)]/stk@refpts[[2]],3))
     
@@ -206,7 +208,7 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
   
   if(dB){
     dBs =(do.call(rbind,lapply(fstks,function(x){
-      matrix(an(100*(ssb(x)[,ac(eval.yrs)]/ssb(x)[,ac(rep(refyr,length(eval.yrs)))]-1)),ncol=length(eval.yrs))
+      round(matrix(an(100*(ssb(x)[,ac(eval.yrs)]/ssb(x)[,ac(rep(refyr,length(eval.yrs)))]-1)),ncol=length(eval.yrs)),2)
     })))
   
   nam = c(names(df),paste0("dB%",eval.yrs))
