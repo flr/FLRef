@@ -117,6 +117,10 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
   if(any(c("Btgt","Bmsy")%in%names(object[[1]]@refpts))){
     if(is.null(dB)) dB = TRUE
     if(is.null(rel)) rel = FALSE
+  } else {
+    if(is.null(dB)) dB =FALSE
+    if(is.null(rel)) rel = TRUE
+    
   }
   
   if(is.null(refyr)){
