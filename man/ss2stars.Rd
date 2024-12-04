@@ -4,12 +4,7 @@
 \alias{ss2stars}
 \title{ss2stars()}
 \usage{
-ss2stars(
-  mvln,
-  output = c("iters", "mle")[2],
-  quantiles = c(0.05, 0.95),
-  refpts = NULL
-)
+ss2stars(mvln, output = c("iters", "mle")[2], quantiles = c(0.05, 0.95))
 }
 \arguments{
 \item{mvln}{output of ssmvln()}
