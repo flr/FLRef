@@ -905,9 +905,9 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     
     stka = spict2FLStockR(spict,bthr=bthr,blim = blim)
     stk = spict2FLStockR(spict,rel=TRUE,bthr=bthr,blim = blim)
-    stki = spict2FLStockR(final,bthr=bthr,blim = blim,rel=T,itsCI=1000)
-    stkai = spict2FLStockR(final,bthr=bthr,blim = blim,rel=F,itsCI=1000)
-    
+    stki = spict2FLStockR(spict,bthr=bthr,blim = blim,rel=T,itsCI=1000)
+    stkai = spict2FLStockR(spict,bthr=bthr,blim = blim,rel=F,itsCI=1000)
+      
     yrs = an(dimnames(stk)$year)
   
   
