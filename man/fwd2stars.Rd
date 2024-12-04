@@ -12,6 +12,8 @@ fwd2stars(object, eval.yrs = NULL, rel = NULL, dB = NULL, refyr = NULL)
 \item{eval.yrs}{evaluation years of forecast}
 
 \item{rel}{if TRUE ratios B/Btgt and F/Ftgt are shown}
+
+\item{dB}{computes change in percentage biomass to refyr}
 }
 \value{
 data.frame

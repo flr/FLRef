@@ -106,6 +106,7 @@ ss2FLStockR <- function(mvln,thin=10, output=NULL){
 #' @param object *FLStocks* with list of *FLStockR* objects 
 #' @param eval.yrs evaluation years of forecast 
 #' @param rel if TRUE ratios B/Btgt and F/Ftgt are shown
+#' @param dB computes change in percentage biomass to refyr
 #' @return data.frame
 #' @export
 fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
