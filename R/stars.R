@@ -115,7 +115,7 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
   if(!class(object)=="FLStocks"){
     object = FLStocks(forecast=object)
   }
-  if(any(c("Btgt","Bmsy")%in%names(object[[1]]@refpts))){
+  if(any(c("Btgt","Bmsy")%in%rownames(object[[1]]@refpts))){
     if(is.null(dB)) dB = FALSE
     if(is.null(rel)) rel = TRUE
   } else {
@@ -156,7 +156,7 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
       if(!class(x)=="FLStockR") 
         stop("input must be FLStockR object with @ref
             pts")
-      if(!any(c("Btgt","Bmsy")%in%names(object[[1]]@refpts))){
+      if(!any(c("Btgt","Bmsy")%in%rownames(object[[1]]@refpts))){
         stop("No B target (Btgt) provided to compute ratio of B/Btgt")
       }
       stk = window(x,start=min(eval.yrs),end=max(eval.yrs))
@@ -166,8 +166,9 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
         By = round(ssb(x)[,ac(eval.yrs)]/stk@refpts[[2]],3))
     
       if(any(c("Bmsy","Btgt")%in%rownames(object[[1]]@refpts))){
-        flqs = FLQuants(c(flqs,FLQuants(Bpa=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts[2]),3))))
+        flqs = FLQuants(c(flqs,FLQuants(Btgt=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts[2]),3))))
       }
+      
       
       if("Bpa"%in%rownames(object[[1]]@refpts)){
         flqs = FLQuants(c(flqs,FLQuants(Bpa=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts["Bpa"]),3))))
