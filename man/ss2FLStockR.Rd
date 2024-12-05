@@ -4,7 +4,7 @@
 \alias{ss2FLStockR}
 \title{ss2FLStockR()}
 \usage{
-ss2FLStockR(mvln, thin = 10, output = NULL)
+ss2FLStockR(mvln, thin = 1, output = NULL, rel = FALSE)
 }
 \arguments{
 \item{mvln}{output from ssmvln()}
@@ -12,6 +12,8 @@ ss2FLStockR(mvln, thin = 10, output = NULL)
 \item{thin}{thinnig rate of retained iters}
 
 \item{output}{expected outputs presented as "mle" or median of "iters"}
+
+\item{rel}{if TRUE ratios B/Btgt and F/Ftgt are shown}
 }
 \value{
 FLStockR with refpts

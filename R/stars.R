@@ -3,9 +3,10 @@
 #' @param mvln output from ssmvln() 
 #' @param output expected outputs presented as "mle" or median of "iters"
 #' @param thin thinnig rate of retained iters
+#' @param rel if TRUE ratios B/Btgt and F/Ftgt are shown
 #' @return FLStockR with refpts
 #' @export
-ss2FLStockR <- function(mvln,thin=10, output=NULL){
+ss2FLStockR <- function(mvln,thin=1, output=NULL,rel=FALSE){
   kbinp = FALSE
   if(!is.null(mvln$mle)){
     if(is.null(output)) output ="mle"
@@ -39,26 +40,41 @@ ss2FLStockR <- function(mvln,thin=10, output=NULL){
     }
     df = df[order(df$year),]
     
-    
+    if(rel){
+      df$b = df$stock  
+      df$f = df$harvest  
+    } else {
+      df$b = df$SSB  
+      df$f = df$F
+    }
     
     N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
                               season="all",area="unique",iter=df$iter,data=df$Recr))
     C = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
                               season="all",area="unique",iter=df$iter,data=df$Catch))
     Mat = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
-                                season="all",area="unique",iter=df$iter,data=df$SSB/df$Recr))
+                                season="all",area="unique",iter=df$iter,data=df$b/df$Recr))
+    
     H = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
-                              season="all",area="unique",iter=df$iter,data=df$F))
+                              season="all",area="unique",iter=df$iter,data=df$f))
     year = unique(df$year)
   } else {
+    
+    if(rel){
+      mle$b = mle$stock  
+      mle$f = mle$harvest  
+    } else {
+      mle$b = mle$SSB  
+      mle$f = mle$F
+    }
     N = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
                               season="all",area="unique",iter=1,data=mle$Recr))
     C = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
                               season="all",area="unique",iter=1,data=mle$Catch))
     Mat = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
-                                season="all",area="unique",iter=1,data=mle$SSB/mle$Recr))
+                                season="all",area="unique",iter=1,data=mle$b/mle$Recr))
     H = as.FLQuant(data.frame(age=1,year=mle$year,unit="unique",
-                              season="all",area="unique",iter=1,data=mle$F)) 
+                              season="all",area="unique",iter=1,data=mle$f)) 
     year = unique(mle$year)
     
   }
@@ -85,10 +101,17 @@ ss2FLStockR <- function(mvln,thin=10, output=NULL){
   stk@stock = computeStock(stk)
   
   if(kbinp){
+    
     stk@refpts = FLPar(
       Ftgt = median(kb$F/kb$harvest),
       Btgt = median(kb$SSB/kb$stock)
     )
+    
+    if(rel){
+      stk@refpts[1:2][] = 1
+    }
+      
+      
   } else {
     stk@refpts = FLPar(
       Ftgt = mvln$refpts[1,2],
@@ -97,6 +120,11 @@ ss2FLStockR <- function(mvln,thin=10, output=NULL){
       B0 = mvln$refpts[4,2],
       R0 = mvln$refpts[5,2]
     )
+    
+    if(rel){
+      stk@refpts["B0"] = stk@refpts["B0"]/stk@refpts[2]
+      stk@refpts[1:2][] = 1
+    }
   }
   return(stk)
 }
