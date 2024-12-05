@@ -602,10 +602,10 @@ flr2stars <- function(object,uncertainty=NULL,quantiles = c(0.05,0.95)){
                      B0.33 = quantile(an(unitSums(ssb(x))),0.33,na.rm=T),
                      B0.66 = quantile(an(unitSums(ssb(x))),0.66,na.rm=T))),3)
     
-    refpts = data.frame(RefPoint=row.names(refpts),Value=as.data.frame(refpts[,1])$data)
+    refpts = data.frame(RefPoint=rownames(refpts),Value=as.data.frame(refpts[,1])$data)
     rownames(refpts) = 1:nrow(refpts)
   
-    if(dim(object)[6]==1){  
+   if(dim(object)[6]==1){  
 
     timeseries =  data.frame(Year=dims(x)$minyear:dims(x)$maxyear,
                              Rec_lower=NA,
@@ -632,7 +632,7 @@ flr2stars <- function(object,uncertainty=NULL,quantiles = c(0.05,0.95)){
                              Fratio=round(an(fbar(x))/x@refpts[[1]],3),
                              Fratio_upper=NA)
     
-                             if(any(c("Bmsy","Btgt")%in%names(object@refpts))){
+                             if(any(c("Bmsy","Btgt")%in%rownames(object@refpts))){
                              timeseries$Bratio=round(an(ssb(x))/x@refpts[[2]],3)
                              }
        } 
@@ -666,7 +666,7 @@ flr2stars <- function(object,uncertainty=NULL,quantiles = c(0.05,0.95)){
     
       
                               # Add Bratio
-                              if(any(c("Bmsy","Btgt")%in%names(object@refpts))){
+                              if(any(c("Bmsy","Btgt")%in%rownames(object@refpts))){
                                 timeseries$Bratio_lower=round(an(quantile(ssb(uncertainty),quantiles[1]))/object@refpts[[2]],3)
                                 timeseries$Bratio=round(an(quantile(ssb(uncertainty)/uncertainty@refpts[[2]],0.5)),3)
                                 timeseries$Bratio_upper=round(an(quantile(ssb(uncertainty),quantiles[2]))/object@refpts[[2]],3)
@@ -704,7 +704,7 @@ flr2stars <- function(object,uncertainty=NULL,quantiles = c(0.05,0.95)){
                                Fratio_upper=an(round(quantile(fbar(uncertainty)/object@refpts[[1]],quantiles[2]),3)))   
       
                               # Add Bratio
-                              if(any(c("Bmsy","Btgt")%in%names(object@refpts))){
+                              if(any(c("Bmsy","Btgt")%in%rownames(object@refpts))){
                                 timeseries$Bratio_lower=round(an(quantile(ssb(uncertainty),quantiles[1]))/object@refpts[[2]],3)
                                 timeseries$Bratio=round(an(quantile(ssb(object)/object@refpts[[2]],0.5)),3)
                                 timeseries$Bratio_upper=round(an(quantile(ssb(uncertainty),quantiles[2]))/object@refpts[[2]],3)
