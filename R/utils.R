@@ -96,7 +96,7 @@ stockMedians <- function(object,FUN=median){
     
     
     
-    B = as.FLQuant(ssb(x))
+    B = ssb(x)
     H = fbar(x)
     R = (rec(x))
     C = computeCatch(x)
@@ -135,8 +135,10 @@ stockMedians <- function(object,FUN=median){
     stk@landings = computeLandings(stk)
     stk@discards = computeStock(stk)
     stk@stock = ssb(x)
-    br = c("Bthr","Blim","Bpa")
+    if(class(x)=="FLStockR"){
+    stk = FLStockR(stk) 
     stk@refpts = x@refpts
+    }
     stk@desc = x@desc
     return(stk)
   }))
