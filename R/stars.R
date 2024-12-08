@@ -101,10 +101,10 @@ ss2FLStockR <- function(mvln,thin=1, output=NULL,rel=FALSE){
   stk@stock = computeStock(stk)
   
   if(kbinp){
-    
+    kbfit = kb[kb$type=="fit",]
     stk@refpts = FLPar(
-      Ftgt = median(kb$F/kb$harvest),
-      Btgt = median(kb$SSB/kb$stock)
+      Ftgt = median(kbfit$F)/(kbfit$harvest),
+      Btgt = median(kbfit$SSB)/(kbfit$stock)
     )
     
     if(rel){
@@ -998,21 +998,30 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
   #' @return FLStockR with ratios F/Ftgt and B/Btgt
   #' @export
   stock2ratios <- function(object){
-      stk = object  
-      B = as.FLQuant(ssb(object)/object@refpts[[2]])
-      H = fbar(object)/object@refpts[[1]]
-      C = computeLandings(object)
+       
+      stks= TRUE
+      if(class(object)=="FLStockR"){
+        object= FLStocks(stk=stk)
+        stks=FALSE
+      }
+      
+      out =FLStocks(lapply(object,function(x){
+      
+    #x = object[[2]]
+      
+      
+      B = as.FLQuant(ssb(x)/x@refpts[[2]])
+      H = fbar(x)/x@refpts[[1]]
+      R = (rec(x))
+      C = computeCatch(x)
       dimnames(B)$age = "1"
       dimnames(C)$age = "1"
       dimnames(H)$age = "1"
+      dimnames(R)$age = "1"
+      year = an(dimnames(x)$year)
+      iters = an(dimnames(x)$iter)
       
-      df = as.data.frame(B)
-       year = unique(df$year)
-       iters = an(unique(df$iter))
-      
-      
-      
-      stk = FLStockR(stock.n=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
+       stk = FLStockR(stock.n=FLQuant(R, dimnames=list(age="1", year = (year),iter=iters)),
       catch.n = C,
       landings.n = C,
       discards.n = FLQuant(0, dimnames=list(age="1", year = (year),iter=iters)),
@@ -1020,7 +1029,10 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
       landings.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
       discards.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
       catch.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
-      mat=B,
+      mat = as.FLQuant(data.frame(age=1,year=year,unit="unique",
+                                  season="all",area="unique",iter=iters,data=an(B/R))),
+      
+      #mat=B/R,
       m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
       harvest = H,
       m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
@@ -1030,12 +1042,24 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     stk@catch = computeCatch(stk)
     stk@landings = computeLandings(stk)
     stk@discards = computeStock(stk)
-    stk@stock = B
-    stk@refpts = FLPar(Ftgt=1,Btgt=1,MSY=object@refpts[[3]])
-    row.names(stk@refpts)[1:2] = row.names(object@refpts)[1:2] 
-    stk@desc = object@desc
-    
+    stk@stock = ssb(x)
+    br = c("Bthr","Blim","Bpa")
+    stk@refpts = FLPar(Ftgt=1,Btgt=1)
+    if(any(rownames(x@refpts)%in%br)){
+      stk@refpts = rbind(stk@refpts,x@refpts[rownames(x@refpts)%in%br]/x@refpts[[2]])
+      
+    }                   
+    row.names(stk@refpts)[1:2] = row.names(x@refpts)[1:2] 
+    stk@desc = x@desc
     return(stk)
+    }))
+    if(!stks){
+      out = out[[1]]
+    }
+    
+    return(out)
   }
 
-
+  
+ 
+  

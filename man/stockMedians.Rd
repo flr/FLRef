@@ -2,16 +2,18 @@
 % Please edit documentation in R/utils.R
 \name{stockMedians}
 \alias{stockMedians}
-\title{stockMedians}
+\title{Converts FLStock into simplified FLStock with Median FLQuants}
 \usage{
-stockMedians(stock)
+stockMedians(object, FUN = median)
 }
 \arguments{
-\item{stock}{class FLStock or FLStockR}
+\item{object}{of class *FLStock* or *FLStockR* or *FLStocks*}
+
+\item{FUN}{computes mean, median}
 }
 \value{
-medians of all FLstock FlQuants
+FLStockR with *FLQuants*
 }
 \description{
-stockMedians
+Converts FLStock into simplified FLStock with Median FLQuants
 }

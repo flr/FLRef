@@ -79,35 +79,74 @@ huecol <- function(n,alpha=1) {
 
 # }}}# color options
 
-
-#' stockMedians
-#' @param stock class FLStock or FLStockR
-#' @return medians of all FLstock FlQuants 
+#' Converts FLStock into simplified FLStock with Median FLQuants
+#' @param object of class *FLStock* or *FLStockR* or *FLStocks*  
+#' @param FUN computes mean, median
+#' @return FLStockR with *FLQuants*
 #' @export
-stockMedians <- function(stock){
-  stk = stock
-  stk@catch.n = iterMedians(stk@catch.n)  
-  stk@stock.n = iterMedians(stk@stock.n)  
-  stock@landings.n =iterMedians(stk@catch.n)
-  stock@discards.n =iterMedians(stk@discards.n)
-  stk@catch.wt = iterMedians(stk@catch.wt)  
-  stk@stock.wt = iterMedians(stk@stock.wt)  
-  stock@landings.wt =iterMedians(stk@landings.wt)
-  stock@discards.wt =iterMedians(stk@discards.wt)
-  stock@m =iterMedians(stk@m)
-  stock@mat =iterMedians(stk@mat)
-  stock@harvest = iterMedians(stk@harvest)
-  stock@harvest.spwn = iterMedians(stk@harvest.spwn)
-  stock@m.spwn = iterMedians(stk@m.spwn)
-  if(class(stock)=="FLStockR"){
-    stk@refpts = iterMedians(stk@refpts)
+stockMedians <- function(object,FUN=median){
+  
+  stks= TRUE
+  if(class(object)%in%c("FLStockR","FLStock")){
+    object= FLStocks(stk=stk)
+    stks=FALSE
   }
-  stk@catch = computeCatch(stk)
-  stk@discards = computeDiscards(stk)
-  stk@landings = computeLandings(stk)
-  stk@stock = computeStock(stk)
-  return(iter(stk,1))
+  
+  out =FLStocks(lapply(object,function(x){
+    
+    
+    
+    B = as.FLQuant(ssb(x))
+    H = fbar(x)
+    R = (rec(x))
+    C = computeCatch(x)
+    dimnames(B)$age = "1"
+    dimnames(C)$age = "1"
+    dimnames(H)$age = "1"
+    dimnames(R)$age = "1"
+    
+    B = apply(B,1:5,FUN)
+    H = apply(H,1:5,FUN)
+    R = apply(R,1:5,FUN)
+    C = apply(R,1:5,FUN)
+    
+    year = an(dimnames(x)$year)
+    iters = an(dimnames(x)$iter)
+    
+    stk = FLStockR(stock.n=FLQuant(R, dimnames=list(age="1", year = (year),iter=iters)),
+                   catch.n = C,
+                   landings.n = C,
+                   discards.n = FLQuant(0, dimnames=list(age="1", year = (year),iter=iters)),
+                   stock.wt=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
+                   landings.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+                   discards.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+                   catch.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+                   mat = as.FLQuant(data.frame(age=1,year=year,unit="unique",
+                                               season="all",area="unique",iter=iters,data=an(B/R))),
+                   
+                   #mat=B/R,
+                   m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+                   harvest = H,
+                   m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
+                   harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+    )
+    units(stk) = standardUnits(stk)
+    stk@catch = computeCatch(stk)
+    stk@landings = computeLandings(stk)
+    stk@discards = computeStock(stk)
+    stk@stock = ssb(x)
+    br = c("Bthr","Blim","Bpa")
+    stk@refpts = x@refpts
+    stk@desc = x@desc
+    return(stk)
+  }))
+  if(!stks){
+    out = out[[1]]
+  }
+  
+  return(out)
 }
+
 
 
 #' ssmvln()
