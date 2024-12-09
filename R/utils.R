@@ -88,7 +88,7 @@ stockMedians <- function(object,FUN=median){
   
   stks= TRUE
   if(class(object)%in%c("FLStockR","FLStock")){
-    object= FLStocks(stk=stk)
+    object= FLStocks(stk=object)
     stks=FALSE
   }
   
@@ -108,10 +108,10 @@ stockMedians <- function(object,FUN=median){
     B = apply(B,1:5,FUN)
     H = apply(H,1:5,FUN)
     R = apply(R,1:5,FUN)
-    C = apply(R,1:5,FUN)
+    C = apply(C,1:5,FUN)
     
     year = an(dimnames(x)$year)
-    iters = an(dimnames(x)$iter)
+    iters = an(dimnames(B)$iter)
     
     stk = FLStockR(stock.n=FLQuant(R, dimnames=list(age="1", year = (year),iter=iters)),
                    catch.n = C,
@@ -133,8 +133,8 @@ stockMedians <- function(object,FUN=median){
     units(stk) = standardUnits(stk)
     stk@catch = computeCatch(stk)
     stk@landings = computeLandings(stk)
-    stk@discards = computeStock(stk)
-    stk@stock = ssb(x)
+    stk@discards = computeDiscards(stk)
+    stk@stock = computeStock(stk)
     if(class(x)=="FLStockR"){
     stk = FLStockR(stk) 
     stk@refpts = x@refpts
