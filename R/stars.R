@@ -388,8 +388,7 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
   
   
   quant= an((vec[which(vn==val)]))
-  if(what=="mle")
-     quant = exp(quant)
+  if(what=="mle") quant = exp(quant)
    
   
      
@@ -404,19 +403,19 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
   if(forecast) timerange[2] = x$inp$maninterval[2]
   
   year.obs  =c(rep(seq(x$inp$timerange[1],x$inp$timerange[2]),each=season))
-  year  =c(rep(seq(floor(timerange[1]),timerange[2]),each=season))
-  seas=c(rep(seq(season),length(year)))
-  
+  year  =floor(c(rep(seq(timerange[1],timerange[2]),each=season)))
+  seas=c(rep(seq(season),length(year)/season))
+  #seas=c(rep(seq(season),timerange[2]-timerange[1]+1))
   min.timeI = min(do.call(c,lapply(x$inp$timeI,function(t)min(t))))
   
   
   if(val=="logCpred"& min(x$inp$timeC)>min(min.timeI)){
     ctinp = floor(x$inp$timeC)
-    ctinp = c(ctinp,max(ctinp)+1) 
-    out = rep(NA,length(ctinp))
+    #ctinp = c(ctinp,max(ctinp)+1) 
+    cadj = rep(NA,length(ctinp))
     qs =quant[1:length(year)] 
-    out[year%in%ctinp] = qs[!is.na(qs)][1:length(ctinp)]
-    quant=out
+    cadj[year%in%ctinp] = qs[!is.na(qs)][1:length(ctinp)]
+    quant=cadj
   }
     
   if(forecast == TRUE){
