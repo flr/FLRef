@@ -349,7 +349,7 @@ ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
   if(class(stock)=="FLStockR"){
     
     if(is.na(stock@refpts[[1]])){
-      ftgt = mean(m(x)[seq(range(x)[c("minfbar","maxfbar")]),])
+      ftgt = mean(stock@m[seq(range(stock)[c("minfbar","maxfbar")]),])
     }
     
     if(is.null(ftgt)){
@@ -358,7 +358,7 @@ ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
     stock = as(stock,"FLStock")
   }
   if(is.null(ftgt)){
-    ftgt = mean(m(x)[seq(range(x)[c("minfbar","maxfbar")]),])
+    ftgt = mean(stock@m[seq(range(stock)[c("minfbar","maxfbar")]),])
   }
     
   eqstk = brp(FLBRP(stock, ...))
