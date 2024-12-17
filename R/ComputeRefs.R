@@ -334,7 +334,7 @@ Fe40 = function(stock,nyears=3){
 #
 #' Computes ABI for target F, e.g. ABImsy (Griffith et al. 2023)
 #'
-#' @param stock object of class FLStock 
+#' @param stock object of class FLStock or FLStockR 
 #' @param ftgt target F at equilibrium, e.g. Fmsy
 #' @param thresh quantile ageref treshold, default 0.9
 #' @return *FLQuant* 
@@ -345,7 +345,17 @@ Fe40 = function(stock,nyears=3){
 #' plot(ABImsy)+ylim(0,2)+
 #'  geom_hline(yintercept = c(0.8,1),col=c(2,1),linetype=c(2,1))+ylab(expression(ABI[MSY]))
 
-ABItgt <- function(stock,ftgt=0.2,thresh=0.9, ...){
+ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
+  if(class(stock)=="FLStockR"){
+    if(is.null(ftgt)){
+      ftgt = stock@refpts[[1]]
+    }
+    stock = as(stock,"FLStock")
+  }
+  if(is.null(ftgt)){
+    stop("Please provide value for ftgt")
+  }
+    
   eqstk = brp(FLBRP(stock, ...))
   fbar(eqstk)[,1][] = 0.00001 # compute for eq Fmsy
   fbar(eqstk)[,1:101][] = ftgt # compute for equilibrium Fmsy
