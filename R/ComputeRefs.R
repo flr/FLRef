@@ -347,13 +347,18 @@ Fe40 = function(stock,nyears=3){
 
 ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
   if(class(stock)=="FLStockR"){
+    
+    if(is.an(stock@refpts[[1]])){
+      ftgt = mean(m(x)[seq(range(x)[c("minfbar","maxfbar")]),])
+    }
+    
     if(is.null(ftgt)){
       ftgt = stock@refpts[[1]]
     }
     stock = as(stock,"FLStock")
   }
   if(is.null(ftgt)){
-    stop("Please provide value for ftgt")
+    ftgt = mean(m(x)[seq(range(x)[c("minfbar","maxfbar")]),])
   }
     
   eqstk = brp(FLBRP(stock, ...))
