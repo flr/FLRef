@@ -348,7 +348,7 @@ Fe40 = function(stock,nyears=3){
 ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
   if(class(stock)=="FLStockR"){
     
-    if(is.an(stock@refpts[[1]])){
+    if(is.na(stock@refpts[[1]])){
       ftgt = mean(m(x)[seq(range(x)[c("minfbar","maxfbar")]),])
     }
     
