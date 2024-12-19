@@ -339,7 +339,7 @@ jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
       Bmsy = median(kb$B)/median(kb$stock),
       MSY = jabba$refpts$msy[1],
       Blim= median(blim*kb$B)/median(kb$stock),
-      Bpa= median(bthr*kb$B)/median(kb$stock),
+      Bthr= median(bthr*kb$B)/median(kb$stock),
       B0 = median(kb$B)/median(kb$BB0),
     )
   }
