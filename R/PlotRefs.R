@@ -396,6 +396,7 @@ return(p)
 #' @param plotrefs if TRUE reference points are plotted 
 #' @param colour color of CIs
 #' @param probs determine credibility intervals, default 80th, 90th percentiles   #' @param ncol number of plot panel columns
+#' @param osa if TRUE it shows one-step-ahead for SSB and Rec
 #' @param label.size size of refpts labels 
 #' @return ggplot  
 #' @export
@@ -405,7 +406,7 @@ return(p)
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","fe40"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
-plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings")[1],plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,label.size=2.5){
+plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings")[1],plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,osa=FALSE,label.size=2.5){
 
   
   if(class(object)%in%c("FLStock","FLStockR"))
@@ -420,6 +421,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
   stock@landings[is.na(stock@landings)] = landings[is.na(stock@landings)]
   stock@discards = computeDiscards(stock)
   stock@catch = computeCatch(stock)
+  
   stock
   }))
   
@@ -492,6 +494,10 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
                    metrics=list(Recruitment=rec,SSB=ssb,F=fbar,Landings=landings,Catches=catch)[c(1:3,(4+what))])+                                                
          ylim(c(0, NA))+ theme_bw()+leg+
       xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
+    
+    if(osa){
+    p$data[p$data$year==max(p$data$year)& p$data$qname%in%c("F","Catches","Landings"),"data"] = NA
+    }
     if(length(stks)==1){
     p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
       ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
@@ -509,6 +515,9 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
                          metrics=list(Biomass=ssb,F=fbar,Landings=landings,Catches=catch)[c(1:2,(3+what))])+                                                
         ylim(c(0, NA))+ theme_bw()+leg+
         xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
+      if(osa){
+        p$data[p$data$year==max(p$data$year)& p$data$qname%in%c("F","Catches","Landings"),"data"] = NA
+      }
       if(length(stks)==1){
       p = p +ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(1,3,5)], alpha=0.2) +
         ggplotFL::geom_flquantiles(fill=colour, probs=probs[c(2,3,4)], alpha=0.4)
@@ -585,19 +594,20 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
   if(plotrefs){
     
     Bsc = data.frame(red =  rownames(Bs)%in%c("Bcrit","Blim"),
-    orange = rownames(Bs)%in%c("Bpa","Bthr","Btri","Btrigger"),
+    orange = rownames(Bs)%in%c("Bpa","Bthr"),
     green = !rownames(Bs)%in%c("B0","SPR0","Bpa","Bthr","Btri","Btrigger","Bcrit","Blim"),
-    blue = rownames(Bs)%in%c("B0","SPR0")
+    blue = rownames(Bs)%in%c("B0","SPR0","Btrigger","Btri")
     )
     Fsc = data.frame(red =  rownames(Fs)%in%c("Flim","Fext","Fcrash","Fcrit"),
-                     orange = rownames(Fs)%in%c("Fpa","Fthr","Fthresh","Ftri"),
-                     green = !rownames(Fs)%in%c("Fpa","Fthr","Fcrit","Flim","Fext","Fcrash")
+                     orange = rownames(Fs)%in%c("Fpa","Fthr","Fthresh","Ftri","Fp0.5"),
+                     green = !rownames(Fs)%in%c("Fpa","Fthr","Fcrit","Flim","Fext","Fcrash","Fp0.5","Flower","Fupper","Fmys.low","Fmsy.up"),
+                     blue = rownames(Fs)%in%c("Flower","Fupper","Fmsy.low","Fmsy.up")
     )
     
     bcol = NULL 
     for(i in 1:length(Bs))  bcol = c(bcol,c("red","orange","darkgreen","blue")[which(Bsc[i,]==TRUE)])
     fcol = NULL 
-    for(i in 1:length(Fs))  fcol = c(fcol,c("red","orange","darkgreen")[which(Fsc[i,]==TRUE)])
+    for(i in 1:length(Fs))  fcol = c(fcol,c("red","darkorange","darkgreen","blue")[which(Fsc[i,]==TRUE)])
     ycol = rep("darkgreen",length(Ys))
     colo = c(bcol,fcol,ycol,"blue")
     posx = c(xy[1:length(Bs)],xy[1:length(Ys)],xy[1:length(Fs)],xy[1])

@@ -170,12 +170,13 @@ stockMedians <- function(object,FUN=median){
 #' @param legendcex=1 Allows to adjust legend cex
 #' @param verbose Report progress to R GUI?
 #' @param seed retains interannual correlation structure like MCMC 
+#' @param observed.catch  if FALSE expected catch is used
 #' @return output list of quant posteriors and mle's
 #' @author Henning Winker (GFCM)
 #' @export
 
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
-                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123){
+                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=TRUE){
   
   
   status=c('Bratio','F')
@@ -188,7 +189,7 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   
   if(is.null(cv)) stop("CoVar from Hessian required")
   # Get years
-  allyrs = unique(as.numeric(gsub(paste0(status[1],"_"),"",hat$Label[grep(paste0(status[1],"_"), hat$Label)])))[-1]
+  allyrs = unique(as.numeric(gsub(paste0(status[1],"_"),"",hat$Label[grep(paste0(status[1],"_"), hat$Label)])))#[-1]
   allyrs = allyrs[!is.na(allyrs)] 
   
   if(is.null(years) & addprj==TRUE) yrs = allyrs   
@@ -369,7 +370,13 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   
   
   # Add catch
+  if(observed.catch){
+  C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
+  } else {
   C_obs = aggregate(Exp~Yr,ss3rep$catch,sum)
+    
+  }
+  
   #colnames(C_obs) = c("Yr","Obs")
   Cobs = C_obs[C_obs$Yr%in%yrs,]
   foreyrs = unique(as.numeric(gsub(paste0("ForeCatch_"),"",hat$Label[grep(paste0("ForeCatch_"), hat$Label)])))
@@ -379,6 +386,22 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   Catch = Catch[Catch$Yr%in%yrs,]
   kb$Catch = rep(Catch[,2],each=max(kb$iter))
   mle$Catch = Catch[,2]
+  kb$Landings =  kb$Catch
+  mle$Landings = mle$Catch
+  kb$Discards = NA
+  mle$Discards = NA
+  if(!is.null(ss3rep$discard)){
+    if(observed.catch){
+    D_obs = aggregate(Obs~Yr,ss3rep$discard,sum)
+    } else {
+    D_obs = aggregate(Exp~Yr,ss3rep$discard,sum)
+    }
+    mle$Discards[mle$year%in%D_obs$Yr] = D_obs[,2]
+    kb$Discards[kb$year%in%D_obs$Yr] =  rep(D_obs[,2],each=max(kb$iter))
+    mle$Landings = mle$Catch-ifelse(is.na(mle$Discards),0,mle$Discards)
+    kb$Landings = kb$Catch-ifelse(is.na(kb$Discards),0,kb$Discards)
+    }
+  
   trg =round(bref*100,0)
   spr = round(ss3rep$sprtarg*100,0)
   xlab = c(bquote("SSB/SSB"[.(trg)]),expression(SSB/SSB[MSY]),bquote("SSB/SSB"[.(trg)]),expression(SSB/SSB[F0.1]))[bb] 
@@ -459,6 +482,4 @@ Mlorenzen = function(object,Mref="missing",Aref=2){
   return(out)
 } 
 #}}}
-
-
 

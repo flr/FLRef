@@ -62,4 +62,5 @@ export(schaefer.sim)
 export(blag)
 export(iALK)
 export(alk.sample)
-
+export(applyAR)
+export(fwdF4B)
