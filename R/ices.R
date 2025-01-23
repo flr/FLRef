@@ -233,6 +233,52 @@ fwdF4B =  function(stock,sr,btgt,nfy=3,niy=1,ival=NULL,imet="TAC",ftune=c(0,2),t
   return(out)
 }
 
+#' Function to summarise ICES fishing opportunities
+#' @param stk *FLStocks* with list of *FLStockR* objects 
+#' @param uncertainty *FLStocks* with list of *FLStockR* objects and iters 
+#' @param eval.yrs evaluation years of forecast 
+#' @param refyr change in percentage biomass to refyr
+#' @return data.frame
+#' @export
+fwd2ices<- function(stock,uncertainty,eval.yrs=NULL,dB=NULL,refyr=NULL){
   
+  object= stock
+  if(!class(object)=="FLStocks"){
+    object = FLStocks(forecast=stock)
+  }
+
+  if(is.null(refyr)){
+    refyr = an(range(object[[1]])["maxyear"])-1
+  }
+  
+  if(is.null(eval.yrs)){
+    eval.yrs = an(range(object[[1]])["maxyear"])
+  }
+  
+    df = do.call(rbind,Map(function(x,y,z){
+      stk = window(x,end=max(eval.yrs))
+      flqs = FLQuants(
+        Cy = round(catch(x)[,ac(eval.yrs-1)],1),
+        Fy = round(fbar(x)[,ac(eval.yrs-1)],3),
+        By = round(ssb(x)[,ac(eval.yrs)],1),
+        dB = 100*(round(ssb(x)[,ac(eval.yrs)],1)/round(ssb(x)[,ac(eval.yrs-1)],1)-1),       
+        PBlim = apply((round(ssb(z)[,ac(eval.yrs)],1)<Blim)*100,2,mean)
+        )
+      out = as.data.frame(flqs)
+      data.frame(scenario=y, t(as.matrix(out$data)))
+    },x=object,y=names(object),z=uncertainty)
+    )
+    names(df) = c("Basis",paste0("C_",eval.yrs-1),
+                  paste0("F_",eval.yrs-1),
+                  paste0("SSB_",eval.yrs),
+                  "SSB_change","P(SSB<Blim)")
+  
+
+  
+  rownames(df) = 1:nrow(df)
+  return(df)  
+} # End of function
+
+
   
 
