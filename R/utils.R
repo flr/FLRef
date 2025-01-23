@@ -176,7 +176,7 @@ stockMedians <- function(object,FUN=median){
 #' @export
 
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
-                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=TRUE){
+                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=FALSE){
   
   
   status=c('Bratio','F')
