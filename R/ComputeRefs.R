@@ -379,3 +379,53 @@ ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
 }
 #}}}
 
+
+
+#' fwdF4B ()
+#
+#' Bisection Function to search F for a given biomass
+#' @param stock FLStock object 
+#' @param sr stock recruitment relationship
+#' @param btgt target biomass of the search
+#' @param nfy number of forecast (default 3)
+#' @param niy number of intermediate years (default 1)
+#' @param ival intermediate year value
+#' @param imet intermediate year metric ("TAC","F")
+#' @param ftune tuning limits for F search c(0.1,2) 
+#' @param tol precision tolerance
+#' @param verbose 
+#' @return  *FLStock*
+#' @export
+
+fwdF4B =  function (stock, sr, btgt, nfy = 3, niy = 1, ival = niy, imet = "TAC", 
+                    ftune = c(0, 2), tol = 0.001, verbose = TRUE) 
+{
+  rpts = NULL
+  if (class(stock) == "FLStockR") {
+    rpts = stock@refpts
+    stock = as(stock, "FLStock")
+  }
+  fyrs = (dims(stock)$maxyear + 1):(dims(stock)$maxyear + nfy)
+  nfy = length(fyrs)
+  stkf = stf(stock, nfy)
+  iyrs = (dims(stock)$maxyear + 1):(dims(stock)$maxyear + niy)
+  if (niy > 0) {
+    val = ifelse(length(ival) == niy, ival, rep(ival[1], 
+                                                niy))
+    ictrl <- fwdControl(data.frame(year = iyrs, quant = ifelse(imet == 
+                                                                 "TAC", "catch", "fbar"), value = val))
+    stkf = fwd(stkf, sr = sr, control = ictrl)
+    fyrs = fyrs[-niy]
+  }
+  
+  statistic <- list(FBtgt = list(~yearMeans((SB/SBtgt)), 
+                                 name = "F4B", desc = "Search Btgt"))
+  out <- ref.bisect(stkf, sr = sr, metrics = list(SB = function(x) unitSums(ssb(x))), refpts = FLPar(SBtgt = btgt), 
+                    statistic = statistic,target=1, years = fyrs, pyears = max(fyrs), 
+                    tune = list(fbar = ftune), tol = tol, verbose = verbose)
+  if (!is.null(rpts)) {
+    out = FLStockR(out)
+    out@refpts = rpts
+  }
+  return(out)
+}

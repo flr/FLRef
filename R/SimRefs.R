@@ -151,6 +151,107 @@ return(out)
 #}}}
 
 
+# ref.bisect {{{
+
+#' Bisection approach to find target F for B (sex-structured)
+#'
+#'
+#' The plain bisection algorithm (Burden & Douglas, 1985) is employed here to
+#' find the value of a given forecast target quantity (e.g. `fbar`) for which
+#' a selected value of a performance statistic is obtained over a chosen period.
+#' @references {Burden, Richard L.; Faires, J. Douglas (1985), "2.1 The Bisection Algorithm", Numerical Analysis (3rd ed.), PWS Publishers, ISBN 0-87150-857-5}
+#' @param stock object class FLStock
+#' @param sr object class FLSR
+#' @param metrics FLQuant of FLStock to be defined  
+#' @param statistic 
+#' @param years years to be evaluated
+#' @param tune range for input x
+#' @param target target with default 1 for ratios
+#' @param tol tolerance level
+#' @param maxit number of optimisation steps
+#' @param log if TRUE, optimise on log-scale  
+#' @export
+#' @author Credits to Iago Mosqueira
+
+ref.bisect = function (stock, sr, deviances = rec(stock) %=% 1, metrics, refpts, 
+                       statistic, years, pyears = years, tune, target=1, tol = 0.01, 
+                       maxit = 15, verbose = TRUE) 
+{
+  if (names(tune)[1] %in% c("f", "fbar")) 
+    foo <- ffwd
+  else foo <- fwd
+  cmin <- fwdControl(year = years, quant = names(tune)[1], 
+                     value = unlist(tune)[1])
+  if (verbose) 
+    cat(paste0("[1] ", names(tune), ": ", unlist(tune)[1]))
+  rmin <- foo(stock, sr = sr, control = cmin, deviances = deviances)
+  pmin <- performance(rmin, metrics = metrics, statistics = statistic, 
+                      refpts = refpts, years = pyears)
+  obmin <- (target-mean(pmin$data, na.rm = TRUE))
+  if (verbose) 
+    cat(" - target:", mean(pmin$data, na.rm = TRUE), " - diff: ", 
+        obmin, "\n")
+  if (isTRUE(all.equal(obmin, 0, tolerance = tol))) 
+    return(rmin)
+  cmax <- fwdControl(year = years, quant = names(tune)[1], 
+                     value = unlist(tune)[2])
+  if (verbose) 
+    cat(paste0("[2] ", names(tune), ": ", unlist(tune)[2]))
+  rmax <- foo(stock, sr = sr, control = cmax, deviances = deviances)
+  pmax <- performance(simplify(rmax,weighted=TRUE), metrics = metrics, statistics = statistic, 
+                      refpts = refpts, probs = NULL, years = pyears)
+  obmax <- (target -  mean(pmax$data, na.rm = TRUE))
+  if (verbose) 
+    cat(" - target:", mean(pmax$data, na.rm = TRUE), " - diff: ", 
+        obmax, "\n")
+  if (isTRUE(all.equal(obmax, 0, tolerance = tol))) 
+    return(rmax)
+  if ((obmin * obmax) > 0) {
+    warning("Range of hcr param(s) cannot achieve requested tuning objective probability")
+    return(list(min = rmin, max = rmax))
+  }
+  count <- 0
+  while (count <= maxit) {
+    cmid <- control
+    cmid <- fwdControl(year = years, quant = names(tune)[1], 
+                       value = (cmin$value + cmax$value)/2)
+    if (verbose) 
+      cat(paste0("[", count + 3, "] ", names(tune), ": ", 
+                 cmid$value[1]))
+    rmid <- foo(stock, sr = sr, control = cmid, deviances = deviances)
+    pmid <- performance(rmid, metrics = metrics, statistics = statistic, 
+                        refpts = refpts, probs = NULL, years = pyears)
+    obmid <- target-mean(pmid$data, na.rm = TRUE) 
+    if (verbose) 
+      cat(" - target:", mean(pmid$data, na.rm = TRUE), " - diff: ", 
+          obmid, "\n")
+    if (isTRUE(all.equal(obmid, 0, tolerance = tol))) {
+      return(rmid)
+    }
+    if ((obmin * obmid) < 0) {
+      cmax <- cmid
+      obmax <- obmid
+      if (isTRUE(all.equal(cmin$value[1], cmid$value[1], 
+                           tolerance = tol))) {
+        return(rmid)
+      }
+    }
+    else {
+      cmin <- cmid
+      obmin <- obmid
+      if (isTRUE(all.equal(cmid$value[1], cmax$value[1], 
+                           tolerance = tol))) {
+        return(rmid)
+      }
+    }
+    count <- count + 1
+  }
+  warning("Solution not found within 'maxit', check 'range', 'maxit' or 'tol'.")
+  return(rmid)
+}
+
+
+
 # opt.bisect {{{
 
 #' Bisection approach to optimise x for maximising y  

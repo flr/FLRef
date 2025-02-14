@@ -79,11 +79,14 @@ huecol <- function(n,alpha=1) {
 
 # }}}# color options
 
+#' stockMedians()
+#
 #' Converts FLStock into simplified FLStock with Median FLQuants
 #' @param object of class *FLStock* or *FLStockR* or *FLStocks*  
 #' @param FUN computes mean, median
 #' @return FLStockR with *FLQuants*
 #' @export
+
 stockMedians <- function(object,FUN=median){
   
   stks= TRUE
@@ -96,27 +99,34 @@ stockMedians <- function(object,FUN=median){
     
     
     
-    B = ssb(x)
-    H = fbar(x)
-    R = (rec(x))
-    C = computeCatch(x)
+    B = unitSums(ssb(x))
+    H = unitMeans(fbar(x))
+    R = unitSums(rec(x))
+    C = unitSums(computeCatch(x))
+    D = unitSums(computeDiscards(x))
+    L = unitSums(computeLandings(x))
+    
     dimnames(B)$age = "1"
     dimnames(C)$age = "1"
     dimnames(H)$age = "1"
     dimnames(R)$age = "1"
+    dimnames(L)$age = "1"
+    dimnames(D)$age = "1"
     
     B = apply(B,1:5,FUN)
     H = apply(H,1:5,FUN)
     R = apply(R,1:5,FUN)
     C = apply(C,1:5,FUN)
+    L = apply(L,1:5,FUN)
+    D = apply(D,1:5,FUN)
     
     year = an(dimnames(x)$year)
     iters = an(dimnames(B)$iter)
     
     stk = FLStockR(stock.n=FLQuant(R, dimnames=list(age="1", year = (year),iter=iters)),
                    catch.n = C,
-                   landings.n = C,
-                   discards.n = FLQuant(0, dimnames=list(age="1", year = (year),iter=iters)),
+                   landings.n = L,
+                   discards.n = D,
                    stock.wt=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
                    landings.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
                    discards.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
@@ -149,6 +159,84 @@ stockMedians <- function(object,FUN=median){
   return(out)
 }
 
+
+
+bisect.ref = function (stock, sr, deviances = rec(stock) %=% 1, metrics, refpts, 
+          statistic, years, pyears = years, tune, target=1, tol = 0.01, 
+          maxit = 15, verbose = TRUE) 
+{
+  if (names(tune)[1] %in% c("f", "fbar")) 
+    foo <- ffwd
+  else foo <- fwd
+  cmin <- fwdControl(year = years, quant = names(tune)[1], 
+                     value = unlist(tune)[1])
+  if (verbose) 
+    cat(paste0("[1] ", names(tune), ": ", unlist(tune)[1]))
+  rmin <- foo(stock, sr = sr, control = cmin, deviances = deviances)
+  pmin <- performance(rmin, metrics = metrics, statistics = statistic, 
+                      refpts = refpts, years = pyears)
+  obmin <- (target-mean(pmin$data, na.rm = TRUE))
+  if (verbose) 
+    cat(" - target:", mean(pmin$data, na.rm = TRUE), " - diff: ", 
+        obmin, "\n")
+  if (isTRUE(all.equal(obmin, 0, tolerance = tol))) 
+    return(rmin)
+  cmax <- fwdControl(year = years, quant = names(tune)[1], 
+                     value = unlist(tune)[2])
+  if (verbose) 
+    cat(paste0("[2] ", names(tune), ": ", unlist(tune)[2]))
+  rmax <- foo(stock, sr = sr, control = cmax, deviances = deviances)
+  pmax <- performance(simplify(rmax,weighted=TRUE), metrics = metrics, statistics = statistic, 
+                      refpts = refpts, probs = NULL, years = pyears)
+  obmax <- (target -  mean(pmax$data, na.rm = TRUE))
+  if (verbose) 
+    cat(" - target:", mean(pmax$data, na.rm = TRUE), " - diff: ", 
+        obmax, "\n")
+  if (isTRUE(all.equal(obmax, 0, tolerance = tol))) 
+    return(rmax)
+  if ((obmin * obmax) > 0) {
+    warning("Range of hcr param(s) cannot achieve requested tuning objective probability")
+    return(list(min = rmin, max = rmax))
+  }
+  count <- 0
+  while (count <= maxit) {
+    cmid <- control
+    cmid <- fwdControl(year = years, quant = names(tune)[1], 
+                       value = (cmin$value + cmax$value)/2)
+    if (verbose) 
+      cat(paste0("[", count + 3, "] ", names(tune), ": ", 
+                 cmid$value[1]))
+    rmid <- foo(stock, sr = sr, control = cmid, deviances = deviances)
+    pmid <- performance(rmid, metrics = metrics, statistics = statistic, 
+                        refpts = refpts, probs = NULL, years = pyears)
+    obmid <- target-mean(pmid$data, na.rm = TRUE) 
+    if (verbose) 
+      cat(" - target:", mean(pmid$data, na.rm = TRUE), " - diff: ", 
+          obmid, "\n")
+    if (isTRUE(all.equal(obmid, 0, tolerance = tol))) {
+      return(rmid)
+    }
+    if ((obmin * obmid) < 0) {
+      cmax <- cmid
+      obmax <- obmid
+      if (isTRUE(all.equal(cmin$value[1], cmid$value[1], 
+                           tolerance = tol))) {
+        return(rmid)
+      }
+    }
+    else {
+      cmin <- cmid
+      obmin <- obmid
+      if (isTRUE(all.equal(cmid$value[1], cmax$value[1], 
+                           tolerance = tol))) {
+        return(rmid)
+      }
+    }
+    count <- count + 1
+  }
+  warning("Solution not found within 'maxit', check 'range', 'maxit' or 'tol'.")
+  return(rmid)
+}
 
 
 #' ssmvln()
