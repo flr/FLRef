@@ -398,7 +398,7 @@ ABItgt <- function(stock,ftgt=NULL,thresh=0.9, ...){
 #' @export
 
 fwdF4B =  function (stock, sr, btgt, nfy = 3, niy = 1, ival = niy, imet = "TAC", 
-                    ftune = c(0, 2), tol = 0.001, verbose = TRUE) 
+                    ftune = c(0, 2), tol = 0.001, verbose = TRUE,ssbQ = 1,recQ=1) 
 {
   rpts = NULL
   if (class(stock) == "FLStockR") {
@@ -420,7 +420,7 @@ fwdF4B =  function (stock, sr, btgt, nfy = 3, niy = 1, ival = niy, imet = "TAC",
   
   statistic <- list(FBtgt = list(~yearMeans((SB/SBtgt)), 
                                  name = "F4B", desc = "Search Btgt"))
-  out <- ref.bisect(stkf, sr = sr, metrics = list(SB = function(x) unitSums(ssb(x))), refpts = FLPar(SBtgt = btgt), 
+  out <- ref.bisect(stkf, sr = sr, metrics = list(SB = function(x) apply(ssb(x)[,,,ssbQ],c(2,6),sum)), refpts = FLPar(SBtgt = btgt), 
                     statistic = statistic,target=1, years = fyrs, pyears = max(fyrs), 
                     tune = list(fbar = ftune), tol = tol, verbose = verbose)
   if (!is.null(rpts)) {

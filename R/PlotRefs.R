@@ -398,6 +398,8 @@ return(p)
 #' @param probs determine credibility intervals, default 80th, 90th percentiles   #' @param ncol number of plot panel columns
 #' @param osa if TRUE it shows one-step-ahead for SSB and Rec
 #' @param label.size size of refpts labels 
+#' @param ssbQ spawning quarter for seasonal models
+#' @param recQ recruitment quarter seasonal models
 #' @return ggplot  
 #' @export
 #' @examples
@@ -406,7 +408,7 @@ return(p)
 #' brp = computeFbrp(stock=ple4,sr=srr,proxy=c("sprx","f0.1","fe40"),blim=0.1,type="b0")
 #' plotAdvice (ple4,brp)
 
-plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings")[1],plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,osa=FALSE,label.size=2.5){
+plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings")[1],plotrefs=TRUE,probs=c(0.05,0.2,0.50,0.8,0.95),colour="dodgerblue",ncol=NULL,osa=FALSE,label.size=2.5,ssbQ = 1,recQ=1){
 
   
   if(class(object)%in%c("FLStock","FLStockR"))
@@ -468,8 +470,8 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
   ref = rownames(rp)[grep("F",rownames(rp))[1]]
   yref = c(rp[ref,"yield"])
   fref = c(rp[ref,"harvest"])
-  fls = FLQuants("Recruitment"=unitSums(rec(stock))/r0,
-                 "Spawning Ratio Potential"=(unitSums(ssb(stock))/r0)/b0,"Yield per Recruit"=(unitSums(landings(stock))/r0)/yref,"F"=unitMeans(fbar(stock)))
+  fls = FLQuants("Recruitment"=apply(rec(stock)[,,,recQ],c(2,6),sum)/r0,
+                 "Spawning Ratio Potential"=(apply(ssb(stock)[,,,ssbQ],c(2,6),sum)/r0)/b0,"Yield per Recruit"=(apply(landings(stock),c(2,6),sum)/r0)/yref,"F"=apply(fbar(stock),c(2,6),mean))
   
   names(fls)[names(fls)=="F"] =  paste0("F(",paste0(range(stock, c("minfbar", "maxfbar")),
          collapse="-"),")")
@@ -491,7 +493,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
     if(!type=="spm"){
    
     p = ggplotFL::plot(stks,
-                   metrics=list(Recruitment=function(x)unitSums(rec(x)),SSB=function(x)unitSums(ssb(x)),F=function(x)unitMeans(fbar(x)),Landings=function(x)unitSums(landings(x)),Catches=function(x)unitSums(catch(x)))[c(1:3,(4+what))])+                                                
+                   metrics=list(Recruitment=function(x)apply(rec(x)[,,,recQ],c(2,6),sum),SSB=function(x)apply(ssb(x)[,,,ssbQ],c(2,6),sum),F=function(x)apply(fbar(x),c(2,6),mean),Landings=function(x)apply(landings(x),c(2,6),sum),Catches=function(x)apply(catch(x),c(2,6),sum))[c(1:3,(4+what))])+                                                
          ylim(c(0, NA))+ theme_bw()+leg+
       xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
     
@@ -512,7 +514,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
       
       
       p = ggplotFL::plot(stks,
-                         metrics=list(Biomass=function(x)unitSums(ssb(x)),F=function(x)unitMeans(fbar(x)),Landings=function(x)unitSums(landings(x)),Catches=function(x)unitSums(catch(x)))[c(1:2,(3+what))])+                                                
+                         metrics=list(Biomass=function(x)apply(ssb(x)[,,,ssbQ],c(2,6),sum),F=function(x)apply(fbar(x),c(2,6),mean),Landings=function(x)apply(landings(x),c(2,6),sum),Catches=function(x)apply(catch(x),c(2,6),mean))[c(1:2,(3+what))])+                                                
         ylim(c(0, NA))+ theme_bw()+leg+
         xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
       if(osa){
@@ -540,8 +542,8 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
   } else {
     stk = stks[[1]]
   }   
-  mets <- list(Rec=function(x) unitSums(rec(x)), SB=function(x) unitSums(ssb(x)),
-               C=function(x) unitSums(landings(x)), F=function(x) unitMeans(fbar(x)))
+  mets <- list(Rec=function(x) apply(rec(x),c(2:6),sum), SB=function(x) apply(ssb(x)[,,,ssbQ],c(2,6),),
+               C=function(x) apply(landings(x),c(2:6),sum), F=function(x) apply(fbar(x),c(2:6),mean))
  
    xy =quantile(dims(stk)$minyear:dims(stk)$maxyear,c(0.2,0.45,0.75,0.6,0.3,0.5,0.1))
   
@@ -955,10 +957,7 @@ plotAR <- function(pars,ftgt = 1,btrigger="missing",bpa="missing",bthresh="missi
 # plotWKREF {{{
 
 #' plotWKREF
-#' Plots the new proposed ICES advice rule
-#'
-#' @param ftgt Target F = min(Fbrp,Fp0.5) 
-#' @param btgt Biomass target corresponding to Fbrp
+#' Plots the newploiomass target corresponding to Fbrp
 #' @param blim biomass limit
 #' @param btrigger biomass trigger below which F is linearly reduced   
 #' @param bthresh biomass threshold beyond which biomass is classified sustainable

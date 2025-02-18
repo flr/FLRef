@@ -84,10 +84,12 @@ huecol <- function(n,alpha=1) {
 #' Converts FLStock into simplified FLStock with Median FLQuants
 #' @param object of class *FLStock* or *FLStockR* or *FLStocks*  
 #' @param FUN computes mean, median
+#' @param ssbQ SSB quarter seasonal models
+#' @param recQ recruitment quarter seasonal models
 #' @return FLStockR with *FLQuants*
 #' @export
 
-stockMedians <- function(object,FUN=median){
+stockMedians <- function(object,FUN=median,ssbQ=1,recQ=1){
   
   stks= TRUE
   if(class(object)%in%c("FLStockR","FLStock")){
@@ -99,12 +101,12 @@ stockMedians <- function(object,FUN=median){
     
     
     
-    B = unitSums(ssb(x))
-    H = unitMeans(fbar(x))
-    R = unitSums(rec(x))
-    C = unitSums(computeCatch(x))
-    D = unitSums(computeDiscards(x))
-    L = unitSums(computeLandings(x))
+    B = apply(ssb(x)[,,,ssbQ],c(2,6),sum)
+    H = apply(fbar(x),c(2,6),mean)
+    R = apply(rec(x)[,,,recQ],c(2,6),sum)
+    C = apply(computeCatch(x),c(2,6),sum)
+    D = apply(computeDiscards(x),c(2,6),sum)
+    L = apply(computeLandings(x),c(2,6),sum)
     
     dimnames(B)$age = "1"
     dimnames(C)$age = "1"
@@ -112,6 +114,13 @@ stockMedians <- function(object,FUN=median){
     dimnames(R)$age = "1"
     dimnames(L)$age = "1"
     dimnames(D)$age = "1"
+    dimnames(B)$season = "all"
+    dimnames(C)$season = "all"
+    dimnames(H)$season = "all"
+    dimnames(R)$season = "all"
+    dimnames(L)$season = "all"
+    dimnames(D)$season = "all"
+    
     
     B = apply(B,1:5,FUN)
     H = apply(H,1:5,FUN)
