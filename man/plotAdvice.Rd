@@ -14,7 +14,10 @@ plotAdvice(
   probs = c(0.05, 0.2, 0.5, 0.8, 0.95),
   colour = "dodgerblue",
   ncol = NULL,
-  label.size = 2.5
+  osa = FALSE,
+  label.size = 2.5,
+  ssbQ = 1,
+  recQ = 1
 )
 }
 \arguments{
@@ -28,7 +31,13 @@ plotAdvice(
 
 \item{colour}{color of CIs}
 
+\item{osa}{if TRUE it shows one-step-ahead for SSB and Rec}
+
 \item{label.size}{size of refpts labels}
+
+\item{ssbQ}{spawning quarter for seasonal models}
+
+\item{recQ}{recruitment quarter seasonal models}
 
 \item{stock}{FLStock or FLStockR}
 

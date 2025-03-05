@@ -1359,7 +1359,8 @@ plotMajuro<- function(ftgt = 1,fthresh=1.1,btgt=1,blim=0.1,btrigger=0.8*btgt,bth
 #' @param text show text
 #' @return GFCM advice plot
 #' @export
-
+#' @examples 
+#' plotGFCM(fadv=0.95,btrigger=0.5)
 
 
 plotGFCM <- function (ftgt = 1, btgt = 1, blim = 0.25, btrigger = "missing",  bthr = 0.5 ,fthr = 1.2 ,bclose = 0, fmin = 0,fadv = 0.8, obs = "missing", kobe = TRUE, alpha = 1, xmax = 1.3, ymax = 1.5, ylab = "missing", xlab = "missing", rel = TRUE, expand = TRUE, labels = TRUE, critical = kobe,text=TRUE) {

@@ -3,7 +3,7 @@
 \name{plotWKREF}
 \alias{plotWKREF}
 \title{plotWKREF
-Plots the new proposed ICES advice rule}
+Plots the newploiomass target corresponding to Fbrp}
 \usage{
 plotWKREF(
   ftgt = 1,
@@ -27,10 +27,6 @@ plotWKREF(
 )
 }
 \arguments{
-\item{ftgt}{Target F = min(Fbrp,Fp0.5)}
-
-\item{btgt}{Biomass target corresponding to Fbrp}
-
 \item{blim}{biomass limit}
 
 \item{btrigger}{biomass trigger below which F is linearly reduced}
@@ -68,7 +64,7 @@ ggplot
 }
 \description{
 plotWKREF
-Plots the new proposed ICES advice rule
+Plots the newploiomass target corresponding to Fbrp
 }
 \examples{
 plotWKREF()

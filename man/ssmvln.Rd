@@ -17,7 +17,8 @@ ssmvln(
   xmax = NULL,
   legendcex = 1,
   verbose = TRUE,
-  seed = 123
+  seed = 123,
+  observed.catch = FALSE
 )
 }
 \arguments{
@@ -44,6 +45,8 @@ ssmvln(
 \item{verbose}{Report progress to R GUI?}
 
 \item{seed}{retains interannual correlation structure like MCMC}
+
+\item{observed.catch}{if FALSE expected catch is used}
 
 \item{out}{choice c("iters","mle")}
 

@@ -2,18 +2,24 @@
 % Please edit documentation in R/utils.R
 \name{stockMedians}
 \alias{stockMedians}
-\title{Converts FLStock into simplified FLStock with Median FLQuants}
+\title{stockMedians()
+Converts FLStock into simplified FLStock with Median FLQuants}
 \usage{
-stockMedians(object, FUN = median)
+stockMedians(object, FUN = median, ssbQ = 1, recQ = 1)
 }
 \arguments{
 \item{object}{of class *FLStock* or *FLStockR* or *FLStocks*}
 
 \item{FUN}{computes mean, median}
+
+\item{ssbQ}{SSB quarter seasonal models}
+
+\item{recQ}{recruitment quarter seasonal models}
 }
 \value{
 FLStockR with *FLQuants*
 }
 \description{
+stockMedians()
 Converts FLStock into simplified FLStock with Median FLQuants
 }
