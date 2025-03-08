@@ -5,10 +5,19 @@
 \title{plotbioage()
 Plots stock N_a, W_a, M_a and Mat_a by year}
 \usage{
-plotbioage(stk, ncol = 2)
+plotbioage(
+  stk,
+  metrics = c("Weight", "Maturity", "M", "Selectivity"),
+  bysex = FALSE,
+  ncol = 2
+)
 }
 \arguments{
 \item{stk}{stock object class FLStock}
+
+\item{metrics}{choose  Weight, Maturity, M, Selectivity}
+
+\item{bysex}{plot by sex default FALSE}
 
 \item{ncol}{number of columns in multiplot}
 }
