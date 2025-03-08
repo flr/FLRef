@@ -74,6 +74,8 @@ plotbioyr <- function(stk,ncol=2){
 #' Plots stock N_a, W_a, M_a and Mat_a by year 
 #'
 #' @param stk stock object class FLStock  
+#' @param metrics choose  Weight, Maturity, M, Selectivity
+#' @param bysex plot by sex default FALSE 
 #' @param ncol number of columns in multiplot  
 #' @return ggplot  
 #' @export
@@ -81,23 +83,37 @@ plotbioyr <- function(stk,ncol=2){
 #' data(ple4)
 #' plotbioage(ple4)
 
-plotbioage = function(stk,ncol=2){
+plotbioage = function(stk,metrics=c("Weight","Maturity","M","Selectivity"),bysex=FALSE,ncol=2){
   if(dim(stk)[6]>1) stk = stockMedians(stk)
+  
+  if(!bysex){
   if(any(dim(stk)[3:5]>1)){
     stk = simplify(stk)
   }
- 
-  dat = as.data.frame(
-    FLQuants(Weight=stock.wt(stk),Maturity=mat(stk),M=m(stk),Selectivity=catch.sel(stk))
-  )
+  
+  flqs =  FLQuants(Weight=stock.wt(stk),Maturity=mat(stk),M=m(stk),Selectivity=catch.sel(stk))
+  flqs = flqs[names(flqs)%in%metrics]
+  dat = as.data.frame(flqs)
+  
+  } else {
+    flqs =  FLQuants(Weight=stock.wt(stk),Maturity=mat(stk),M=m(stk),Selectivity=catch.sel(stk))
+    flqs = flqs[names(flqs)%in%metrics]
+    dat = as.data.frame(flqs )
+    dat$qname = paste0(dat$qname," (",dat$unit,")")
+  
+  }
+  
+  dat$qname = factor(dat$qname,levels = unique(dat$qname))
   dat$Year = factor(dat$year)
   p =ggplot2::ggplot(dat)+
     geom_line(aes(age,data,group=Year,col=Year))+
+    scale_x_continuous(breaks=seq(0,100,1))+
     facet_wrap(~qname,scale="free",ncol=ncol)+
     theme_bw()+
     theme(legend.position="right",legend.text = element_text(size=5),
           legend.title = element_text(size=6),legend.key.height = unit(.3, 'cm'))+
     xlab("Age")+ylab("Value-at-age")
+
   return(p)
 }
 
