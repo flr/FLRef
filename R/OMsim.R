@@ -248,14 +248,19 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
 #' ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age,scales="free_y")+
 #' theme(legend.position = "none")+ylab("Index")
 
-idx.sim <- function(object,sel=catch.sel(object),ages=NULL,years=NULL,ess=200,sigma=0.2,q=0.01){
+idx.sim <- function(object,sel=catch.sel(object),r,years=NULL,ess=200,sigma=0.2,q=0.01){
   if(is.null(ages)){
     ages = an(dimnames(object)$age)
   }
   if(is.null(years)){
     years = an(dimnames(object)$year)
   }
-  sel = trim(sel,age=ages,year=years)
+  if(dims(sel)$unit<dims(object)$unit){
+    sel <- expand(sel, unit = c("F", "M"))
+  }
+  selinp =  catch.sel(object)
+  selinp[] = sel
+  sel = trim(selinp,age=ages,year=years)
   object = trim(object,age=ages,year=years)
   idx = index = trim(survey(object,ages=ac(ages),sel=sel,biomass=F))
   devs = rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
