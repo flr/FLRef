@@ -248,29 +248,28 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
 #' ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age,scales="free_y")+
 #' theme(legend.position = "none")+ylab("Index")
 
-idx.sim <- function(object,sel=catch.sel(object),r,years=NULL,ess=200,sigma=0.2,q=0.01){
-  
-   if(is.null(ages)){
+idx.sim <- function(object,sel=catch.sel(object),ages=NULL,years=NULL,ess=200,sigma=0.2,q=0.01){
+  if(is.null(ages)){
     ages = an(dimnames(object)$age)
-   }
-   if(is.null(years)){
+  }
+  if(is.null(years)){
     years = an(dimnames(object)$year)
-   }
-   if(dims(sel)$unit<dims(object)$unit){
+  }
+  if(dims(sel)$unit<dims(object)$unit){
     sel <- expand(sel, unit = c("F", "M"))
-   }
-   selinp =  catch.sel(object)
-   selinp[] = sel
-   sel = trim(selinp,age=ages,year=years)
-   object = trim(object,age=ages,year=years)
-   idx = index = trim(survey(object,ages=ac(ages),sel=sel,biomass=F))
-   devs = rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
-   for(i in seq(ages)){
+  }
+  selinp =  catch.sel(object)
+  selinp[] = sel
+  sel = trim( selinp,age=ages,year=years)
+  object = trim(object,age=ages,year=years)
+  idx = index = trim(survey(object,ages=ac(ages),sel=sel,biomass=F))
+  devs = rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
+  for(i in seq(ages)){
     idx@index.q[i,] = devs 
-   }
-   res = idx@index
-   # Sample age-comp from multinomial
-   for(i in seq(dims(object)$iter)){
+  }
+  res = idx@index
+  # Sample age-comp from multinomial
+  for(i in seq(dims(object)$iter)){
     for(y in seq(dims(object)$year)){
       prob =  c(res[,y,,,,i]%/%apply(res[,y,,,,i],2,sum))
       res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob),1,sum)

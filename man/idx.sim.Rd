@@ -7,7 +7,7 @@
 idx.sim(
   object,
   sel = catch.sel(object),
-  r,
+  ages = NULL,
   years = NULL,
   ess = 200,
   sigma = 0.2,
@@ -19,6 +19,8 @@ idx.sim(
 
 \item{sel}{FLQuant with selectivity.pattern}
 
+\item{ages}{define age range}
+
 \item{years}{define year range}
 
 \item{ess}{effective sample size for age composition sample}
@@ -26,8 +28,6 @@ idx.sim(
 \item{sigma}{annual observation error for log(q)}
 
 \item{q}{catchability coefficient for scaling}
-
-\item{ages}{define age range}
 }
 \value{
 FLIndex
