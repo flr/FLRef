@@ -205,12 +205,21 @@ newselex<- function(object,selexpars){
 #' ggplot(idx@sel.pattern)+geom_line(aes(age,data))+ylab("Selectivity")+xlab("Age")
 #' ggplot(idx@index)+geom_line(aes(year,data,col=ac(iter)))+theme(legend.position = "none")+ylab("Index")
 
-bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001){
-  idx = survey(object,sel=sel,biomass=TRUE)
+bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
   
-  idx@index.q[] =  rlnorm(dims(object)$iter*dims(object)$year,log(q),sigma)
+  if(dims(sel)$unit<dims(object)$unit){
+    sel <- expand(sel, unit = c("F", "M"))
+  }
+  selinp =  catch.sel(object)
+  years = ac(dimnames(object)$year)
+  selinp[] = sel
+  idx = survey(object,sel=selinp,biomass=TRUE)
+  idx@index.q[] =  ar1rlnorm(rho=rho,
+                             years=years,iters= dims(object)$iter,meanlog=log(q),sdlog=sigma)
+    
   idx@index.var[] = sigma
   idx@index = idx@index.q*idx@index
+  
   units(idx)[] = "NA"
   return(idx)
 }

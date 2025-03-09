@@ -4,7 +4,7 @@
 \alias{bioidx.sim}
 \title{generates FLIndexBiomass with random observation error from an FLStock}
 \usage{
-bioidx.sim(object, sel = catch.sel(object), sigma = 0.2, q = 0.001)
+bioidx.sim(object, sel = catch.sel(object), sigma = 0.2, q = 0.001, rho = 0)
 }
 \arguments{
 \item{object}{FLStock}

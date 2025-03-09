@@ -1015,7 +1015,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
        
       stks= TRUE
       if(class(object)=="FLStockR"){
-        object= FLStocks(stk=stk)
+        object= FLStocks(stk=object)
         stks=FALSE
       }
       
@@ -1023,11 +1023,10 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
       
     #x = object[[2]]
       
-      
-      B = as.FLQuant(ssb(x)/x@refpts[[2]])
-      H = fbar(x)/x@refpts[[1]]
-      R = (rec(x))
-      C = computeCatch(x)
+      B = as.FLQuant(unitSums(ssb(x))/x@refpts[[2]])
+      H = unitMeans(fbar(x))/x@refpts[[1]]
+      R = unitSums(rec(x))
+      C = unitSums(computeCatch(x))
       dimnames(B)$age = "1"
       dimnames(C)$age = "1"
       dimnames(H)$age = "1"
@@ -1053,16 +1052,18 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
       harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
     )
     units(stk) = standardUnits(stk)
-    stk@catch = computeCatch(stk)
-    stk@landings = computeLandings(stk)
-    stk@discards = computeStock(stk)
-    stk@stock = ssb(x)
+    stk@catch = unitSums(computeCatch(stk))
+    stk@landings = unitSums(computeLandings(stk))
+    stk@discards = unitSums(computeStock(stk))
+    stk@stock = unitSums(ssb(x))
     br = c("Bthr","Blim","Bpa")
     stk@refpts = FLPar(Ftgt=1,Btgt=1)
     if(any(rownames(x@refpts)%in%br)){
       stk@refpts = rbind(stk@refpts,x@refpts[rownames(x@refpts)%in%br]/x@refpts[[2]])
       
-    }                   
+    } 
+    
+    
     row.names(stk@refpts)[1:2] = row.names(x@refpts)[1:2] 
     stk@desc = x@desc
     return(stk)
