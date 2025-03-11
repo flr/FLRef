@@ -311,6 +311,7 @@ pgquant <- function(object,pg){
 #' @param sel FLQuant with selectivity.pattern e.g. catch.sel()
 #' @param ess effective sample size for age composition
 #' @param what c("catch", "landings", "discards")
+#' @param rescale rescale to the abudance scale of the input 
 #' @return FLQuant with catch.n samples
 #' @export 
 #' @examples 
@@ -320,7 +321,7 @@ pgquant <- function(object,pg){
 #' # Checks
 #' ggplot(ca)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
 #' theme(legend.position = "none")+ylab("Index")
-ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1]){
+ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1],rescale=FALSE){
   res=object
   ref=res
   # Sample age-comp from multinomial
@@ -329,6 +330,11 @@ ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1]){
       prob =  c(res[,y,,,,i]%/%apply(res[,y,,,,i],2,sum))
       res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob),1,sum)
     }
+  }
+  if(rescale){
+    
+    res = quantSums(ref)%*%(res%/%quantSums(res))  
+    
   }
   #fac = apply(ref,2:6,sum)/apply(res,2:6,sum)
   #res = res%*%fac
