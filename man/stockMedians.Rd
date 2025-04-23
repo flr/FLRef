@@ -5,12 +5,12 @@
 \title{stockMedians()
 Converts FLStock into simplified FLStock with Median FLQuants}
 \usage{
-stockMedians(object, FUN = median, ssbQ = 1, recQ = 1)
+stockMedians(object, FUN = iterMedians, ssbQ = 1, recQ = 1)
 }
 \arguments{
 \item{object}{of class *FLStock* or *FLStockR* or *FLStocks*}
 
-\item{FUN}{computes mean, median}
+\item{FUN}{computes iterMedians, iterMeans}
 
 \item{ssbQ}{SSB quarter seasonal models}
 

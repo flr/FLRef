@@ -4,7 +4,12 @@
 \alias{ca.sim}
 \title{generates catch.n with lognormal annual and multinomial age composition observation error}
 \usage{
-ca.sim(object, ess = 200, what = c("catch", "landings", "discards")[1])
+ca.sim(
+  object,
+  ess = 200,
+  what = c("catch", "landings", "discards")[1],
+  rescale = FALSE
+)
 }
 \arguments{
 \item{object}{FLQuant}
@@ -12,6 +17,8 @@ ca.sim(object, ess = 200, what = c("catch", "landings", "discards")[1])
 \item{ess}{effective sample size for age composition}
 
 \item{what}{c("catch", "landings", "discards")}
+
+\item{rescale}{rescale to the abudance scale of the input}
 
 \item{sel}{FLQuant with selectivity.pattern e.g. catch.sel()}
 }

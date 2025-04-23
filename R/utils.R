@@ -83,13 +83,13 @@ huecol <- function(n,alpha=1) {
 #
 #' Converts FLStock into simplified FLStock with Median FLQuants
 #' @param object of class *FLStock* or *FLStockR* or *FLStocks*  
-#' @param FUN computes mean, median
+#' @param FUN computes iterMedians, iterMeans
 #' @param ssbQ SSB quarter seasonal models
 #' @param recQ recruitment quarter seasonal models
 #' @return FLStockR with *FLQuants*
 #' @export
 
-stockMedians <- function(object,FUN=median,ssbQ=1,recQ=1){
+stockMedians <- function(object,FUN=iterMedians,ssbQ=1,recQ=1){
   
   stks= TRUE
   if(class(object)%in%c("FLStockR","FLStock")){
@@ -122,12 +122,12 @@ stockMedians <- function(object,FUN=median,ssbQ=1,recQ=1){
     dimnames(D)$season = "all"
     
     
-    B = apply(B,1:5,FUN)
-    H = apply(H,1:5,FUN)
-    R = apply(R,1:5,FUN)
-    C = apply(C,1:5,FUN)
-    L = apply(L,1:5,FUN)
-    D = apply(D,1:5,FUN)
+    B = FUN(B)
+    H = FUN(H)
+    R = FUN(R)
+    C = FUN(C)
+    L = FUN(L)
+    D = FUN(D)
     
     year = an(dimnames(x)$year)
     iters = an(dimnames(B)$iter)
