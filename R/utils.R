@@ -272,8 +272,9 @@ bisect.ref = function (stock, sr, deviances = rec(stock) %=% 1, metrics, refpts,
 #' @author Henning Winker (GFCM)
 #' @export
 
+
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
-                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=FALSE){
+                  addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=FALSE){
   
   
   status=c('Bratio','F')
@@ -346,10 +347,10 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   bbasis  = c("SSB/SSB0","SSB/SSBMSY","SSB/SSBtgt","SSB/SSBF01")[bb]
   
   if(!is.null(ss3rep$F_report_basis))
-        fbasis = strsplit(ss3rep$F_report_basis,";")[[1]][1]
+    fbasis = strsplit(ss3rep$F_report_basis,";")[[1]][1]
   # For  r4ss_1.50.0  
   if(!is.null(ss3rep$F_std_basis))
-      fbasis = strsplit(ss3rep$F_std_basis,";")[[1]][1]
+    fbasis = strsplit(ss3rep$F_std_basis,";")[[1]][1]
   
   if(is.na(ss3rep$btarg)) ss3rep$btarg=0
   gettrg = ifelse(ss3rep$btarg>0,ss3rep$btarg,round(btgt/b0,2))
@@ -468,9 +469,9 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   
   # Add catch
   if(observed.catch){
-  C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
+    C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
   } else {
-  C_obs = aggregate(Exp~Yr,ss3rep$catch,sum)
+    C_obs = aggregate(Exp~Yr,ss3rep$catch,sum)
     
   }
   
@@ -487,17 +488,17 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   mle$Landings = mle$Catch
   kb$Discards = NA
   mle$Discards = NA
-  if(!is.null(ss3rep$discard)){
+  if(!is.na(ss3rep$discard)){
     if(observed.catch){
-    D_obs = aggregate(Obs~Yr,ss3rep$discard,sum)
+      D_obs = aggregate(Obs~Yr,ss3rep$discard,sum)
     } else {
-    D_obs = aggregate(Exp~Yr,ss3rep$discard,sum)
+      D_obs = aggregate(Exp~Yr,ss3rep$discard,sum)
     }
     mle$Discards[mle$year%in%D_obs$Yr] = D_obs[,2]
     kb$Discards[kb$year%in%D_obs$Yr] =  rep(D_obs[,2],each=max(kb$iter))
     mle$Landings = mle$Catch-ifelse(is.na(mle$Discards),0,mle$Discards)
     kb$Landings = kb$Catch-ifelse(is.na(kb$Discards),0,kb$Discards)
-    }
+  }
   
   trg =round(bref*100,0)
   spr = round(ss3rep$sprtarg*100,0)
@@ -515,10 +516,10 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
            paste0("F",spr),
            "F0.1")[which(c("MSY","Btgt","SPR","F01")%in%Fquant)] 
   refpts = data.frame(RefPoint=c("Ftgt","Btgt","MSY","B0","R0"),value=c((mle$F/mle$harvest)[1],
-                      (mle$SSB/mle$stock)[1],
-                      MSY=hat$Value[hat$Label=="Dead_Catch_MSY"],
-                      B0=b0,
-                      MSY=hat$Value[hat$Label=="Recr_unfished"]))
+                                                                        (mle$SSB/mle$stock)[1],
+                                                                        MSY=hat$Value[hat$Label=="Dead_Catch_MSY"],
+                                                                        B0=b0,
+                                                                        MSY=hat$Value[hat$Label=="Recr_unfished"]))
   
   return(list(kb=kb,mle=mle,refpts=refpts, quants=c("stock","harvest","SSB","F","Recr","Catch"),
               labels=c(xlab,ylab,labs[1],"F",labs[2],"Catch"),Btgtref = bref))
