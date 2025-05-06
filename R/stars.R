@@ -194,7 +194,7 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
         By = round(ssb(x)[,ac(eval.yrs)]/stk@refpts[[2]],3))
     
       if(any(c("Bmsy","Btgt")%in%rownames(object[[1]]@refpts))){
-        flqs = FLQuants(c(flqs,FLQuants(Btgt=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts[2]),3))))
+        flqs = FLQuants(c(flqs[-3],FLQuants(Btgt=round(ssb(x)[,ac(eval.yrs)]/an(object[[1]]@refpts[2]),3))))
       }
       
       
@@ -220,9 +220,9 @@ fwd2stars <- function(object,eval.yrs=NULL, rel=NULL,dB=NULL,refyr=NULL){
                   paste0("B",eval.yrs,"/",refn[2])
                   )
     
-    if(any(c("Bmsy","Btgt")%in%rownames(object[[1]]@refpts))){
-      nam = c(nam, paste0("B",eval.yrs,"/",names(object[[1]])[2]))
-    }
+    #if(any(c("Bmsy","Btgt")%in%rownames(object[[1]]@refpts))){
+    #  nam = c(nam[-4], paste0("B",eval.yrs,"/",rownames(object[[1]]@refpts)[2]))
+    #}
     
     if("Bpa"%in%rownames(object[[1]]@refpts)){
       nam = c(nam, paste0("B",eval.yrs,"/","Bpa"))
