@@ -579,3 +579,105 @@ Mlorenzen = function(object,Mref="missing",Aref=2){
 } 
 #}}}
 
+
+
+
+#' ss3vcv
+#'
+#' function to generate to extract variance-covariance matrix for F and SSB 
+#'
+#' @param ss3rep from r4ss::SS_output
+#' @return covariance matrix for F and SSB end year
+#' @author Henning Winker (GFCM)
+#' @export
+
+ss3vcv = function(ss3rep){
+  
+  hat = ss3rep$derived_quants
+  if(is.null(hat$Label)){ylabel = hat$LABEL} else {ylabel=hat$Label}
+  cv  = ss3rep$CoVar
+  if(is.null(cv)) stop("CoVar from Hessian required")
+  # Get years
+  years=ss3rep$endyr
+  bt = hat[hat$Label==paste0("SSB_",years),2]
+  ft = hat[hat$Label==paste0("F_",years),2]
+  # virgin
+  status = c("SSB","F")
+  # check ss3 version
+  cv <- cv[cv$label.i %in% paste0(c("SSB_","F"),"_",years),]
+  
+  yr = years
+  x <- cv[cv$label.j %in% paste0(status[1],"_",c(yr)) & cv$label.i %in% paste0(status[2],"_",c(yr)),]
+  y = hat[ylabel %in% paste0(status,"_",yr),] # old version Label not LABEL
+  y$Value[2] = ifelse(y$Value[1]==0,0.001,y$Value[2])
+  varF = log(1+(y$StdDev[2]/y$Value[2])^2) # variance log(F/Fmsy)  
+  varB = log(1+(y$StdDev[1]/y$Value[1])^2) # variance log(SSB/SSBmsy)  
+  cov = log(1+mean(x$corr)*sqrt(varF*varB)) # covxy
+  # MVN means of SSB/SBBmsy, Fvalue and Fref (Ftgt or Fmsy) 
+  mvnmu = log(c(y$Value[1],y$Value[2])) 
+  # Create MVN-cov-matrix
+  mvncov = matrix(NA,ncol=2,nrow=2)
+  diag(mvncov) = c(varB,varF)
+  mvncov[1,2] = mvncov[2,1] = cov 
+  rownames(mvncov) = colnames(mvncov) = c("SSB","F")
+  
+  return(mvncov)
+  
+} # End 
+
+
+#' ss3devs
+#'
+#' function to generate MVN assessment error deviations of F and SSB  
+#'
+#' @param om *FLom* or *FLStock* object
+#' @param vcv covariance matrix from ss3vcv() 
+#' @param Fphi autocorrelation of F error
+#' @param biasB  bias for SSB, e.g. retrospective
+#' @param biasF  bias for F, e.g. retrospective
+#' @param bias.correct lognormal bias correction if TRUE 
+#' @return FLQuants with devs of F and SSB
+#' @author Henning Winker (GFCM)
+#' @export
+
+ss3devs <- function(om, vcv, Fphi = 0.423,biasB = 0, biasF=0, bias.correct = TRUE,...){ 
+  
+  years = dimnames(om)$year  
+  iters = dims(om)$iter
+  n <- length(years)
+  logbias <- 0
+  rho = Fphi
+  if (bias.correct) 
+    logbias <- 0.5 * diag(vcv)
+  rhosq <- c(rho)^2
+  
+  resmvn = mvtnorm::rmvnorm(n*iters ,mean = meanlog,sigma = vcv,method=c( "svd"))
+  
+  resB <- matrix(resmvn[,1], 
+                 nrow = n, ncol = iters)
+  resF = matrix(resmvn[,2], 
+                nrow = n, ncol = iters)
+  
+  
+  resB <- apply(resB, 2, function(x) {
+    for (i in 2:n) x[i] <- 0 * x[i - 1] + sqrt(1 - 0) * 
+        x[i]
+    return(exp(x - logbias[1])+biasB[1])
+  })
+  
+  
+  resF <- apply(resF, 2, function(x) {
+    for (i in 2:n) x[i] <- rho * x[i - 1] + sqrt(1 - rhosq) * 
+        x[i]
+    return(exp(x - logbias[2])+biasF)
+  })
+  
+  devs <- FLQuants(
+    SSB = FLQuant(array(resB, dim = c(1, n, 1, 1, 1, iters)), 
+                  dimnames = list(year = years, iter = seq(1, iters))),
+    F = FLQuant(array(resF, dim = c(1, n, 1, 1, 1, iters)), 
+                dimnames = list(year = years, iter = seq(1, iters))))
+  
+  
+  return(devs)
+}
