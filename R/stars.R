@@ -753,7 +753,7 @@ updstars <- function(star,newrefpts){
   }
   
   newts[,8:10] = newts[,8:10]*bmsyr 
-  newts[,8:10] = newts[,17:19]*fmsyr 
+  newts[,17:19] = newts[,17:19]*fmsyr 
   out = star
   out$timeseries = newts
   out$refpts = star$refpts
@@ -842,7 +842,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
                              
                              Bratio_lower=mu[,quants[4]][,2],
                              Bratio=mle$stock,
-                             Bratio_upper=mu[,quants[6]][,3],
+                             Bratio_upper=mu[,quants[4]][,3],
                              
                              Catches=mle$Catch,
                              Landings=NA,
