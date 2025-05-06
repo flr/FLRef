@@ -272,7 +272,6 @@ bisect.ref = function (stock, sr, deviances = rec(stock) %=% 1, metrics, refpts,
 #' @author Henning Winker (GFCM)
 #' @export
 
-
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
                   addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=FALSE){
   
@@ -524,7 +523,6 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   return(list(kb=kb,mle=mle,refpts=refpts, quants=c("stock","harvest","SSB","F","Recr","Catch"),
               labels=c(xlab,ylab,labs[1],"F",labs[2],"Catch"),Btgtref = bref))
 } # End 
-
 # {{{
 #' blag()
 #'
