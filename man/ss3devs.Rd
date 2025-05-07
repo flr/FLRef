@@ -4,7 +4,7 @@
 \alias{ss3devs}
 \title{ss3devs}
 \usage{
-ss3devs(om, vcv, Fphi = 0.423, biasB = 0, biasF = 0, bias.correct = TRUE, ...)
+ss3devs(om, vcv, Fphi = 0.423, bias.correct = TRUE, ...)
 }
 \arguments{
 \item{om}{*FLom* or *FLStock* object}
@@ -12,10 +12,6 @@ ss3devs(om, vcv, Fphi = 0.423, biasB = 0, biasF = 0, bias.correct = TRUE, ...)
 \item{vcv}{covariance matrix from ss3vcv()}
 
 \item{Fphi}{autocorrelation of F error}
-
-\item{biasB}{bias for SSB, e.g. retrospective}
-
-\item{biasF}{bias for F, e.g. retrospective}
 
 \item{bias.correct}{lognormal bias correction if TRUE}
 }

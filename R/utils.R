@@ -633,14 +633,12 @@ ss3vcv = function(ss3rep){
 #' @param om *FLom* or *FLStock* object
 #' @param vcv covariance matrix from ss3vcv() 
 #' @param Fphi autocorrelation of F error
-#' @param biasB  bias for SSB, e.g. retrospective
-#' @param biasF  bias for F, e.g. retrospective
 #' @param bias.correct lognormal bias correction if TRUE 
 #' @return FLQuants with devs of F and SSB
 #' @author Henning Winker (GFCM)
 #' @export
 
-ss3devs <- function(om, vcv, Fphi = 0.423,biasB = 0, biasF=0, bias.correct = TRUE,...){ 
+ss3devs <- function(om, vcv, Fphi = 0.423, bias.correct = TRUE,...){ 
   
   years = dimnames(om)$year  
   iters = dims(om)$iter
@@ -662,14 +660,14 @@ ss3devs <- function(om, vcv, Fphi = 0.423,biasB = 0, biasF=0, bias.correct = TRU
   resB <- apply(resB, 2, function(x) {
     for (i in 2:n) x[i] <- 0 * x[i - 1] + sqrt(1 - 0) * 
         x[i]
-    return(exp(x - logbias[1])+biasB[1])
+    return(exp(x - logbias[1]))
   })
   
   
   resF <- apply(resF, 2, function(x) {
     for (i in 2:n) x[i] <- rho * x[i - 1] + sqrt(1 - rhosq) * 
         x[i]
-    return(exp(x - logbias[2])+biasF)
+    return(exp(x - logbias[2]))
   })
   
   devs <- FLQuants(
