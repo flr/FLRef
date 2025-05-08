@@ -649,7 +649,7 @@ ss3devs <- function(om, vcv, Fphi = 0.423, bias.correct = TRUE,...){
     logbias <- 0.5 * diag(vcv)
   rhosq <- c(rho)^2
   
-  resmvn = mvtnorm::rmvnorm(n*iters ,mean = meanlog,sigma = vcv,method=c( "svd"))
+  resmvn = mvtnorm::rmvnorm(n*iters ,mean = c(0,0),sigma = vcv,method=c( "svd"))
   
   resB <- matrix(resmvn[,1], 
                  nrow = n, ncol = iters)
