@@ -18,6 +18,8 @@ spict2FLQuant(
 \item{osa}{add one-step-ahead forecast}
 
 \item{forecast}{TRUE/FALSE}
+
+\item{what}{mle or log.sd}
 }
 \value{
 FLQuant

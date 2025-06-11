@@ -358,6 +358,7 @@ jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
 #' @param x fit from SPICT
 #' @param osa add one-step-ahead forecast
 #' @param forecast TRUE/FALSE
+#' @param what mle or log.sd
 #' @return FLQuant  
 #' @author adopted from Laurie Kell (biodyn)
 #' @export
@@ -454,6 +455,7 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
 #' @param rel if TRUE ratios BBmsy and FFmsy are stored
 #' @param osa add one-step-ahead forecast 
 #' @param forecast extract forecast TRUE/FALSE
+#' @param itsCI number of iterations to depict uncertainty in plots
 #' @return FLStockR with refpts
 #' @export
 spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NULL,itsCI=1){
@@ -590,6 +592,108 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NU
   return(stks)
 }
 
+
+#' sam2FLQuant()
+#' @param x fit from FLSAM
+#' @param forecast TRUE/FALSE
+#' @return FLQuant  
+#' @author adopted from Laurie Kell (biodyn)
+#' @export
+sam2FLQuant <- function(x,metric=c("ssb","fbar","catch","rec")[1],what=c("mle")){
+  
+  
+  vals=c("logssb","logfbar","logCatch","logR")
+  metrics=c("ssb","fbar","catch","rec")
+  val = vals[which(metrics%in%metric)]
+  
+  res =  subset(object@params,name%in%val)[,c("name","value","std.dev")]
+  
+  res = cbind(year=seq(object@range["minyear"],
+                 object@range["maxyear"]),res)
+  
+  if(what=="mle"){
+  
+  dat=data.frame(age=1,year  =res$year,
+                 season="all",
+                 data  =exp(res$value))
+  } else {
+    
+  dat=data.frame(age=1,year  =res$year,
+                   season="all",
+                   data  =res$std.dev)  
+    
+  }
+  
+  out= as.FLQuant(dat)
+  
+  return(out)
+} # End
+
+
+#' sam2FLStockR()
+#' @param res fit from FLSAM  
+#' @param itsCI number of iterations to depict uncertainty in plots
+#' @param seed  random seed
+#' @return FLStockR with refpts
+#' @export
+sam2FLStockR <- function(res,itsCI=1000,seed=set.seed(123)){
+  seed
+  # start 
+    B = sam2FLQuant(res,metric="ssb")
+    H = sam2FLQuant(res,metric="fbar")
+    C = sam2FLQuant(res,metric="catch")
+    R = sam2FLQuant(res,metric="rec")
+    
+    if(itsCI>1){
+      sdb = sam2FLQuant(res,metric="ssb",what="sd")
+      sdf = sam2FLQuant(res,metric="fbar",what="sd")
+      sdc = sam2FLQuant(res,metric="catch",what="sd")
+      sdr = sam2FLQuant(res,metric="rec",what="sd")
+      B =rlnorm(itsCI,log(B),sdb)
+      H = rlnorm(itsCI,log(H),sdf)
+      C = rlnorm(itsCI,log(C),sdc)
+      R = rlnorm(itsCI,log(R),sdr)
+    }
+    
+    
+    
+    
+    
+    df = as.data.frame(B)
+    year = unique(df$year)
+    N = R
+    Mat = B/R
+    
+    stk = FLStockR(
+      stock.n=N,
+      catch.n = C,
+      landings.n = C,
+      discards.n = FLQuant(0, dimnames=list(age="1", year = (year))),
+      stock.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+      landings.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+      discards.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+      catch.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+      mat=Mat,
+      m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+      harvest = H,
+      m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
+      harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+    )
+    units(stk) = standardUnits(stk)
+    stk@catch = computeCatch(stk)
+    stk@landings = computeLandings(stk)
+    stk@discards = computeStock(stk)
+    stk@stock = B
+    
+    
+    
+    stk@desc = "aspm"
+    stk
+
+  
+  
+  return(stk)
+}
 
 
 #' flr2stars()
