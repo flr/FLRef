@@ -4,14 +4,12 @@
 \alias{sam2FLStockR}
 \title{sam2FLStockR()}
 \usage{
-sam2FLStockR(res, itsCI = 1000, seed = set.seed(123))
+sam2FLStockR(res, itsCI = 1000)
 }
 \arguments{
 \item{res}{fit from FLSAM}
 
 \item{itsCI}{number of iterations to depict uncertainty in plots}
-
-\item{seed}{random seed}
 }
 \value{
 FLStockR with refpts

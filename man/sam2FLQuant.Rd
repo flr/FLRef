@@ -4,10 +4,14 @@
 \alias{sam2FLQuant}
 \title{sam2FLQuant()}
 \usage{
-sam2FLQuant(x, metric = c("ssb", "fbar", "catch", "rec")[1], what = c("mle"))
+sam2FLQuant(
+  object,
+  metric = c("ssb", "fbar", "catch", "rec")[1],
+  what = c("mle")
+)
 }
 \arguments{
-\item{x}{fit from FLSAM}
+\item{object}{fit from FLSAM}
 
 \item{forecast}{TRUE/FALSE}
 }

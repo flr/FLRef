@@ -594,16 +594,16 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NU
 
 
 #' sam2FLQuant()
-#' @param x fit from FLSAM
+#' @param object fit from FLSAM
 #' @param forecast TRUE/FALSE
 #' @return FLQuant  
 #' @author adopted from Laurie Kell (biodyn)
 #' @export
-sam2FLQuant <- function(x,metric=c("ssb","fbar","catch","rec")[1],what=c("mle")){
+sam2FLQuant <- function(object,metric=c("ssb","fbar","catch","rec")[1],what=c("mle")){
   
   
-  vals=c("logssb","logfbar","logCatch","logR")
-  metrics=c("ssb","fbar","catch","rec")
+  vals=c("logssb","logfbar","logCatch","logR","logLand")
+  metrics=c("ssb","fbar","catch","rec","landings")
   val = vals[which(metrics%in%metric)]
   
   res =  subset(object@params,name%in%val)[,c("name","value","std.dev")]
@@ -633,11 +633,10 @@ sam2FLQuant <- function(x,metric=c("ssb","fbar","catch","rec")[1],what=c("mle"))
 #' sam2FLStockR()
 #' @param res fit from FLSAM  
 #' @param itsCI number of iterations to depict uncertainty in plots
-#' @param seed  random seed
 #' @return FLStockR with refpts
 #' @export
-sam2FLStockR <- function(res,itsCI=1000,seed=set.seed(123)){
-  seed
+sam2FLStockR <- function(res,itsCI=1000){
+  
   # start 
     B = sam2FLQuant(res,metric="ssb")
     H = sam2FLQuant(res,metric="fbar")
@@ -1052,6 +1051,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
   #' @param spict fit from  fit.spict()  
   #' @param blim biomass limit point as fraction of Bmsy, default 0.3Bmsy (ICES) 
   #' @param bthr biomass precautionary point as fraction of Bmsy, default 0.5Bmsy (ICES) 
+  #' @param bthr biomass precautionary point as fraction of Bmsy, default 0.5Bmsy (ICES) 
   #' @return STARS list with $timeseris and $refpts
   #' @export
   spict2stars <- function(spict,
@@ -1059,9 +1059,10 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     
     stka = spict2FLStockR(spict,bthr=bthr,blim = blim)
     stk = spict2FLStockR(spict,rel=TRUE,bthr=bthr,blim = blim)
-    stki = spict2FLStockR(spict,bthr=bthr,blim = blim,rel=T,itsCI=1000)
-    stkai = spict2FLStockR(spict,bthr=bthr,blim = blim,rel=F,itsCI=1000)
-      
+    stki = spict2FLStockR(spict,bthr=bthr,blim = blim,rel=T,itsCI=5000)
+    stkai = spict2FLStockR(spict,bthr=bthr,blim = blim,rel=F,itsCI=5000)
+    
+     
     yrs = an(dimnames(stk)$year)
   
   
@@ -1110,6 +1111,105 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     return(list(timeseries=timeseries,refpts=refpts))
   }
   
+  #' sam2stars()
+  #' @param sam fit from FLSAM  
+  #' @param refpts optional FLPar object with reference points 
+  #' @return STARS list with $timeseris and $refpts
+  #' @export
+  sam2stars <- function(sam,
+                          refpts = NULL,quantiles = c(0.05,0.95)){
+    rps = refpts
+    stka = sam2FLStockR(sam,itsCI=1)
+    stkai = sam2FLStockR(sam,itsCI=5000)
+    
+    
+    yrs = an(dimnames(stka)$year)
+    
+    Bratio_lower=Bratio=Bratio_upper = NA
+    Fratio_lower=Fratio=Fratio_upper = NA
+    Landings = sam2FLQuant(sam,metric="landings")
+    
+    if(!is.null(rps)){
+      ftgt = an(rps[rownames(rps)[grep("F",rownames(rps))]])[1]
+      rps.tgt = rps[!rownames(rps)%in%c("Blim","Bpa","Bthr")]
+      btgt = an(rps.tgt[rownames(rps.tgt)[grep("B",rownames(rps.tgt))]])[1]
+      Bratio_lower=round(an(quantile(ssb(stkai),quantiles[1])),3)/btgt
+      Bratio=round(an(ssb(stka)),3)/btgt
+      Bratio_upper=round(an(quantile(ssb(stkai),quantiles[2])),3)/btgt
+      
+      Fratio_lower=round(an(quantile(fbar(stkai),quantiles[1])),3)/ftgt
+      Fratio=round(an(fbar(stka)),3)/ftgt
+      Fratio_upper=round(an(quantile(fbar(stkai),quantiles[2])),3)/ftgt
+   }
+    
+    
+    
+    
+    # Added uncertainty
+    timeseries =  data.frame(year=yrs,
+                             Rec_lower=round(an(quantile(rec(stkai),quantiles[1])),1),
+                             Rec=round(an(rec(stka)),1),
+                             Rec_upper=round(an(quantile(rec(stkai),quantiles[2])),1),
+                             
+                             Biomass_lower=round(an(quantile(ssb(stkai),quantiles[1])),1),
+                             Biomass=round(an(ssb(stka)),1),
+                             Biomass_upper=round(an(quantile(ssb(stkai),quantiles[2])),1),
+                             
+                             Bratio_lower=Bratio_lower,
+                             Bratio=Bratio,
+                             Bratio_upper=Bratio_upper,
+                             
+                               Catches=round(an(catch(stka)),1),
+                             Landings=round(an(Landings),1),
+                             Discards=NA,
+                             
+                             F_lower=round(an(quantile(fbar(stkai),quantiles[1])),3),
+                             F=round(an(fbar(stka)),3),
+                             F_upper=round(an(quantile(fbar(stkai),quantiles[2])),3),
+                             
+                             Fratio_lower=Fratio_lower,
+                             Fratio=Fratio,
+                             Fratio_upper=Fratio_upper
+    )
+    
+    if(sum(round(an(catch(stka)),1)-round(an(Landings),1))>1){
+      timeseries$Discards = round(an(catch(stka)),1)-round(an(Landings),1)
+      
+    }
+    
+    if(is.null(rps)){
+      
+    }
+    
+    endyr = which(max(yrs)==yrs)
+    
+    
+    
+    # TODO change system to relative
+    refpts = round(t(data.frame(
+      Ftgt = NA,
+      Btgt = NA,
+      Bthr= NA,
+      Blim= NA,
+      Fcur  = timeseries$F[endyr],
+      Bcur  = timeseries$Biomass[endyr],
+      B0.33= quantile(timeseries$Biomass,0.33),
+      B0.66= quantile(timeseries$Biomass,0.66))),3)
+    
+    refpts = data.frame(RefPoint=row.names(refpts),Value=refpts[,1])
+    rownames(refpts) = 1:nrow(refpts)
+    
+    
+     if(!is.null(rps)){
+      rps.tgt = rps[!rownames(rps)%in%c("Blim","Bpa","Bthr")]
+      refpts[1,2] =  an(rps[rownames(rps)[grep("F",rownames(rps))]])[1]
+      refpts[2,2] = an(rps.tgt[rownames(rps.tgt)[grep("B",rownames(rps.tgt))]])[1]
+      refpts[3,2] = an(rps[rownames(rps)%in%c("Bpa","Bthr","Btri")])[1]
+      refpts[4,2] = an(rps[rownames(rps)%in%c("Blim")])[1]
+     }    
+  
+    return(list(timeseries=timeseries,refpts=refpts))
+  }
   
   #' stock2ratios()
   #' @param object of class *FLStockR*  
