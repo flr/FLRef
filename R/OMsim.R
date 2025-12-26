@@ -49,12 +49,10 @@ rffwd <- function(object, sr, fbar=control, control=fbar, deviances="missing") {
   
   if(is(fbar,"FLPar")){
     control = fbar
-    fbar = FLQuant(an(control["Feq"]), dimnames=list(year=control["minyear"]:control["maxyear"]))
+    fbar = FLQuant(an(control["Feq"]),
+      dimnames=list(year=control["minyear"]:control["maxyear"]))
     fbar= propagate(fbar,control["its"])
   }
-  
-  
-  
   
   # SET years
   yrs <- match(dimnames(fbar)$year, dimnames(object)$year)
@@ -62,7 +60,7 @@ rffwd <- function(object, sr, fbar=control, control=fbar, deviances="missing") {
   # COMPUTE harvest
   fages <- range(object, c("minfbar", "maxfbar"))
   sf[, yrs] <- (se[, yrs] %/%
-                  quantMeans(se[seq(fages[1], fages[2]), yrs])) %*% fbar
+    quantMeans(se[seq(fages[1], fages[2]), yrs])) %*% fbar
   
   # COMPUTE TEP
   sw <- stock.wt(object)
@@ -75,7 +73,7 @@ rffwd <- function(object, sr, fbar=control, control=fbar, deviances="missing") {
   for (i in yrs - 1) {
     # rec * deviances
     sn[1, i + 1] <- eval(sr@model[[3]],   
-                         c(as(sr@params, 'list'), list(ssb=c(colSums(sn[, i] * ep[, i]))))) *
+      c(as(sr@params, 'list'), list(ssb=c(colSums(sn[, i] * ep[, i]))))) *
       c(deviances[, i + 1])
     # n
     sn[-1, i + 1] <- sn[-dm[1], i] * exp(-sf[-dm[1], i] - sm[-dm[1], i])
@@ -86,15 +84,18 @@ rffwd <- function(object, sr, fbar=control, control=fbar, deviances="missing") {
     # Endogenous F 
     if(is(control,"FLPar")){
       fbar[,i] =  quantMeans(sf[seq(fages[1], fages[2]), i]) *
-        ((c(colSums(sn[, i] * ep[, i]))/an(control["Feq"]*control["SB0"]))^an(control["Frate"]))*
-        exp(rnorm(an(control["its"]), mean=-control["Fsigma"]^2/2, sd=control["Fsigma"]))
-      sf[, i+1] <- (se[,i+1]%/%quantMeans(se[seq(fages[1], fages[2]), i+1])) %*% fbar[,i]
-      ep[,i+1] <- exp(-(sf[,i+1] * fs[,i+1]) - (sm[,i+1] * ms[,i+1])) * sw[,i+1] * ma[,i+1]
+        ((c(colSums(sn[, i] * ep[, i]))/an(control["Feq"] *
+        control["SB0"]))^an(control["Frate"])) *
+        exp(rnorm(an(control["its"]), mean=-control["Fsigma"]^2/2,
+          sd=control["Fsigma"]))
+      sf[, i+1] <- (se[,i+1] %/% quantMeans(se[seq(fages[1], fages[2]), i+1])) %*%
+        fbar[,i]
+      ep[,i+1] <- exp(-(sf[,i+1] * fs[,i+1]) - (sm[,i+1] * ms[,i+1])) * sw[,i+1] *
+        ma[,i+1]
     }   
   }
   
   # UPDATE stock.n & harvest
-  
   stock.n(object) <- sn
   harvest(object) <- sf
   
@@ -105,18 +106,21 @@ rffwd <- function(object, sr, fbar=control, control=fbar, deviances="missing") {
   catch.n(object)[,-1] <- (sn * sf / (sm + sf) * (1 - exp(-sf - sm)))[,-1]
   
   # landings.n & discards.n
-  
   landings.n(object)[is.na(landings.n(object))] <- 0
   discards.n(object)[is.na(discards.n(object))] <- 0
   
   landings.n(object) <- catch.n(object) * (landings.n(object) / 
-                                             (discards.n(object) + landings.n(object)))
+    (discards.n(object) + landings.n(object)))
   
   discards.n(object) <- catch.n(object) - landings.n(object)
   
+  # landings & discards
+  landings(object) <- computeLandings(object)
+  discards(object) <- computeDiscards(object)
+  
   # catch.wt
   catch.wt(object) <- (landings.wt(object) * landings.n(object) + 
-                         discards.wt(object) * discards.n(object)) / catch.n(object)
+    discards.wt(object) * discards.n(object)) / catch.n(object)
   
   # catch
   catch(object) <- quantSums(catch.n(object) * catch.wt(object))
@@ -180,8 +184,6 @@ newselex<- function(object,selexpars){
   return(res)
 }
 # }}}
-
-
 
 # {{{
 # bioidx.sim()
