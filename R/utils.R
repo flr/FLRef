@@ -273,7 +273,7 @@ bisect.ref = function (stock, sr, deviances = rec(stock) %=% 1, metrics, refpts,
 #' @export
 
 ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,run="MVLN",
-                       addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=FALSE){
+                  addprj=FALSE,ymax=NULL,xmax=NULL,legendcex=1,verbose=TRUE,seed=123,observed.catch=FALSE){
   
   
   status=c('Bratio','F')
@@ -346,10 +346,10 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   bbasis  = c("SSB/SSB0","SSB/SSBMSY","SSB/SSBtgt","SSB/SSBF01")[bb]
   
   if(!is.null(ss3rep$F_report_basis))
-        fbasis = strsplit(ss3rep$F_report_basis,";")[[1]][1]
+    fbasis = strsplit(ss3rep$F_report_basis,";")[[1]][1]
   # For  r4ss_1.50.0  
   if(!is.null(ss3rep$F_std_basis))
-      fbasis = strsplit(ss3rep$F_std_basis,";")[[1]][1]
+    fbasis = strsplit(ss3rep$F_std_basis,";")[[1]][1]
   
   if(is.na(ss3rep$btarg)) ss3rep$btarg=0
   gettrg = ifelse(ss3rep$btarg>0,ss3rep$btarg,round(btgt/b0,2))
@@ -468,9 +468,9 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   
   # Add catch
   if(observed.catch){
-  C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
+    C_obs = aggregate(Obs~Yr,ss3rep$catch,sum)
   } else {
-  C_obs = aggregate(Exp~Yr,ss3rep$catch,sum)
+    C_obs = aggregate(Exp~Yr,ss3rep$catch,sum)
     
   }
   
@@ -487,17 +487,17 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   mle$Landings = mle$Catch
   kb$Discards = NA
   mle$Discards = NA
-  if(!is.null(ss3rep$discard)){
+  if(!is.na(ss3rep$discard)){
     if(observed.catch){
-    D_obs = aggregate(Obs~Yr,ss3rep$discard,sum)
+      D_obs = aggregate(Obs~Yr,ss3rep$discard,sum)
     } else {
-    D_obs = aggregate(Exp~Yr,ss3rep$discard,sum)
+      D_obs = aggregate(Exp~Yr,ss3rep$discard,sum)
     }
     mle$Discards[mle$year%in%D_obs$Yr] = D_obs[,2]
     kb$Discards[kb$year%in%D_obs$Yr] =  rep(D_obs[,2],each=max(kb$iter))
     mle$Landings = mle$Catch-ifelse(is.na(mle$Discards),0,mle$Discards)
     kb$Landings = kb$Catch-ifelse(is.na(kb$Discards),0,kb$Discards)
-    }
+  }
   
   trg =round(bref*100,0)
   spr = round(ss3rep$sprtarg*100,0)
@@ -515,15 +515,14 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
            paste0("F",spr),
            "F0.1")[which(c("MSY","Btgt","SPR","F01")%in%Fquant)] 
   refpts = data.frame(RefPoint=c("Ftgt","Btgt","MSY","B0","R0"),value=c((mle$F/mle$harvest)[1],
-                      (mle$SSB/mle$stock)[1],
-                      MSY=hat$Value[hat$Label=="Dead_Catch_MSY"],
-                      B0=b0,
-                      MSY=hat$Value[hat$Label=="Recr_unfished"]))
+                                                                        (mle$SSB/mle$stock)[1],
+                                                                        MSY=hat$Value[hat$Label=="Dead_Catch_MSY"],
+                                                                        B0=b0,
+                                                                        MSY=hat$Value[hat$Label=="Recr_unfished"]))
   
   return(list(kb=kb,mle=mle,refpts=refpts, quants=c("stock","harvest","SSB","F","Recr","Catch"),
               labels=c(xlab,ylab,labs[1],"F",labs[2],"Catch"),Btgtref = bref))
 } # End 
-
 # {{{
 #' blag()
 #'
@@ -580,3 +579,103 @@ Mlorenzen = function(object,Mref="missing",Aref=2){
 } 
 #}}}
 
+
+
+
+#' ss3vcv
+#'
+#' function to generate to extract variance-covariance matrix for F and SSB 
+#'
+#' @param ss3rep from r4ss::SS_output
+#' @return covariance matrix for F and SSB end year
+#' @author Henning Winker (GFCM)
+#' @export
+
+ss3vcv = function(ss3rep){
+  
+  hat = ss3rep$derived_quants
+  if(is.null(hat$Label)){ylabel = hat$LABEL} else {ylabel=hat$Label}
+  cv  = ss3rep$CoVar
+  if(is.null(cv)) stop("CoVar from Hessian required")
+  # Get years
+  years=ss3rep$endyr
+  bt = hat[hat$Label==paste0("SSB_",years),2]
+  ft = hat[hat$Label==paste0("F_",years),2]
+  # virgin
+  status = c("SSB","F")
+  # check ss3 version
+  cv <- cv[cv$label.i %in% paste0(c("SSB_","F"),"_",years),]
+  
+  yr = years
+  x <- cv[cv$label.j %in% paste0(status[1],"_",c(yr)) & cv$label.i %in% paste0(status[2],"_",c(yr)),]
+  y = hat[ylabel %in% paste0(status,"_",yr),] # old version Label not LABEL
+  y$Value[2] = ifelse(y$Value[1]==0,0.001,y$Value[2])
+  varF = log(1+(y$StdDev[2]/y$Value[2])^2) # variance log(F/Fmsy)  
+  varB = log(1+(y$StdDev[1]/y$Value[1])^2) # variance log(SSB/SSBmsy)  
+  cov = log(1+mean(x$corr)*sqrt(varF*varB)) # covxy
+  # MVN means of SSB/SBBmsy, Fvalue and Fref (Ftgt or Fmsy) 
+  mvnmu = log(c(y$Value[1],y$Value[2])) 
+  # Create MVN-cov-matrix
+  mvncov = matrix(NA,ncol=2,nrow=2)
+  diag(mvncov) = c(varB,varF)
+  mvncov[1,2] = mvncov[2,1] = cov 
+  rownames(mvncov) = colnames(mvncov) = c("SSB","F")
+  
+  return(mvncov)
+  
+} # End 
+
+
+#' ss3devs
+#'
+#' function to generate MVN assessment error deviations of F and SSB  
+#'
+#' @param om *FLom* or *FLStock* object
+#' @param vcv covariance matrix from ss3vcv() 
+#' @param Fphi autocorrelation of F error
+#' @param bias.correct lognormal bias correction if TRUE 
+#' @return FLQuants with devs of F and SSB
+#' @author Henning Winker (GFCM)
+#' @export
+
+ss3devs <- function(om, vcv, Fphi = 0.423, bias.correct = TRUE,...){ 
+  
+  years = dimnames(om)$year  
+  iters = dims(om)$iter
+  n <- length(years)
+  logbias <- 0
+  rho = Fphi
+  if (bias.correct) 
+    logbias <- 0.5 * diag(vcv)
+  rhosq <- c(rho)^2
+  
+  resmvn = mvtnorm::rmvnorm(n*iters ,mean = c(0,0),sigma = vcv,method=c( "svd"))
+  
+  resB <- matrix(resmvn[,1], 
+                 nrow = n, ncol = iters)
+  resF = matrix(resmvn[,2], 
+                nrow = n, ncol = iters)
+  
+  
+  resB <- apply(resB, 2, function(x) {
+    for (i in 2:n) x[i] <- 0 * x[i - 1] + sqrt(1 - 0) * 
+        x[i]
+    return(exp(x - logbias[1]))
+  })
+  
+  
+  resF <- apply(resF, 2, function(x) {
+    for (i in 2:n) x[i] <- rho * x[i - 1] + sqrt(1 - rhosq) * 
+        x[i]
+    return(exp(x - logbias[2]))
+  })
+  
+  devs <- FLQuants(
+    SSB = FLQuant(array(resB, dim = c(1, n, 1, 1, 1, iters)), 
+                  dimnames = list(year = years, iter = seq(1, iters))),
+    F = FLQuant(array(resF, dim = c(1, n, 1, 1, 1, iters)), 
+                dimnames = list(year = years, iter = seq(1, iters))))
+  
+  
+  return(devs)
+}

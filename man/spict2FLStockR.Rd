@@ -26,6 +26,8 @@ spict2FLStockR(
 \item{osa}{add one-step-ahead forecast}
 
 \item{forecast}{extract forecast TRUE/FALSE}
+
+\item{itsCI}{number of iterations to depict uncertainty in plots}
 }
 \value{
 FLStockR with refpts
