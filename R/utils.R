@@ -406,7 +406,7 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
     mvncov[1,2] = mvncov[2,1] = cov 
     mvncov[2,3] = mvncov[3,2] = cov1 
     mvncov[1,3] = mvncov[3,1] = cov2 
-    kb.temp = data.frame(year=yr,run=run,type=estimate[yi],iter=1:mc,exp(mvtnorm::rmvnorm(mc ,mean = mvnmu,sigma = mvncov,method=c( "svd")))) # random  MVN generator
+    kb.temp = data.frame(year=yr,run=run,type=estimate[yi],iter=1:mc,exp(rmvnorm(mc ,mean = mvnmu,sigma = mvncov,method=c( "svd")))) # random  MVN generator
     colnames(kb.temp) = c("year","run","type","iter","stock","harvest","F")
     if(length(quants)>0){
       quant=NULL
@@ -649,7 +649,7 @@ ss3devs <- function(om, vcv, Fphi = 0.423, bias.correct = TRUE,...){
     logbias <- 0.5 * diag(vcv)
   rhosq <- c(rho)^2
   
-  resmvn = mvtnorm::rmvnorm(n*iters ,mean = c(0,0),sigma = vcv,method=c( "svd"))
+  resmvn = rmvnorm(n*iters ,mean = c(0,0),sigma = vcv,method=c( "svd"))
   
   resB <- matrix(resmvn[,1], 
                  nrow = n, ncol = iters)
