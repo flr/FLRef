@@ -24,7 +24,7 @@ docs: $(HELP_FILES) README.md
 
 roxygen: $(R_FILES)
 	R --vanilla --silent -e "library(devtools);" \
-		-e "document(roclets='rd')"
+		-e "document()"
 
 $(HELP_FILES): $(R_FILES)
 	R --vanilla --silent -e "library(devtools);" \
