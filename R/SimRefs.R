@@ -1,4 +1,5 @@
-#{{{
+# F sim {{{
+
 #' Fsim()
 #
 #' Simulates stochastic stock dynamics under under constant Fbrp
@@ -77,9 +78,10 @@ Fsim <- function(brp,Ftgt=NULL,sigmaR=0.5,rho=0.,nyears=100,iters=250,yrs.eval=N
   return(out)
   
 }  
-#}}}
+# }}}
 
-#{{{
+# Fp05 {{{
+
 # Fp05()
 #
 #' Calculates the Fbar value giving a maximum probability of ssb being below Blim of 5 percent
@@ -123,7 +125,7 @@ if(dims(stock)$iter < iters) stock = iter(stock,1:iters)
 }
 statistic <- list(FP05=list(~apply(iterMeans((SB/SBlim) < 1), c(1, 3:6), max),
                             name="P.05", desc="ICES P.05"))
-run <- mse::bisect(stock, sr=object$sr, refpts=FLPar(SBlim=refpts(object$brp)["Blim","ssb"]), deviances=object$devs,
+run <- bisect(stock, sr=object$sr, refpts=FLPar(SBlim=refpts(object$brp)["Blim","ssb"]), deviances=object$devs,
               metrics=list(SB=ssb), statistic=statistic, years=years, pyears=pyrs, 
               tune=list(fbar=range), prob=0.05, tol=tol, verbose=verbose)
 
@@ -149,7 +151,6 @@ if(verbose) cat(paste0("Fp.05 = ",round(fp05,3)," is ",ifelse(fp05<Fbrp,"smaller
 return(out)
 }
 #}}}
-
 
 # ref.bisect {{{
 
@@ -249,8 +250,7 @@ ref.bisect = function (stock, sr, deviances = rec(stock) %=% 1, metrics, refpts,
   warning("Solution not found within 'maxit', check 'range', 'maxit' or 'tol'.")
   return(rmid)
 }
-
-
+# }}}
 
 # opt.bisect {{{
 
@@ -408,9 +408,8 @@ opt.bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics,
   
 } # }}}
 
+# Fmmy {{{
 
-
-#{{{
 #' Fmmy()
 #   
 #' Uses opt.bisect to derive the F at Maximum Median Yield from stochastic simulations  
@@ -490,9 +489,9 @@ Fmmy <- function(brp,sigmaR=0.5,rho=0.0,nyears=100,iters=250,yrs.eval=NULL,range
   return(out)  
   
 }  
-#}}}
+# }}}
 
-
+# getF {{{
 
 #' getF()
 #' 
@@ -505,7 +504,151 @@ getF <- function(x){
   if(class(x)=="FLBRP") y = an(Fbrp(x)[[1]])
   return(y)
 }
+# }}}
 
+# bisect {{{
 
+#' Bisection search for a forecast target providing a given performance statistic value.
+#'
+#' The plain bisection algorithm (Burden & Douglas, 1985) is employed here to
+#' find the value of a given forecast target quantity (e.g. `fbar`) for which
+#' a selected value of a performance statistic is obtained over a chosen period.
+#' @references {Burden, Richard L.; Faires, J. Douglas (1985), "2.1 The Bisection Algorithm", Numerical Analysis (3rd ed.), PWS Publishers, ISBN 0-87150-857-5}
+#' @param stock
+#' @param sr
+#' @param metrics
+#' @param statistic
+#' @param years
+#' @param tune
+#' @param prob
+#' @param tol
+#' @param maxit
+#' @export
+#' @examples
+#' data(ple4)
+#' stock <- propagate(stf(ple4, end=2118), 100)
+#' srr <- predictModel(model=rec~a*ssb*exp(-b*ssb), params=FLPar(a=5.20, b=1.65e-6))
+#' # GENERATE SRR deviances
+#' devs <- ar1rlnorm(rho=0.4, 2018:2118, iters=100, meanlog=0, sdlog=0.5)
+#' # DEFINE Fp05 statistic
+#' statistic <- list(FP05=list(~yearMeans((SB/SBlim) < 1), name="P.05",
+#'   desc="ICES P.05"))
+#' # CALL bisect over 100 years, Fp.05 calculated over last 50.
+#' fp05fwd <- bisect(stock, sr=srr, deviances=devs, metrics=list(SB=ssb), 
+#'   refpts=FLPar(SBlim=150000), statistic=statistic, years=2018:2118,
+#'   pyears=2069:2118, tune=list(fbar=c(0.1, 1)), prob=0.05)
+
+bisect <- function(stock, sr, deviances=rec(stock) %=% 1, metrics, refpts,
+  statistic, years, pyears=years, tune, prob, tol=0.01, maxit=15, verbose=TRUE) {
+
+  # CHOOSE method
+
+  if(names(tune)[1] %in% c("f", "fbar"))
+    foo <- ffwd
+  else
+    foo <- fwd
+
+  # --- RUN at min
+
+  cmin <- fwdControl(year=years, quant=names(tune)[1], value=unlist(tune)[1])
+
+  # PRINT at top
+  if(verbose)
+    cat(paste0("[1] ", names(tune), ": ", unlist(tune)[1]))
+  rmin <- foo(stock, sr=sr, control=cmin, deviances=deviances)
+  
+  pmin <- performance(rmin, metrics=metrics, 
+    statistics=statistic, refpts=refpts, probs=NULL, years=pyears)
+
+  obmin <- mean(pmin$data, na.rm=TRUE) - prob
+
+  if(verbose)
+    cat(" - prob:", mean(pmin$data, na.rm=TRUE), " - diff: ", obmin, "\n")
+  
+  # CHECK cmin result
+  if(isTRUE(all.equal(obmin, 0, tolerance=tol)))
+    return(rmin)
+  
+  # --- RUN at max
+
+  cmax <- fwdControl(year=years, quant=names(tune)[1], value=unlist(tune)[2])
+
+  # PRINT at top
+  if(verbose)
+    cat(paste0("[2] ", names(tune), ": ", unlist(tune)[2]))
+
+  rmax <- foo(stock, sr=sr, control=cmax, deviances=deviances)
+  
+  pmax <- performance(rmax, metrics=metrics, 
+    statistics=statistic, refpts=refpts, probs=NULL, years=pyears)
+  obmax <- mean(pmax$data, na.rm=TRUE) - prob
+
+  if(verbose)
+    cat(" - prob:", mean(pmax$data, na.rm=TRUE), " - diff: ", obmax, "\n")
+  
+  # CHECK cmax result
+  if(isTRUE(all.equal(obmax, 0, tolerance=tol)))
+    return(rmax)
+ 
+  # --- CHECK range includes 0
+  if((obmin * obmax) > 0) {
+    warning("Range of hcr param(s) cannot achieve requested tuning objective probability")
+    return(list(min=rmin, max=rmax))
+  } 
+
+  # --- LOOP bisecting
+
+  count <- 0
+  while(count <= maxit) {
+
+    # RUN at mid
+    cmid <- control
+    cmid <- fwdControl(year=years, quant=names(tune)[1],
+      value=(cmin$value + cmax$value) / 2)
+
+    # PRINT at mid
+    if(verbose)
+      cat(paste0("[", count + 3, "] ", names(tune), ": ", cmid$value[1]))
+
+    rmid <- foo(stock, sr=sr, control=cmid, deviances=deviances)
+
+    pmid <- performance(rmid, metrics=metrics, 
+      statistics=statistic, refpts=refpts, probs=NULL, years=pyears)
+    obmid <- mean(pmid$data, na.rm=TRUE) - prob
+
+    if(verbose)
+      cat(" - prob:", mean(pmid$data, na.rm=TRUE), " - diff: ", obmid, "\n")
+
+    # CHECK and RETURN cmid result
+    if(isTRUE(all.equal(obmid, 0, tolerance=tol))) {
+      return(rmid)
+    }
+
+    # TEST LEFT
+    if((obmin * obmid) < 0) {
+
+      # SET max as new mid
+      cmax <- cmid
+      obmax <- obmid
+      if(isTRUE(all.equal(cmin$value[1], cmid$value[1], tolerance=tol))) {
+        return(rmid)
+      }
+    } else {
+
+      # SET min as new mid
+      cmin <- cmid
+      obmin <- obmid
+      if(isTRUE(all.equal(cmid$value[1], cmax$value[1], tolerance=tol))) {
+        return(rmid)
+      }
+    }
+    count <- count + 1
+  }
+
+  warning("Solution not found within 'maxit', check 'range', 'maxit' or 'tol'.")
+
+  return(rmid)
+
+} # }}}
 
 
