@@ -487,7 +487,7 @@ ssmvln = function(ss3rep,Fref = NULL,years=NULL,virgin=FALSE,mc=1000,weight=1,ru
   mle$Landings = mle$Catch
   kb$Discards = NA
   mle$Discards = NA
-  if(!is.na(ss3rep$discard)){
+  if(!is.null(ss3rep$discard)){
     if(observed.catch){
       D_obs = aggregate(Obs~Yr,ss3rep$discard,sum)
     } else {
