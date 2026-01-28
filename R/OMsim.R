@@ -1,4 +1,6 @@
 
+# rffwd {{{
+
 #' rffwd() Project forward an FLStock with evolutionary Fbar
 #'
 #' @param object An *FLStock*
@@ -129,9 +131,7 @@ rffwd <- function(object, sr, fbar=control, control=fbar, deviances="missing") {
 }
 # }}}
 
-
-# {{{
-# newselex()
+# newselex() {{{
 #
 #' generates flexible 5-paramater selex curves 
 #'
@@ -185,8 +185,7 @@ newselex<- function(object,selexpars){
 }
 # }}}
 
-# {{{
-# bioidx.sim()
+# bioidx.sim() {{{
 #
 #' generates FLIndexBiomass with random observation error from an FLStock
 #'
@@ -287,8 +286,7 @@ idx.sim <- function(object,sel=catch.sel(object),ages=NULL,years=NULL,ess=200,si
 }
 # }}}
 
-# {{{
-# pgquant
+# pgquant {{{
 #
 #' sets plus group on FLQuant
 #' @param object FLQuant
@@ -304,9 +302,9 @@ pgquant <- function(object,pg){
   res[ac(pg),] = quantSums(object[plus,]) 
   return(res)
 }
+# }}}
 
-# {{{
-# ca.sim()
+# ca.sim() {{{
 
 #' generates catch.n with lognormal annual and multinomial age composition observation error 
 #' @param object FLQuant
@@ -344,9 +342,7 @@ ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1],re
 }
 # }}}
 
-
-# {{{
-# iALK()
+# iALK() {{{
 #
 #' inverse ALK function with lmin added to FLCore::invALK 
 #' @param params growth parameter, default FLPar(linf,k,t0)
@@ -402,9 +398,7 @@ iALK <- function(params, model=vonbert, age, cv=0.1,lmin=5, lmax=1.2, bin=1,
 } 
 # }}}
 
-
-# {{{
-# ALK()
+# ALK() {{{
 #
 #' ALK function
 #' @param N_a numbers at age sample for single event
@@ -423,8 +417,7 @@ ALK <- function(N_a,iALK){
 }
 # }}}
 
-# {{{
-# alk.sample()
+# alk.sample() {{{
 #
 #' generates annual ALK sample with length stratified sampling
 #' @param lfds length frequency *FLQuant*
@@ -455,10 +448,9 @@ alk.sample <- function(lfds,alks,nbin = 20,n.sample=1){
   }
   res
 }  
+# }}}
 
-
-# {{{
-# ALKs()
+# ALKs() {{{
 #
 #' annual ALK function
 #' @param object FLQuant with numbers at age
@@ -484,8 +476,7 @@ ALKs <- function(object,iALK){
 }
 # }}}
 
-# {{{
-# applyALK()
+# applyALK() {{{
 #
 #' applyALK function to length to age
 #' @param lfd *FLQuant* with numbers at length
@@ -792,12 +783,10 @@ updsr <- function(object,s=0.7,v=NULL){
   params(object)=FLCore::ab(par[c("s","v")],sr,spr0=spr0(object))[c("a","b")]
   return(object)
 }  
-#}}}
+# }}}
 
+# fudc() {{{
 
-
-#' fudc()
-#' 
 #' generates an up-down-constant F-pattern 
 #' @param object An *FLStock*
 #' @param fref reference denominator for fbar 
@@ -839,6 +828,9 @@ fudc = function(object,fref=0.2,fhi=2.5,flo=0.8,sigmaF=0.2,breaks=c(0.5,0.75)){
   return(flq[,-1])
 }
 
+# }}}
+
+# schaefer.sim() {{{
 
 #' schaefer.sim()
 #' 
@@ -950,4 +942,4 @@ schaefer.sim <- function(k=10000,r=0.3,q=0.5,pe=0.1,oe=0.2,bk=0.9,
   
   return(stk)
 }       
-
+# }}}

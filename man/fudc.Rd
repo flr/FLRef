@@ -2,7 +2,7 @@
 % Please edit documentation in R/OMsim.R
 \name{fudc}
 \alias{fudc}
-\title{fudc()}
+\title{generates an up-down-constant F-pattern}
 \usage{
 fudc(
   object,
