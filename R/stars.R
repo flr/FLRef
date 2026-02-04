@@ -1293,6 +1293,17 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     if(!class(object)=="FLStocks"){
       object = FLStocks(forecast=stock)
     }
+    refpts <- object[[1]]@refpts
+    Blim = Bpa = Btgt = 0
+    if(("Btgt")%in%rownames(refpts)){
+      Btgt = an(refpts["Btgt"])
+    } 
+    if(("Bpa")%in%rownames(refpts)){
+      Bpa = an(refpts["Bpa"])
+    } 
+    if(("Blim")%in%rownames(refpts)){
+      Blim <- an(refpts["Blim"])
+    } 
     
     if(is.null(refyr)){
       refyr = an(range(object[[1]])["maxyear"])-1
@@ -1309,8 +1320,10 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
         Fy = round(fbar(x)[,ac(eval.yrs)],3),
         By = round(ssb(x)[,ac(eval.yrs)],1),
         dB = round(100*((ssb(x)[,ac(eval.yrs)])/(ssb(x)[,ac(eval.yrs-1)])-1),2),       
-        PBlim = apply((round(ssb(z)[,ac(eval.yrs)],1)<Blim)*100,2,mean)
-      )
+        PBlim = apply((round(ssb(z)[,ac(eval.yrs)],1)>Blim)*100,2,mean),
+        PBpa = apply((round(ssb(z)[,ac(eval.yrs)],1)>Bpa)*100,2,mean),
+        PBtgt = apply((round(ssb(z)[,ac(eval.yrs)],1)>Btgt)*100,2,mean)
+        )
       out = as.data.frame(flqs)
       data.frame(scenario=y, t(as.matrix(out$data)))
     },x=object,y=names(object),z=uncertainty)
@@ -1318,10 +1331,12 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     names(df) = c("Basis",paste0("C_",eval.yrs),
                   paste0("F_",eval.yrs),
                   paste0("SSB_",eval.yrs),
-                  "SSB_change","P(SSB<Blim)")
+                  "SSB_change","P(SSB>Blim)","P(SSB>Bpa)","P(SSB>Btgt)")
     
-    
-    
+    if(any(c(Blim,Bpa,Btgt)==0)){
+    sel = c(1:(ncol(df)-3),(ncol(df)-3)+which(!c(Blim,Bpa,Btgt)==0))
+    df = df[,sel]
+    }
     rownames(df) = 1:nrow(df)
     return(df)  
   } # End of function
