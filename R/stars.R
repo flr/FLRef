@@ -1285,19 +1285,33 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
   #' @param uncertainty *FLStocks* with list of *FLStockR* objects and iters 
   #' @param eval.yrs evaluation years of forecast 
   #' @param refyr change in percentage biomass to refyr
+  #' @param rel values of biomass and F are expressed relative to the target
+  #' @param osa one-step-ahead for the biomass evaluation year
+  #' @param maxdec maximum decimal 
   #' @return data.frame
   #' @export
-  fwd2type1<- function(stock,uncertainty,eval.yrs=NULL,dB=NULL,refyr=NULL){
+  fwd2type1 <- function(stock,uncertainty=NULL,eval.yrs=NULL,dB=NULL,refyr=NULL,rel=NULL,osa=FALSE,maxdec=2){
     
+    if(is.null(uncertainty)){
+      uncertainty=stock
+    }
     object= stock
     if(!class(object)=="FLStocks"){
       object = FLStocks(forecast=stock)
     }
+    if(dims(object[[1]])$iter>1){
+    object  <- FLStocks(lapply(object,function(x)stockMedians(x)))
+    }
+    if(is.null(rel)){
+      rel=FALSE
+      if(object[[1]]@desc=="spm") rel=TRUE
+    }  
+      
     refpts <- object[[1]]@refpts
-    Blim = Bpa = Btgt = 0
+     
     if(("Btgt")%in%rownames(refpts)){
       Btgt = an(refpts["Btgt"])
-    } 
+    }
     if(("Bpa")%in%rownames(refpts)){
       Bpa = an(refpts["Bpa"])
     } 
@@ -1311,28 +1325,40 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     
     if(is.null(eval.yrs)){
       eval.yrs = an(range(object[[1]])["maxyear"])
+      if(osa) eval.yrs = eval.yrs-1 
     }
+    evalB.yrs = eval.yrs
+     
+    if(osa) evalB.yrs = eval.yrs+1
     
     df = do.call(rbind,Map(function(x,y,z){
       stk = window(x,end=max(eval.yrs))
       flqs = FLQuants(
-        Cy = round(catch(x)[,ac(eval.yrs)],1),
-        Fy = round(fbar(x)[,ac(eval.yrs)],3),
-        By = round(ssb(x)[,ac(eval.yrs)],1),
-        dB = round(100*((ssb(x)[,ac(eval.yrs)])/(ssb(x)[,ac(eval.yrs-1)])-1),2),       
-        PBlim = apply((round(ssb(z)[,ac(eval.yrs)],1)>Blim)*100,2,mean),
-        PBpa = apply((round(ssb(z)[,ac(eval.yrs)],1)>Bpa)*100,2,mean),
-        PBtgt = apply((round(ssb(z)[,ac(eval.yrs)],1)>Btgt)*100,2,mean)
+        Cy = round(catch(x)[,ac(eval.yrs)],maxdec-1),
+        Fy = round(fbar(x)[,ac(eval.yrs)],maxdec),
+        By = round(ssb(x)[,ac(evalB.yrs)],maxdec),
+        dB = round(100*((ssb(x)[,ac(evalB.yrs)])/(ssb(x)[,ac(eval.yrs-1)])-1),maxdec),       
+        PBlim = round(apply((ssb(z)[,ac(evalB.yrs)]>Blim)*100,2,mean),maxdec-1),
+        PBpa = round(apply((ssb(z)[,ac(evalB.yrs)]>Bpa)*100,2,mean),maxdec-1),
+        PBtgt = round(apply((ssb(z)[,ac(evalB.yrs)]>Btgt)*100,2,mean),maxdec-1)
         )
       out = as.data.frame(flqs)
       data.frame(scenario=y, t(as.matrix(out$data)))
     },x=object,y=names(object),z=uncertainty)
     )
-    names(df) = c("Basis",paste0("C_",eval.yrs),
-                  paste0("F_",eval.yrs),
-                  paste0("SSB_",eval.yrs),
+    if(!rel){
+    names(df) = c("Basis",paste0("C ",eval.yrs),
+                  paste0("F ",eval.yrs),
+                  paste0("SSB ",evalB.yrs),
                   "SSB_change","P(SSB>Blim)","P(SSB>Bpa)","P(SSB>Btgt)")
-    
+    df[,4] =  round(df[,4],1)
+    } else {
+      names(df) = c("Basis",paste0("C ",eval.yrs),
+                    paste0("F/Ftgt ",eval.yrs),
+                    paste0("B/Btgt ",evalB.yrs),
+                    "B change","P(B>Blim)","P(B>Bpa)","P(B>Btgt)")
+      
+    }
     if(any(c(Blim,Bpa,Btgt)==0)){
     sel = c(1:(ncol(df)-3),(ncol(df)-3)+which(!c(Blim,Bpa,Btgt)==0))
     df = df[,sel]
