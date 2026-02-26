@@ -5,8 +5,8 @@ Authors@R:
   c(person(given = "Henning",
     family = "Winker",
     role = c("aut", "cre"),
-    email = "henning.winker@gmail.com"))
-Maintainer: Henning Winker <Henning.Winker@gmail.com>
+    email = "Henning.Winker@fao.org"))
+Maintainer: Henning Winker <Henning.Winker@fao.org>
 Description: Blah
 Depends:
     R (>= 4.0),
