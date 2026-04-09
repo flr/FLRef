@@ -208,6 +208,7 @@ newselex<- function(object,selexpars){
 
 bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
   
+  sel = sel%/%apply(sel,2:6,max)
   if(dims(sel)$unit<dims(object)$unit){
     sel <- expand(sel, unit = c("F", "M"))
   }
@@ -215,9 +216,10 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
   years = ac(dimnames(object)$year)
   selinp[] = sel
   idx = survey(object,sel=selinp,biomass=TRUE)
-  idx@index.q[] =  ar1rlnorm(rho=rho,
-                             years=years,iters= dims(object)$iter,meanlog=log(q),sdlog=sigma)
+  qdevs =  rlnormar1(rho=rho,years=years,n= dims(object)$iter,meanlog=0,sdlog=sigma)
     
+  idx@index.q = q*qdevs
+
   idx@index.var[] = sigma
   idx@index = idx@index.q*idx@index
   
@@ -943,3 +945,19 @@ schaefer.sim <- function(k=10000,r=0.3,q=0.5,pe=0.1,oe=0.2,bk=0.9,
   return(stk)
 }       
 # }}}
+
+
+# updCatch.n {{{
+
+#' computes catch.n for a given harvest 
+#' @param object An *FLStock*
+#' @return FLQuant
+#' @export
+
+updCatch.n <- function(stk) {
+  z <- harvest(stk) + m(stk)
+  cn <- stock.n(stk) * harvest(stk) / z * (1 - exp(-z))
+  cn[z == 0] <- 0
+  catch.n(stk) <- cn
+  stk
+}

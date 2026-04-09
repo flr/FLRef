@@ -9,7 +9,7 @@
 Blah
 }
 \author{
-\strong{Maintainer}: Henning Winker \email{henning.winker@gmail.com}
+\strong{Maintainer}: Henning Winker \email{Henning.Winker@fao.org}
 
 }
 \keyword{internal}

@@ -354,6 +354,110 @@ jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
 }
 
 
+
+
+#' jabba2FLStockR()
+#' @param jabba fit from JABBA fit_jabba() or jabba$kbtrj 
+#' @param blim biomass limit reference point as fraction of Bmsy
+#' @param bpa biomass precautionary reference point as fraction of Bmsy
+#' @param thin thinnig rate of retained iters 
+#' @param rel if TRUE ratios BBmsy and FFmsy are stored
+#' @return FLStockR with refpts
+#' @export
+jabba2FLStockR <- function(jabba,blim=0.3,bthr=0.5,thin=10,rel=FALSE){
+  kbinp = FALSE
+  if(is.null(jabba$assessment)){
+    kbinp=TRUE
+    kb = jabba
+  }  else {
+    kb = jabba$kbtrj
+  }
+  
+  df = kb
+  df = df[seq(1,nrow(df),thin),]
+  year = unique(df$year)
+  for(i in 1:length(year)){
+    df[df$year%in%year[i],]$iter = 1:nrow(df[df$year%in%year[i],]) 
+  }
+  
+  
+  N = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                            season="all",area="unique",iter=df$iter,data=exp(df$Bdev)))
+  C = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                            season="all",area="unique",iter=df$iter,data=df$Catch))
+  
+  if(!rel){
+    Mat = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                                season="all",area="unique",iter=df$iter,data=df$B/exp(df$Bdev)))
+    
+    H = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=df$H))
+    B= as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                             season="all",area="unique",iter=df$iter,data=df$B))
+  } else {
+    Mat = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                                season="all",area="unique",iter=df$iter,data=df$stock/exp(df$Bdev)))
+    
+    H = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                              season="all",area="unique",iter=df$iter,data=df$harvest))
+    B= as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                             season="all",area="unique",iter=df$iter,data=df$stock))
+    
+  }
+  
+  
+  stk = FLStockR(
+    stock.n=N,
+    catch.n = C,
+    landings.n = C,
+    discards.n = FLQuant(0, dimnames=list(age="1", year = (year))),
+    stock.wt=FLQuant(1, dimnames=list(age="1", year = (year))),
+    landings.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    discards.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    catch.wt=FLQuant(1, dimnames=list(age="1", year = year)),
+    mat=Mat,
+    m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+    harvest = H,
+    m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
+    harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+  )
+  units(stk) = standardUnits(stk)
+  stk@catch = computeCatch(stk)
+  stk@landings = computeLandings(stk)
+  stk@discards = computeStock(stk)
+  stk@stock = as.FLQuant(data.frame(age=1,year=df$year,unit="unique",
+                                    season="all",area="unique",iter=df$iter,data=df$B))
+  
+  if(kbinp){
+    stk@refpts = FLPar(
+      Fmsy = median(kb$H)/median(kb$harvest),
+      Bmsy = median(kb$B)/median(kb$stock),
+      MSY = NA,
+      Bthr= median(bthr*kb$B)/median(kb$stock),
+      Blim= median(blim*kb$B)/median(kb$stock),
+      B0 = median(kb$B)/median(kb$BB0),
+    )
+  } else {
+    stk@refpts = FLPar(
+      Fmsy = median(kb$H)/median(kb$harvest),
+      Bmsy = median(kb$B)/median(kb$stock),
+      MSY = jabba$refpts$msy[1],
+      Blim= median(blim*kb$B)/median(kb$stock),
+      Bthr= median(bthr*kb$B)/median(kb$stock),
+      B0 = median(kb$B)/median(kb$BB0),
+    )
+  }
+  if(rel){
+    stk@refpts[1:2] = 1
+    stk@refpts["Blim"] = blim
+    stk@refpts["Bthr"] = bthr
+    stk@refpts["B0"] = median(kb$B/kb$BB0)/median(kb$B/kb$stock)
+  }
+  stk@desc = "spm"
+  return(stk)
+}
+
+
 #' spict2FLQuant()
 #' @param x fit from SPICT
 #' @param osa add one-step-ahead forecast
@@ -456,10 +560,11 @@ spict2FLQuant <- function(x,metric=c("ssb","fbar","catch","stock","harvest")[1],
 #' @param osa add one-step-ahead forecast 
 #' @param forecast extract forecast TRUE/FALSE
 #' @param itsCI number of iterations to depict uncertainty in plots
+#' @param seed random seed for consistent sampling across scenarios
 #' @return FLStockR with refpts
 #' @export
-spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NULL,itsCI=1){
-  
+spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NULL,itsCI=1,seed=123){
+
   if(!is.null(forecast)){
     fw = forecast
   } else {
@@ -486,6 +591,7 @@ spict2FLStockR <- function(res,blim=0.3,bthr=0.5,rel=FALSE,osa=FALSE,forecast=NU
   
   b = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa)
   f = spict2FLQuant(res,metric="fbar",forecast=fw,osa=osa)
+  set.seed(seed)
   if(itsCI>1){
     sdb = spict2FLQuant(res,metric="ssb",forecast=fw,osa=osa,what="sd")
     b =rlnorm(itsCI,log(b),sdb)
@@ -1312,8 +1418,16 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
     if(("Btgt")%in%rownames(refpts)){
       Btgt = an(refpts["Btgt"])
     }
+    
+    if(!("Btgt")%in%rownames(refpts)&("Bmsy")%in%rownames(refpts)){
+      Btgt = an(refpts["Bmsy"])
+    }
+    
     if(("Bpa")%in%rownames(refpts)){
       Bpa = an(refpts["Bpa"])
+    } 
+    if(("Bthr")%in%rownames(refpts)){
+      Bpa = an(refpts["Bthr"])
     } 
     if(("Blim")%in%rownames(refpts)){
       Blim <- an(refpts["Blim"])
