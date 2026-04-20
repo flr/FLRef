@@ -216,7 +216,7 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
   years = ac(dimnames(object)$year)
   selinp[] = sel
   idx = survey(object,sel=selinp,biomass=TRUE)
-  qdevs =  rlnormar1(rho=rho,years=years,n= dims(object)$iter,meanlog=0,sdlog=sigma)
+  qdevs =  FLQuant(rlnormar1(rho=rho,years=years,n= dims(object)$iter,meanlog=0,sdlog=sigma),quant="age")
     
   idx@index.q = q*qdevs
 
@@ -537,15 +537,23 @@ applyALK <- function(lfds,alks){
 len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
   gp = c(params) 
   age = an(dimnames(N_a)$age)
-  lenls = FLQuants(lapply(as.list(timing),function(x){
-  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
-                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-  N_adj =  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))                 
-  })) 
-  if(length(lenls)>1){
-    out= iterSums(combine(lenls))} else {
-    out = lenls[[1]]
+  iters = length(an(dimnames(N_a)$iter))
+  # iter 1
+  
+  t = 1
+  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
+               model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
+  lenls=  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
+  
+  if(length(timing)>1){
+    for(t in 1:length(timing)){
+      ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
+                   model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
+      lenls = lenls + lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
     }
+  }
+  out = lenls
+  
   units(out) = unit
   fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
   if(scale){
@@ -585,18 +593,21 @@ lfd.sim <- function(object, stock, sel=catch.sel(stock),params,model=vonbert,ess
   year = an(dimnames(object)$year)
   stock = trim(stock,year=year,age=age)
   
-  lenls = FLQuants(lapply(as.list(timing),function(x){
-    ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
-                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-    # Adjust for timing in abundance
-    N_a =  object# * exp(-harvest(stock) * (x-timeref) - m(stock) * (x-timeref))
-    N_adj =  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))
-    #return(N_adj)
-  })) 
-  if(length(lenls)>1){
-    out= iterSums(combine(lenls))} else {
-      out = lenls[[1]]
+  
+  t = 1
+  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
+               model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
+  lenls=  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
+  
+  if(length(timing)>1){
+    for(t in 1:length(timing)){
+      ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
+                   model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
+      lenls = lenls + lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
     }
+  }
+  out = lenls
+  out = lenls
   units(out) = unit
   if(scale){
     fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
