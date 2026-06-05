@@ -609,16 +609,6 @@ vbbrp <- function(x) {
   return(vb)
 }
 
-# vbbrp {{{
-vbbrp <- function(x) {
-            
-  sel <- landings.sel(x) +discards.sel(x)
-  sel <- sel/max(sel)
-  vb <- quantSums(stock.n(x) %*% stock.wt(x) %*% sel)
-  units(vb) <- units(stock(x))
-  return(vb)
-}
-
 
 #' Merge catch into landings and remove discards
 #'
