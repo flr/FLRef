@@ -1479,3 +1479,159 @@ plotGFCM <- function (ftgt = 1, btgt = 1, blim = 0.25, btrigger = "missing",  bt
   }
   return(p)
 }
+
+
+
+
+#' plotGFCM()
+#' 
+#' Produces candidate GFCM advice plot
+#' @param ftg Ftarget
+#' @param btgt Btarget corresponding Ftgt  
+#' @param blim biomass limit point used as fraction of Btgt, default 0.25-0.3Btgt 
+#' @param btrigger biomass trigger (can differ from Bthr)
+#' @param bthr biomass precautionary point as fraction of Bmsy, default 0.5Btgt 
+#' @param fthr upper Ftgt threshold, default 1.2 Ftgt 
+#' @param bclose fishing closure
+#' @param fmin minimum F at closure
+#' @param fadv advice F from HCR 
+#' @param obs  "missing" option to show observed ssb,fba
+#' @param kobe if TRUE option to add KOBE colors
+#' @param alpha option for transparency
+#' @param xmax  multiplier of btgt for ylim  
+#' @param ymax multiplier of ftgt for xlim
+#' @param ylab 
+#' @param xlab 
+#' @param rel illustrate relative to btgt and ftgt if TRUE
+#' @param expand = TRUE graphic param
+#' @param labels if true add labels
+#' @param critical show area below Blim as dark red
+#' @param text show text
+#' @return GFCM advice plot
+#' @export
+#' @examples 
+#' plotGFCM(fadv=0.95,btrigger=0.5)
+
+
+plotCECAF <- function (ftgt = 1, btgt = 1, blim = 0.3, btrigger = "missing",  bthr = 0.8 ,fthr = 1.2 ,bclose = 0.3, fmin = 0.2,fadv = 0.8, obs = "missing", kobe = TRUE, alpha = 1, xmax = 1.3, ymax = 1.5, ylab = "missing", xlab = "missing", rel = TRUE, expand = TRUE, labels = TRUE, critical = kobe,text=TRUE) {
+  bthresh = bthr
+  metric = "ssb"
+  output = "fbar"
+  xlim <- btgt * xmax
+  ylim <- ftgt * ymax
+  if (!missing(obs)) {
+    if (class(obs)%in%c("FLStock","FLStockR")) 
+      obs <- model.frame(metrics(obs, list(met = get(metric), 
+                                           out = get(output))))
+    if (class(obs) == "FLQuants") {
+      obs = obs[1:2]
+      names(obs) = c("met", "out")
+    }
+    xlim <- max(c(obs$met, btgt * 1.5)) * 1.05
+    ylim <- max(c(obs$out, fthr * 1.3)) * 1.05
+  }
+  met <- seq(0, xlim, length = 200)
+  out <- rep(1,length=200)
+  if(!missing(btrigger)){
+    out <- ifelse(met <= bclose, fmin, ifelse(met < btrigger, 
+                                              pmax(c(((fadv - fmin)/(btrigger - bclose)) * (met - bclose) + 
+                                                       fmin, fmin)), fadv))
+  }
+  dat <- data.frame(met = met, out = out)
+  if (missing(xlab)) {
+    xlab = "SSB"
+    if (rel) 
+      xlab = expression(B/B[tgt])
+  }
+  if (missing(ylab)) {
+    ylab = "Fishing Mortality"
+    if (rel) 
+      ylab = expression(F/F[tgt])
+  }
+  p <- ggplot(dat, aes(x = met, y = out)) + theme_bw() + xlab(xlab) + 
+    ylab(ylab)
+  if (expand) {
+    p <- p + scale_x_continuous(expand = c(0, 0), limits = c(0,xlim)) +
+      scale_y_continuous(expand = c(0, 0), limits = c(0,ylim)) + 
+      theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(), panel.background = element_blank(),
+            axis.line = element_blank())
+  }
+  if(kobe){
+    yell = geom_polygon(data = data.frame(x = c(0, bthresh, bthresh, 0), 
+                                          y = c(0, 0, ftgt, ftgt)), aes(x = x, y = y), fill = "yellow", alpha = alpha)
+    rdd = geom_polygon(data = data.frame(x = c(0, bthr,bthr,0), y = c(ftgt,ftgt,ylim,ylim)), 
+                       aes(x = x, y = y), fill = "red", alpha = alpha)
+    gree = geom_polygon(data = data.frame(x = c(bthresh,xlim,xlim, bthresh), 
+                                          y = c(0, 0, ftgt, ftgt)), aes(x = x, y = y), fill = "green", alpha = alpha)
+    oran = geom_polygon(data = data.frame(x = c(bthresh,xlim,xlim, bthresh), 
+                                          y = c(ylim, ylim, ftgt, ftgt)), aes(x = x, y = y), fill = "orange", alpha = alpha)
+    
+    p <- p+yell+rdd+gree+oran
+  }
+  p <- p + geom_polygon(data = data.frame(x = c(0, blim, blim, 0, 0), y = c(0, 0, ylim, ylim, 0)), 
+                        aes(x = x, y = y), fill = "red")
+  
+  if(critical){  
+    p <- p + geom_polygon(data = data.frame(x = c(0, blim, blim, 0, 0), y = c(0, 0, ylim, ylim, 0)), 
+                          aes(x = x, y = y), fill = "red4", alpha = 0.5)
+  }
+  
+  p <- p+geom_segment(aes(x = blim, xend = blim, y = 0, yend = ylim),linetype = 2, cex = 0.6)+
+    geom_segment(aes(x = btgt, xend = btgt, y = 0, yend = ftgt), 
+                 linetype = 1, color = "black", cex = 0.5)+
+    geom_segment(aes(x = bthr, xend = bthr, y = 0, yend = ftgt), 
+                 linetype = 1, color = "black", cex = 0.5)+
+    geom_segment(aes(x = 0, xend = xlim, y = ftgt, yend = ftgt), 
+                 linetype = 1, color = "black", cex = 0.5) 
+  
+  
+  if (labels) {
+    p <- p + annotate("text", x = btgt, y = ftgt + 
+                        ylim/30 * 1.08, label = "F[tgt]", parse = TRUE, hjust = "right") + 
+      annotate("text", x = btgt * 1.02, y = ftgt * 0.2, 
+               label = paste0("B[tgt]"), hjust = "left", parse = TRUE) + 
+      annotate("text", x = bthresh * 1.02, y = ftgt * 0.2, 
+               label = paste0("B[thr]"), hjust = "left", parse = TRUE) + 
+      annotate("text", x = blim * 1.02, y = ftgt * 0.2, label = paste0("B[lim]"), 
+               hjust = "left", parse = TRUE)
+    
+  } 
+  
+  if(!missing("btrigger")){
+    ythresh <- ifelse(bthresh < btrigger, pmax(c(((fadv - fmin)/(btrigger - 
+                                                                   bclose)) * (bthresh - bclose) + fmin, fmin)), fadv)
+    ytarget <- ifelse(btgt < btrigger, pmax(c(((fadv - fmin)/(btrigger - 
+                                                                bclose)) * (btgt - bclose) + fmin, fmin)), fadv)
+    p <-  p + annotate("text", x = btrigger * 1.02, y = fadv * 1.03, 
+                       label = paste0("B[tri]"), vjust = "bottom", parse = TRUE)+
+      geom_line(color="blue",cex=1.)+
+      annotate("text", x = btgt * 1.1, y = fadv * 0.99, 
+               label = paste0("F[adv]"), vjust = 1, parse = TRUE)+
+      geom_line(color="blue",cex=1.)
+  }
+  
+  
+  if(text){
+    
+    p <- p+annotate("text", x =  (bthr+xlim)/2, y = (ftgt+ylim)/2, 
+                    label = paste0("In overexploitation"))+
+      annotate("text", x =  (bthr*0.7), y = (ftgt+ylim)/2, 
+               label = paste0("Overexploited & \n In overexploitation"),vjust="bottom")+
+      annotate("text", x =  (0+blim)/2, y = (0+ylim)/2, 
+               label = paste0("Depleted"),angle=90)+
+      annotate("text", x =  (btgt)*0.98, y = (0+ftgt)/2, 
+               label = paste0("Sustainable"),angle=90,vjust="bottom")+
+      annotate("text", x =  (bthr*0.7), y = (ftgt+0)/2, 
+               label = paste0("Overexploited"),vjust="bottom")
+  }
+  if (!missing(obs)) {
+    p = p + geom_path(data = obs, cex = 0.2, col = "blue", 
+                      linetype = 1, alpha = 0.5) + geom_point(data = obs, 
+                                                              cex = c(rep(1.5, nrow(obs) - 1), 2.5), pch = 21,
+                                                              fill = c(rep("grey", nrow(obs) - 1), "blue"))
+  }
+  
+  
+  
+  return(p)
+}

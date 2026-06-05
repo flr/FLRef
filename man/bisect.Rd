@@ -2,7 +2,7 @@
 % Please edit documentation in R/SimRefs.R
 \name{bisect}
 \alias{bisect}
-\title{Bisection search for a forecast target providing a given performance statistic value.}
+\title{Bisection search for a forecast target matching a performance statistic}
 \usage{
 bisect(
   stock,
@@ -20,25 +20,140 @@ bisect(
   verbose = TRUE
 )
 }
+\arguments{
+\item{stock}{An \code{FLStock} object used as the starting point for the
+forecast. The object can be propagated over iterations before calling
+\code{bisect()}.}
+
+\item{sr}{A stock-recruitment object or model passed to \code{fwd()} or
+\code{ffwd()} through the \code{sr} argument.}
+
+\item{deviances}{Recruitment deviances used in the stochastic forecast.
+Defaults to \code{rec(stock) \%=\% 1}, i.e. deterministic recruitment
+multipliers of one. For stochastic projections this is usually an
+\code{FLQuant} of lognormal or autocorrelated recruitment deviances.}
+
+\item{metrics}{A named list of metric functions passed to
+\code{performance()}, for example \code{list(SB = ssb)}.}
+
+\item{refpts}{Reference points passed to \code{performance()}, typically an
+\code{FLPar} object such as \code{FLPar(SBlim = 150000)}.}
+
+\item{statistic}{A named list defining the performance statistic to evaluate,
+passed to \code{performance()}. For example, a risk statistic based on
+\code{SB / SBlim < 1}.}
+
+\item{years}{Projection years over which the forecast control is applied.}
+
+\item{pyears}{Years over which the performance statistic is evaluated.
+Defaults to \code{years}. This is often a subset of the projection period,
+for example the final 50 years of a long stochastic forecast.}
+
+\item{tune}{A named numeric vector or list giving the forecast quantity to
+tune and its lower and upper bounds. For example,
+\code{list(fbar = c(0.1, 1.0))}. If the tuned quantity is named
+\code{"f"} or \code{"fbar"}, \code{ffwd()} is used; otherwise
+\code{fwd()} is used.}
+
+\item{prob}{Numeric. Target value of the performance statistic. For example,
+\code{0.05} for a 5 percent risk threshold.}
+
+\item{tol}{Numeric. Absolute tolerance used to decide whether the target
+statistic has been reached. Default is \code{0.01}.}
+
+\item{maxit}{Integer. Maximum number of bisection iterations. Default is
+\code{15}.}
+
+\item{verbose}{Logical. If \code{TRUE}, print the value of the tuned control,
+the resulting statistic, and the difference from the target at each
+bisection step.}
+}
+\value{
+If a solution is found, an \code{FLStock} object returned by
+  \code{fwd()} or \code{ffwd()} for the tuned control value. If the requested
+  target is already achieved at the lower or upper bound, the corresponding
+  forecast object is returned. If the supplied range does not bracket the
+  target statistic, a list with elements \code{min} and \code{max} is
+  returned, containing the forecasts at the lower and upper bounds.
+}
 \description{
-The plain bisection algorithm (Burden & Douglas, 1985) is employed here to
-find the value of a given forecast target quantity (e.g. `fbar`) for which
-a selected value of a performance statistic is obtained over a chosen period.
+Uses a bisection algorithm to find the value of a forecast control quantity
+that gives a specified target value for a performance statistic. Typical use
+cases include finding the constant \code{fbar} that gives a chosen risk level,
+such as \eqn{P(SSB < B_{lim}) = 0.05}, over a projection period.
+}
+\details{
+The function evaluates the forecast at the lower and upper bounds supplied in
+\code{tune}. If the requested probability lies between the two outcomes, the
+interval is repeatedly bisected until the performance statistic is within
+\code{tol} of \code{prob}, or until \code{maxit} iterations are reached.
+
+
+The bisection search requires that the target objective is bracketed by the
+two values supplied in \code{tune}. In practice, this means that:
+
+\deqn{
+\left[g(x_{min}) - p\right]
+\left[g(x_{max}) - p\right] < 0
+}
+
+where \eqn{g(x)} is the performance statistic produced by forecasting with
+control value \eqn{x}, and \eqn{p} is the target value supplied by
+\code{prob}. If both bounds give performance statistics on the same side of
+the target, the function cannot identify a unique bracketed solution.
+
+The function is most useful for risk-based advice calculations, such as
+finding the fishing mortality that gives a pre-specified probability of
+falling below \code{Blim} over a future evaluation period.
 }
 \examples{
+\dontrun{
 data(ple4)
-stock <- propagate(stf(ple4, end=2118), 100)
-srr <- predictModel(model=rec~a*ssb*exp(-b*ssb), params=FLPar(a=5.20, b=1.65e-6))
-# GENERATE SRR deviances
-devs <- ar1rlnorm(rho=0.4, 2018:2118, iters=100, meanlog=0, sdlog=0.5)
-# DEFINE Fp05 statistic
-statistic <- list(FP05=list(~yearMeans((SB/SBlim) < 1), name="P.05",
-  desc="ICES P.05"))
-# CALL bisect over 100 years, Fp.05 calculated over last 50.
-fp05fwd <- bisect(stock, sr=srr, deviances=devs, metrics=list(SB=ssb), 
-  refpts=FLPar(SBlim=150000), statistic=statistic, years=2018:2118,
-  pyears=2069:2118, tune=list(fbar=c(0.1, 1)), prob=0.05)
+
+# Extend and propagate stock
+stock <- propagate(stf(ple4, end = 2118), 100)
+
+# Define a Beverton-Holt stock-recruitment relationship
+srr <- predictModel(
+  model = rec ~ a * ssb * exp(-b * ssb),
+  params = FLPar(a = 5.20, b = 1.65e-6)
+)
+
+# Generate autocorrelated recruitment deviances
+devs <- ar1rlnorm(
+  rho = 0.4,
+  years = 2018:2118,
+  iters = 100,
+  meanlog = 0,
+  sdlog = 0.5
+)
+
+# Define an ICES-style risk statistic
+statistic <- list(
+  FP05 = list(
+    ~ yearMeans((SB / SBlim) < 1),
+    name = "P.05",
+    desc = "ICES P.05"
+  )
+)
+
+# Find fbar that gives P(SSB < Blim) = 0.05
+fp05fwd <- bisect(
+  stock = stock,
+  sr = srr,
+  deviances = devs,
+  metrics = list(SB = ssb),
+  refpts = FLPar(SBlim = 150000),
+  statistic = statistic,
+  years = 2018:2118,
+  pyears = 2069:2118,
+  tune = list(fbar = c(0.1, 1.0)),
+  prob = 0.05
+)
+}
+
 }
 \references{
-{Burden, Richard L.; Faires, J. Douglas (1985), "2.1 The Bisection Algorithm", Numerical Analysis (3rd ed.), PWS Publishers, ISBN 0-87150-857-5}
+Burden, R. L. and Faires, J. D. (1985). Numerical Analysis. 3rd edition.
+PWS Publishers. Section 2.1: The Bisection Algorithm.
 }
