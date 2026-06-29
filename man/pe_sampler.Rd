@@ -46,7 +46,6 @@ process error changes with stock depletion or fishing pressure.
 \examples{
 \dontrun{
 data(ple4)
-ple4 <- merge_catch(ple4)
 
 bh <- srrTMB(
   as.FLSR(ple4, model = bevholt),

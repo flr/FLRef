@@ -1344,7 +1344,7 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
       year = an(dimnames(x)$year)
       iters = an(dimnames(x)$iter)
       
-       stk = FLStockR(stock.n=FLQuant(R, dimnames=list(age="1", year = (year),iter=iters)),
+      stk = FLStockR(stock.n=R,
       catch.n = C,
       landings.n = C,
       discards.n = FLQuant(0, dimnames=list(age="1", year = (year),iter=iters)),
@@ -1352,14 +1352,13 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
       landings.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
       discards.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
       catch.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
-      mat = as.FLQuant(data.frame(age=1,year=year,unit="unique",
-                                  season="all",area="unique",iter=iters,data=an(B/R))),
+      mat = B/R,
       
       #mat=B/R,
-      m=FLQuant(0.0001, dimnames=list(age="1", year = year)),
+      m=FLQuant(0.0001, dimnames=list(age="1", year = year,iter=iters)),
       harvest = H,
-      m.spwn = FLQuant(0, dimnames=list(age="1", year = year)),
-      harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year))
+      m.spwn = FLQuant(0, dimnames=list(age="1", year = year,iter=iters)),
+      harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year,iter=iters))
     )
     units(stk) = standardUnits(stk)
     stk@catch = unitSums(computeCatch(stk))
@@ -1386,6 +1385,96 @@ ss2stars <- function(mvln,output=c("iters","mle")[2],quantiles = c(0.05,0.95)){
   }
 
 
+  #' stock2spm()
+  #' @param object of class *FLStockR*  
+  #' @return FLStockR with ratios F/Ftgt and B/Btgt
+  #' @export
+  stock2spm <- function(object,brps,bthr=0.5,blim=0.3,rel=T,relC=FALSE){
+
+    stks= TRUE
+    flbrps = TRUE
+    if(class(object)=="FLStockR"){
+      object= FLStocks(stk=object)
+      stks=FALSE
+    }
+    if(class(brps)=="FLBRP"){
+      brps= FLBRPs(brp=brps)
+      flbrps=FALSE
+    }
+    
+    out =FLStocks(Map(function(x,y){
+      asem <- asem2spm(y)
+      #x = object[[2]]
+      if(rel){
+      B = as.FLQuant(unitSums(vb(x))/an(asem["Bmsy"]))
+      H = unitMeans(catch(x)/vb(x))/an(asem["Hmsy"])
+      R = unitSums(rec(x))
+      C = unitSums(computeCatch(x))
+      if(relC) C = C/an(asem["MSY"])
+      dimnames(B)$age = "1"
+      dimnames(C)$age = "1"
+      dimnames(H)$age = "1"
+      dimnames(R)$age = "1"
+      year = an(dimnames(x)$year)
+      iters = an(dimnames(x)$iter)
+      }
+      if(!rel){
+        B = as.FLQuant(unitSums(vb(x)))
+        H = unitMeans(catch(x)/vb(x))
+        R = unitSums(rec(x))
+        C = unitSums(computeCatch(x))
+        if(relC) C = C/an(asem["MSY"])
+        dimnames(B)$age = "1"
+        dimnames(C)$age = "1"
+        dimnames(H)$age = "1"
+        dimnames(R)$age = "1"
+        year = an(dimnames(x)$year)
+        iters = an(dimnames(x)$iter)
+      }
+      
+      stk = FLStockR(stock.n=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
+                     catch.n = C,
+                     landings.n = C,
+                     discards.n = FLQuant(0, dimnames=list(age="1", year = (year),iter=iters)),
+                     stock.wt=FLQuant(1, dimnames=list(age="1", year = (year),iter=iters)),
+                     landings.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+                     discards.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+                     catch.wt=FLQuant(1, dimnames=list(age="1", year = year,iter=iters)),
+                     mat = B,
+                     
+                     #mat=B/R,
+                     m=FLQuant(0.0001, dimnames=list(age="1", year = year,iter=iters)),
+                     harvest = H,
+                     m.spwn = FLQuant(0, dimnames=list(age="1", year = year,iter=iters)),
+                     harvest.spwn = FLQuant(0.0, dimnames=list(age="1", year = year,iter=iters))
+      )
+      units(stk) = standardUnits(stk)
+      stk@catch = unitSums(computeCatch(stk))
+      stk@landings = unitSums(computeLandings(stk))
+      stk@discards = unitSums(computeStock(stk))
+      stk@stock = unitSums(ssb(x))
+      br = c("Bthr","Blim","Bpa")
+      if(rel) stk@refpts = FLPar(Fmsy=1,Bmsy=1,Bthr=bthr,Blim=blim,MSY = an(asem["MSY"]))
+      if(!rel) stk@refpts = FLPar(Fmsy=an(asem["Hmsy"]),
+                                  Bmsy=an(asem["Bmsy"]),
+                                  Bthr=bthr*an(asem["Bmsy"]),
+                                  Blim=blim*an(asem["Bmsy"]),MSY = an(asem["MSY"]))
+      if(relC)  stk@refpts["MSY"] = 1
+      
+      stk@desc = x@desc
+      return(stk)
+    },x = object,y=brps))
+    
+    if(!stks){
+      out = out[[1]]
+    }
+    
+    return(out)
+  }
+  
+  
+  
+  
   #' Function to summarise Type 1 GFCM fishing opportunities
   #' @param stk *FLStocks* with list of *FLStockR* objects 
   #' @param uncertainty *FLStocks* with list of *FLStockR* objects and iters 

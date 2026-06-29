@@ -440,7 +440,6 @@ sample_proc_dev <- function(stk, brp, biomass = c("vb", "ssb"), eps = 1e-12) {
 #' @examples
 #' \dontrun{
 #' data(ple4)
-#' ple4 <- merge_catch(ple4)
 #'
 #' bh <- srrTMB(
 #'   as.FLSR(ple4, model = bevholt),
@@ -647,6 +646,7 @@ vbbrp <- function(x) {
 merge_catch <- function(stock) {
   
   landings.n(stock) <- catch.n(stock)
+  landings.wt(stock) <- catch.wt(stock)
   discards.n(stock)[] <- 0
   
   landings(stock) <- computeLandings(stock)
