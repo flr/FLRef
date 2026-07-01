@@ -84,4 +84,5 @@ export(plot_pf)
 export(asem2spm)
 export(vbbrp)
 export(merge_catch)
+export(stock2spm)
 
