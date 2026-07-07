@@ -667,10 +667,11 @@ for(i in seq(dims(object)$age)){
 
 updsr <- function(object,s=0.7,v=NULL){
   if(is.null(v))
-    v = refpts(object)["virgin","ssb"]
+  v = refpts(object)["virgin","ssb"]
   sr=SRModelName(model(object))
   par=FLPar(s=s,v = v)
   params(object)=FLCore::ab(par[c("s","v")],sr,spr0=spr0(object))[c("a","b")]
+  brp(object)
   return(object)
 }  
 # }}}
