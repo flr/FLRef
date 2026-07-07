@@ -89,7 +89,7 @@ export(stock2spm)
 export(sel_logistic_len)
 export(sel_normal_len)
 export(sel_dnormal_len)
-export(plot_sel_la)
+export(sel_la)
 export(combine_sel_age)
 export(plot_sel_age)
 

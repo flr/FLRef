@@ -52,22 +52,125 @@ sel_dnormal_len <- function(L, Lpeak, sd_left, sd_right) {
 }
 
 
-
-
-
-sel_la <- function(lhpar,amin=0,amax=20,
-                               type = c("logistic", "normal", "dnormal"),
-                               lmin = 3,
-                               lmax = NULL,
-                               binwidth = 1,
-                               lmax_mult = 1.1,
-                               L50 = NULL,
-                               L95 = NULL,
-                               Lpeak = NULL,
-                               sd = NULL,
-                               sd_left = 0.3,
-                               sd_right = 0.6,
-                               scale = TRUE) {
+#' Generate selectivity-at-length and selectivity-at-age
+#'
+#' Generates length-based gear selectivity and converts it to selectivity-at-age
+#' using von Bertalanffy growth parameters. The function returns both
+#' selectivity-at-length and selectivity-at-age as `FLQuant` objects.
+#'
+#' @param lhpar Named numeric vector or named object containing life-history
+#'   parameters. Must include at least `linf`, `k`, and `t0`.
+#' @param amin Integer. Minimum age for the age-based selectivity vector.
+#'   Default is `0`.
+#' @param amax Integer. Maximum age for the age-based selectivity vector.
+#'   Default is `20`.
+#' @param type Character. Selectivity type. One of `"logistic"`, `"normal"`,
+#'   or `"dnormal"`.
+#' @param lmin Numeric. Lower bound of the first length bin. Default is `3`.
+#' @param lmax Numeric. Upper length limit used to construct length bins.
+#'   If `NULL`, this is set to `ceiling(linf * lmax_mult)`.
+#' @param binwidth Numeric. Width of length bins. Default is `1`.
+#' @param lmax_mult Numeric. Multiplier applied to `linf` when `lmax = NULL`.
+#'   Default is `1.1`.
+#' @param L50 Numeric. Length at 50 percent selectivity for logistic
+#'   selectivity. Required when `type = "logistic"`.
+#' @param L95 Numeric. Length at 95 percent selectivity for logistic
+#'   selectivity. Required when `type = "logistic"`.
+#' @param Lpeak Numeric. Peak selectivity length for normal or double-normal
+#'   selectivity. Required when `type = "normal"` or `type = "dnormal"`.
+#' @param sd Numeric. Standard deviation of the normal selectivity curve.
+#'   Required when `type = "normal"`.
+#' @param sd_left Numeric. Standard deviation of the ascending limb of the
+#'   double-normal selectivity curve. Required when `type = "dnormal"`.
+#'   Default is `0.3`.
+#' @param sd_right Numeric. Standard deviation of the descending limb of the
+#'   double-normal selectivity curve. Required when `type = "dnormal"`.
+#'   Default is `0.6`.
+#' @param scale Logical. Should selectivity-at-length and selectivity-at-age be
+#'   scaled independently to a maximum of one? Default is `TRUE`.
+#'
+#' @return A named list with:
+#' \itemize{
+#'   \item `sel_len`: selectivity-at-length as an `FLQuant`, with the `len`
+#'   dimension storing lower length-bin limits.
+#'   \item `sel_a`: selectivity-at-age as an `FLQuant`.
+#'   \item `len_bins`: data frame containing lower, upper and midpoint of each
+#'   length bin.
+#' }
+#'
+#' @details
+#' Length bins are stored in the `FLQuant` `len` dimension as lower bin limits.
+#' Selectivity is evaluated at the corresponding bin midpoints:
+#'
+#' `mid = lower + binwidth / 2`
+#'
+#' Selectivity-at-age is obtained by predicting length-at-age from the
+#' von Bertalanffy growth curve:
+#'
+#' `L[a] = Linf * (1 - exp(-k * (a - t0)))`
+#'
+#' The function uses `t0 + 0.5` when predicting length-at-age, which approximates
+#' mid-year length-at-age.
+#'
+#' The following selectivity curves are supported:
+#'
+#' \itemize{
+#'   \item logistic, specified by `L50` and `L95`;
+#'   \item normal, specified by `Lpeak` and `sd`;
+#'   \item double-normal, specified by `Lpeak`, `sd_left`, and `sd_right`.
+#' }
+#'
+#' The helper functions `sel_logistic_len()`, `sel_normal_len()` and
+#' `sel_dnormal_len()` must be available in the namespace.
+#'
+#' @examples
+#' \dontrun{
+#' ## Logistic linefish selectivity
+#' linefish <- sel_la(
+#'   lhpar = lhpar,
+#'   amin = 0,
+#'   amax = 20,
+#'   type = "logistic",
+#'   L50 = 35,
+#'   L95 = 50
+#' )
+#'
+#' ## Dome-shaped gillnet selectivity
+#' gillnet <- sel_la(
+#'   lhpar = lhpar,
+#'   type = "normal",
+#'   Lpeak = 35,
+#'   sd = 10
+#' )
+#'
+#' ## Asymmetric double-normal trap selectivity
+#' traps <- sel_la(
+#'   lhpar = lhpar,
+#'   type = "dnormal",
+#'   Lpeak = 30,
+#'   sd_left = 8,
+#'   sd_right = 25
+#' )
+#'
+#' plot_sel_la(traps)
+#' }
+#'
+#' @export
+sel_la <- function(lhpar,
+                   amin = 0,
+                   amax = 20,
+                   type = c("logistic", "normal", "dnormal"),
+                   lmin = 3,
+                   lmax = NULL,
+                   binwidth = 1,
+                   lmax_mult = 1.1,
+                   L50 = NULL,
+                   L95 = NULL,
+                   Lpeak = NULL,
+                   sd = NULL,
+                   sd_left = 0.3,
+                   sd_right = 0.6,
+                   scale = TRUE) {
   
   type <- match.arg(type)
   
@@ -77,13 +180,13 @@ sel_la <- function(lhpar,amin=0,amax=20,
                             binwidth = 1,
                             lmax_mult = 1.1) {
     
-    if(is.null(lmax)) {
+    if (is.null(lmax)) {
       lmax <- ceiling(an(lhpar["linf"]) * lmax_mult)
     }
     
     lower <- seq(lmin, lmax - binwidth, by = binwidth)
     upper <- lower + binwidth
-    mid   <- lower + binwidth / 2
+    mid <- lower + binwidth / 2
     
     data.frame(
       lower = lower,
@@ -100,32 +203,45 @@ sel_la <- function(lhpar,amin=0,amax=20,
     lmax_mult = lmax_mult
   )
   
+  ## Length-bin midpoints for selectivity-at-length
   L <- bins$mid
-  # Length-at-age
-  age <- amin:amax
-  l_a <-vonbert(an(lhpar["linf"]),an(lhpar["k"]),an(lhpar["t0"])+0.5,amin:amax)
   
-  if(type == "logistic") {
-    if(is.null(L50) || is.null(L95)) {
+  ## Mid-year length-at-age
+  age <- amin:amax
+  
+  l_a <- vonbert(
+    linf = an(lhpar["linf"]),
+    k = an(lhpar["k"]),
+    t0 = an(lhpar["t0"]) + 0.5,
+    age = age
+  )
+  
+  if (type == "logistic") {
+    
+    if (is.null(L50) || is.null(L95)) {
       stop("For logistic selectivity, provide L50 and L95.")
     }
+    
     sel <- sel_logistic_len(L, L50 = L50, L95 = L95)
     sel_a <- sel_logistic_len(l_a, L50 = L50, L95 = L95)
   }
   
-  #browser()
-  if(type == "normal") {
-    if(is.null(Lpeak) || is.null(sd)) {
+  if (type == "normal") {
+    
+    if (is.null(Lpeak) || is.null(sd)) {
       stop("For normal selectivity, provide Lpeak and sd.")
     }
+    
     sel <- sel_normal_len(L, Lpeak = Lpeak, sd = sd)
     sel_a <- sel_normal_len(l_a, Lpeak = Lpeak, sd = sd)
-  } 
-
-  if(type == "dnormal") {
-    if(is.null(Lpeak) || is.null(sd_left) || is.null(sd_right)) {
+  }
+  
+  if (type == "dnormal") {
+    
+    if (is.null(Lpeak) || is.null(sd_left) || is.null(sd_right)) {
       stop("For double-normal selectivity, provide Lpeak, sd_left, and sd_right.")
     }
+    
     sel <- sel_dnormal_len(
       L = L,
       Lpeak = Lpeak,
@@ -141,13 +257,12 @@ sel_la <- function(lhpar,amin=0,amax=20,
     )
   }
   
-  if(scale) {
+  if (scale) {
     sel <- sel / max(sel, na.rm = TRUE)
     sel_a <- sel_a / max(sel_a, na.rm = TRUE)
   }
   
-
- sel_l <- FLCore::FLQuant(
+  sel_l <- FLCore::FLQuant(
     sel,
     dimnames = list(
       len = as.character(bins$lower),
@@ -171,11 +286,12 @@ sel_la <- function(lhpar,amin=0,amax=20,
     )
   )
   
- 
-  
- list(sel_len=sel_l,sel_a=sel_a)
+  list(
+    sel_len = sel_l,
+    sel_a = sel_a,
+    len_bins = bins
+  )
 }
-
 
 #' Plot selectivity at length and age
 #'
