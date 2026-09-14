@@ -9,9 +9,9 @@ sel_logistic_len(L, L50, L95)
 \arguments{
 \item{L}{Numeric vector of lengths.}
 
-\item{L50}{Length at 50% selectivity.}
+\item{L50}{Length at 50\% selectivity.}
 
-\item{L95}{Length at 95% selectivity.}
+\item{L95}{Length at 95\% selectivity.}
 }
 \value{
 Numeric vector of selectivity values between 0 and 1.

@@ -834,7 +834,7 @@ rUnif_len <- function(gear, timing, years, nsim, seed = NULL) {
 #' @export
 lfd.sim <- function(object, gear,
                     ess_age = gear$ess_age, ess_len = gear$ess_len,
-                    u_age = NULL, u_len = NULL, scale = TRUE) {
+                    u_age = NULL, u_len = NULL, scale = FALSE) {
   
   age <- an(dimnames(object)$age)
   years <- dimnames(object)$year

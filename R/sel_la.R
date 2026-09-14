@@ -6,8 +6,8 @@
 #' and the length at 95% selectivity (`L95`).
 #'
 #' @param L Numeric vector of lengths.
-#' @param L50 Length at 50% selectivity.
-#' @param L95 Length at 95% selectivity.
+#' @param L50 Length at 50\% selectivity.
+#' @param L95 Length at 95\% selectivity.
 #'
 #' @return Numeric vector of selectivity values between 0 and 1.
 #' @export

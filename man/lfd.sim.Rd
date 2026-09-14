@@ -11,7 +11,7 @@ lfd.sim(
   ess_len = gear$ess_len,
   u_age = NULL,
   u_len = NULL,
-  scale = TRUE
+  scale = FALSE
 )
 }
 \arguments{
