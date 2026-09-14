@@ -679,3 +679,66 @@ ss3devs <- function(om, vcv, Fphi = 0.423, bias.correct = TRUE,...){
   
   return(devs)
 }
+
+# {{{
+# rmultinom_crn()
+#
+#' Draw a multinomial sample using pre-generated uniform deviates (CRN-safe)
+#'
+#' Draws a multinomial sample of size `length(u)` from probability vector
+#' `p` by inverse-transform sampling: each element of `u` is mapped to a
+#' category by comparing it against the cumulative probability vector
+#' `cumsum(p)`. This is the standard device for common random numbers (CRN)
+#' in simulation studies -- as long as the same `u` is reused, the sampled
+#' category for a given draw only changes when `p` itself changes, never
+#' because of an unrelated call to the random number generator elsewhere in
+#' the program.
+#'
+#' Contrast with `stats::rmultinom(n, size=1, prob=p)`, which draws against
+#' R's live RNG stream and gives no control over which "slice" of that
+#' stream is consumed by which computation -- two calls with different `p`
+#' will in general use different underlying randomness even if seeded
+#' identically, once anything else in the program has touched the RNG in
+#' between.
+#'
+#' @param u Numeric vector of independent `Uniform(0,1)` deviates, one per
+#'   individual to be classified. Typically pre-generated once for an
+#'   entire MSE run and reused across scenarios.
+#' @param p Numeric vector of category probabilities. Need not sum to 1
+#'   (renormalised internally); values that are `NA`, non-finite, or
+#'   negative are treated as 0.
+#'
+#' @return Integer vector of length `length(p)`, the count landing in each
+#'   category. Sums to `length(u)`, or to 0 if `p` sums to a non-positive
+#'   value (all-zero true proportions, e.g. no catch that year/iter).
+#'
+#' @examples
+#' set.seed(1)
+#' u <- runif(1000)
+#' p <- c(0.1, 0.3, 0.6)
+#' rmultinom_crn(u, p)                     # ~= c(100, 300, 600)
+#'
+#' ## CRN property: same u, slightly different p -> only the boundary shifts
+#' p2 <- c(0.12, 0.28, 0.60)
+#' rbind(rmultinom_crn(u, p), rmultinom_crn(u, p2))
+#'
+#' ## degenerate case: all-zero probability vector
+#' rmultinom_crn(u, c(0, 0, 0))            # c(0, 0, 0), no error
+#'
+#' @export
+rmultinom_crn <- function(u, p) {
+  
+  p[!is.finite(p) | p < 0] <- 0
+  
+  if (sum(p) <= 0)
+    return(rep(0L, length(p)))
+  
+  p <- p / sum(p)
+  cp <- cumsum(p)
+  cp[length(cp)] <- 1                      # guard against floating-point drift
+  
+  idx <- findInterval(u, cp, rightmost.closed = TRUE) + 1L
+  idx <- pmin(idx, length(p))
+  
+  tabulate(idx, nbins = length(p))
+}

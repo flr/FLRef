@@ -2,37 +2,59 @@
 % Please edit documentation in R/OMsim.R
 \name{ca.sim}
 \alias{ca.sim}
-\title{generates catch.n with lognormal annual and multinomial age composition observation error}
+\title{Generate catch.n with lognormal annual and multinomial age composition
+observation error}
 \usage{
 ca.sim(
   object,
   ess = 200,
+  u = NULL,
   what = c("catch", "landings", "discards")[1],
   rescale = FALSE
 )
 }
 \arguments{
-\item{object}{FLQuant}
+\item{object}{`FLQuant` of true numbers/catch-at-age.}
 
-\item{ess}{effective sample size for age composition}
+\item{ess}{Effective sample size for the age-composition sample.}
 
-\item{what}{c("catch", "landings", "discards")}
+\item{u}{Optional. A `[ess, year, iter]` array of pre-generated
+`Uniform(0,1)` deviates (e.g. from [rUnif_lfd()]) for CRN-safe
+sampling via [rmultinom_crn()]. If `NULL` (default), sampling falls
+back to `stats::rmultinom()` against the live RNG, i.e. the original
+`ca.sim()` behaviour is unchanged.}
 
-\item{rescale}{rescale to the abudance scale of the input}
+\item{what}{One of `"catch"`, `"landings"`, `"discards"` (currently
+unused inside the function body, kept for interface compatibility
+with the original `ca.sim()`).}
 
-\item{sel}{FLQuant with selectivity.pattern e.g. catch.sel()}
+\item{rescale}{Logical. If `TRUE`, rescale the sampled age composition
+back to the abundance scale of `object` (sampled proportions x true
+total), rather than returning raw counts on the `ess` scale.}
 }
 \value{
-FLQuant with catch.n samples
+`FLQuant`, same dimensions as `object`, with sampled
+  catch-at-age (or rescaled proportions x true total, if
+  `rescale=TRUE`).
 }
 \description{
-generates catch.n with lognormal annual and multinomial age composition observation error
+Generate catch.n with lognormal annual and multinomial age composition
+observation error
 }
 \examples{
+\dontrun{
 data(ple4)
-object = propagate(catch.sel(ple4),10)
-ca = ca.sim(object,ess=200)
-# Checks
-ggplot(ca)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
-theme(legend.position = "none")+ylab("Index")
+object <- propagate(catch.n(ple4), 10)
+
+## original behaviour, unchanged
+ca1 <- ca.sim(object, ess = 200)
+
+## CRN-safe: same u -> same sample, even if called twice
+u <- array(runif(200 * dim(object)[2] * 10),
+           dim = c(200, dim(object)[2], 10))
+ca2 <- ca.sim(object, ess = 200, u = u)
+ca3 <- ca.sim(object, ess = 200, u = u)
+stopifnot(identical(ca2, ca3))
+}
+
 }

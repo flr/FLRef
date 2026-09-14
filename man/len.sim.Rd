@@ -2,7 +2,7 @@
 % Please edit documentation in R/OMsim.R
 \name{len.sim}
 \alias{len.sim}
-\title{function to generate survey (pulse) and continuous LFDs}
+\title{Generate survey (pulse) or continuous length-frequency samples}
 \usage{
 len.sim(
   N_a,
@@ -16,37 +16,84 @@ len.sim(
   bin = 1,
   cv = 0.1,
   lmin = 5,
-  lmax = 1.2
+  lmax = 1.2,
+  gear = NULL,
+  u = NULL
 )
 }
 \arguments{
-\item{N_a}{numbers at age sample}
+\item{N_a}{Numbers (or catch)-at-age `FLQuant`.}
 
-\item{params}{growth parameter, default FLPar(linf,k,t0)}
+\item{params}{Growth parameters, `FLPar(linf, k, t0)`.}
 
-\item{model}{growth model, only option currently vonbert}
+\item{model}{Growth model. Default `vonbert`.}
 
-\item{ess}{effective sample size}
+\item{ess}{Effective sample size, split evenly across `timing` events
+(`round(ess / length(timing))` per event, as in the original).
+Default `250`. If using `gear`, consider passing `gear$ess_len`
+explicitly.}
 
-\item{timing}{t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5}
+\item{timing}{Within-year timing of sampling events (as fractions of a
+year added to `t0`). Default `seq(0, 11/12, 1/12)` (roughly monthly,
+continuous sampling); pass a single value (e.g. `0.5`) for a single
+survey pulse.}
 
-\item{unit}{default is "cm"}
+\item{unit}{Length unit label. Default `"cm"`.}
 
-\item{scale}{if TRUE scaled to N_a input}
+\item{scale}{Logical. If `TRUE` (default), rescale the output so its
+per-year/iter total matches `N_a`'s true total.}
 
-\item{reflen}{evokes fixed sd for L_a at sd = cv*reflen}
+\item{reflen, bin, cv, lmin, lmax}{Passed to `iALK()`, as in the original.}
 
-\item{bin}{length bin size, dafault 1}
+\item{gear}{Optional gear object as returned by [build_gear()]. If
+supplied, its `sel_len` is folded into the ALK at every timing event
+via [condition_alk()]. If `NULL` (default), no selectivity weighting
+is applied -- reproduces the original `len.sim()` behaviour exactly.}
 
-\item{cv}{variation in L_a}
-
-\item{lmin}{minimum length}
-
-\item{lmax}{maximum upper length specified lmax*linf}
+\item{u}{Optional list of length `length(timing)`, each element a
+`[ess_t, year, iter]` array of pre-generated `Uniform(0,1)` deviates
+(`ess_t = round(ess / length(timing))`) for CRN-safe sampling via
+[rmultinom_crn()] -- see [rUnif_len()]. If `NULL` (default), falls
+back to `stats::rmultinom()` against the live RNG, i.e. the
+original behaviour.}
 }
 \value{
-FLQuant for length
+`FLQuant` with a `len` dimension, the sampled length-frequency
+  by year and iter.
 }
 \description{
-function to generate survey (pulse) and continuous LFDs
+Samples a length-frequency distribution from `N_a` by projecting it
+through the biological inverse age-length key at one or more
+within-year timing events (`timing`), optionally re-weighted by a
+gear's length selectivity.
+}
+\details{
+Unlike [lfd.sim()]'s two-stage fishery-dependent design (a noisy
+catch-at-age sample feeding a length draw), `len.sim()` samples length
+directly from `N_a` at each timing event and sums across events -- the
+single-stage design appropriate for a survey or continuous sampling
+programme, where `N_a` is already the relevant numbers/catch-at-age
+for that observation process rather than something to be re-sampled
+for age first.
+
+Because growth (`t0 + timing[t]`) shifts within a year, the ALK -- and
+therefore any gear-selectivity weighting applied to it via
+[condition_alk()] -- is rebuilt fresh at each timing event, rather
+than reusing a single pre-built `gear$condALK` as `lfd.sim()` does.
+}
+\examples{
+\dontrun{
+## original behaviour, unchanged: no gear, no CRN
+lfd_survey <- len.sim(stock.n(om)[, "2024"], params = lhpar, ess = 300,
+                       timing = 0.5)
+
+## gear-aware, CRN-safe
+u_len <- rUnif_len(trawl, timing = seq(0, 11/12, 1/12),
+                    years = an(dimnames(N_a)$year), nsim = dims(N_a)$iter,
+                    seed = 456)
+lfd_survey_g <- len.sim(N_a, params = lhpar, ess = trawl$ess_len,
+                         timing = seq(0, 11/12, 1/12),
+                         gear = trawl, u = u_len)
+}
+
 }

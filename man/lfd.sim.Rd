@@ -2,60 +2,82 @@
 % Please edit documentation in R/OMsim.R
 \name{lfd.sim}
 \alias{lfd.sim}
-\title{function to generate survey (pulse) and continuous LFDs}
+\title{Two-stage gear-selective length-frequency sample from an operating model}
 \usage{
 lfd.sim(
   object,
-  stock,
-  sel = catch.sel(stock),
-  params,
-  model = vonbert,
-  ess = 250,
-  timing = seq(0, 11/12, 1/12),
-  timeref = 0.5,
-  unit = "cm",
-  scale = TRUE,
-  reflen = NULL,
-  bin = 1,
-  cv = 0.1,
-  lmin = 5,
-  lmax = 1.2
+  gear,
+  ess_age = gear$ess_age,
+  ess_len = gear$ess_len,
+  u_age = NULL,
+  u_len = NULL,
+  scale = TRUE
 )
 }
 \arguments{
-\item{object}{*FLQuant* numbers at age sample}
+\item{object}{`FLQuant` of the gear's true catch (or numbers)-at-age,
+e.g. one element of `catch_n_gear` from the operating model.}
 
-\item{stock}{*FLStock* object}
+\item{gear}{A gear object as returned by [build_gear()]; must contain
+`condALK` (age x len matrix, rows sum to 1) and, unless overridden
+below, `ess_age`/`ess_len`.}
 
-\item{sel}{selectivity, default catch.sel(stock)}
+\item{ess_age, ess_len}{Integer. Effective sample sizes for the two
+stages. Default to `gear$ess_age`/`gear$ess_len`.}
 
-\item{params}{growth parameter, default FLPar(linf,k,t0)}
+\item{u_age}{Optional `[ess_age, year, iter]` array of pre-generated
+`Uniform(0,1)` deviates for the stage-1 draw (see [rUnif_lfd()]). If
+`NULL` (default), stage 1 falls back to `ca.sim()`'s own
+`stats::rmultinom()` behaviour (no CRN).}
 
-\item{model}{growth model, only option currently vonbert}
+\item{u_len}{Optional `[ess_len, year, iter]` array of pre-generated
+`Uniform(0,1)` deviates for the stage-2 draw. If `NULL` (default),
+stage 2 falls back to a plain `stats::rmultinom()` draw (no CRN).}
 
-\item{ess}{effective sample size}
-
-\item{timing}{default constinoues seq(0,11/12,1/12), but can be single event 0.5}
-
-\item{timeref}{reference timing of the sample, default 0.5 (e.g. survey or catch.n)}
-
-\item{unit}{default is "cm"}
-
-\item{scale}{if TRUE scaled to N_a input}
-
-\item{reflen}{evokes fixed sd for L_a at sd = cv*reflen}
-
-\item{bin}{length bin size, dafault 1}
-
-\item{cv}{variation in L_a}
-
-\item{lmin}{minimum length}
-
-\item{lmax}{maximum upper length specified lmax*linf}
+\item{scale}{Logical. If `TRUE` (default), rescale the returned length
+sample so its per-year/iter total matches the true total in `object`,
+rather than returning raw counts on the `ess_len` scale.}
 }
 \value{
-FLQuant for length
+`FLQuant` with a `len` dimension (matching `gear$len_bins`),
+  the sampled length frequencies by year and iter.
 }
 \description{
-function to generate survey (pulse) and continuous LFDs
+Generates a length-frequency sample for one gear in two stages:
+\enumerate{
+  \item a low-effective-sample-size catch-at-age sample is drawn from
+    the gear's true catch-at-age (via [ca.sim()]);
+  \item that sampled age composition is projected through the gear's
+    conditional inverse age-length key,
+    \eqn{P(l \mid a, \text{caught by gear})} (built once by
+    [build_gear()], so selectivity is already folded in), and a larger
+    length sample is drawn from the resulting expected length
+    distribution.
+}
+This mimics a sampling design where a small, possibly more costly,
+age-reading sample (e.g. observer-collected otoliths) informs the age
+structure applied to a larger, cheaper length sample (e.g. market or
+landings-site length measurements) -- rather than treating the two as
+independent draws from the true population.
+}
+\examples{
+\dontrun{
+## trawl <- build_gear(...) from build_gear.R examples
+## catch_n_gear$Trawl : FLQuant, true catch-at-age for Trawl, from the OM
+
+lfd_trawl <- lfd.sim(catch_n_gear$Trawl, trawl)
+
+## sanity check: shape should show the dome, not just decline with length
+plot(lfd_trawl)
+
+## CRN-safe version, reproducible across calls
+devs <- rUnif_lfd(om_gears, years = an(dimnames(catch_n_gear$Trawl)$year),
+                   nsim = dim(catch_n_gear$Trawl)[6], seed = 456)
+lfd_trawl_a <- lfd.sim(catch_n_gear$Trawl, trawl,
+                        u_age = devs$age$Trawl, u_len = devs$len$Trawl)
+lfd_trawl_b <- lfd.sim(catch_n_gear$Trawl, trawl,
+                        u_age = devs$age$Trawl, u_len = devs$len$Trawl)
+stopifnot(identical(lfd_trawl_a, lfd_trawl_b))
+}
+
 }

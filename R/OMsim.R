@@ -306,42 +306,79 @@ pgquant <- function(object,pg){
 }
 # }}}
 
+
+
 # ca.sim() {{{
 
-#' generates catch.n with lognormal annual and multinomial age composition observation error 
-#' @param object FLQuant
-#' @param sel FLQuant with selectivity.pattern e.g. catch.sel()
-#' @param ess effective sample size for age composition
-#' @param what c("catch", "landings", "discards")
-#' @param rescale rescale to the abudance scale of the input 
-#' @return FLQuant with catch.n samples
-#' @export 
-#' @examples 
+# Adds an optional `u`
+# argument for CRN-safe sampling; existing call sites that don't pass `u`
+# are unaffected (falls back to the original stats::rmultinom() behaviour).
+
+#' Generate catch.n with lognormal annual and multinomial age composition
+#' observation error
+#'
+#' @param object `FLQuant` of true numbers/catch-at-age.
+#' @param ess Effective sample size for the age-composition sample.
+#' @param u Optional. A `[ess, year, iter]` array of pre-generated
+#'   `Uniform(0,1)` deviates (e.g. from [rUnif_lfd()]) for CRN-safe
+#'   sampling via [rmultinom_crn()]. If `NULL` (default), sampling falls
+#'   back to `stats::rmultinom()` against the live RNG, i.e. the original
+#'   `ca.sim()` behaviour is unchanged.
+#' @param what One of `"catch"`, `"landings"`, `"discards"` (currently
+#'   unused inside the function body, kept for interface compatibility
+#'   with the original `ca.sim()`).
+#' @param rescale Logical. If `TRUE`, rescale the sampled age composition
+#'   back to the abundance scale of `object` (sampled proportions x true
+#'   total), rather than returning raw counts on the `ess` scale.
+#'
+#' @return `FLQuant`, same dimensions as `object`, with sampled
+#'   catch-at-age (or rescaled proportions x true total, if
+#'   `rescale=TRUE`).
+#'
+#' @examples
+#' \dontrun{
 #' data(ple4)
-#' object = propagate(catch.sel(ple4),10)
-#' ca = ca.sim(object,ess=200)
-#' # Checks
-#' ggplot(ca)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
-#' theme(legend.position = "none")+ylab("Index")
-ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1],rescale=FALSE){
-  res=object
-  ref=res
-  # Sample age-comp from multinomial
-  for(i in seq(dims(object)$iter)){
-    for(y in seq(dims(object)$year)){
-      prob =  c(res[,y,,,,i]%/%apply(res[,y,,,,i],2,sum))
-      res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob),1,sum)
+#' object <- propagate(catch.n(ple4), 10)
+#'
+#' ## original behaviour, unchanged
+#' ca1 <- ca.sim(object, ess = 200)
+#'
+#' ## CRN-safe: same u -> same sample, even if called twice
+#' u <- array(runif(200 * dim(object)[2] * 10),
+#'            dim = c(200, dim(object)[2], 10))
+#' ca2 <- ca.sim(object, ess = 200, u = u)
+#' ca3 <- ca.sim(object, ess = 200, u = u)
+#' stopifnot(identical(ca2, ca3))
+#' }
+#'
+#' @export
+ca.sim <- function(object, ess = 200, u = NULL,
+                   what = c("catch", "landings", "discards")[1],
+                   rescale = FALSE) {
+  
+  res <- object
+  ref <- res
+  
+  for (i in seq(dims(object)$iter)) {
+    for (y in seq(dims(object)$year)) {
+      
+      prob <- c(res[, y, , , , i] %/% apply(res[, y, , , , i], 2, sum))
+      
+      if (is.null(u)) {
+        res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob), 1, sum)
+      } else {
+        res[, y, , , , i] <- rmultinom_crn(u[, y, i], prob)
+      }
     }
   }
-  if(rescale){
-    
-    res = quantSums(ref)%*%(res%/%quantSums(res))  
-    
+  
+  if (rescale) {
+    res <- quantSums(ref) %*% (res %/% quantSums(res))
   }
-  #fac = apply(ref,2:6,sum)/apply(res,2:6,sum)
-  #res = res%*%fac
-  return(res)
+  
+  res
 }
+
 # }}}
 
 # iALK() {{{
@@ -514,135 +551,406 @@ applyALK <- function(lfds,alks){
   return(res)
 }
 
-
-# {{{
-# len.sim()
-#
-#' function to generate survey (pulse) and continuous LFDs
-#' @param N_a numbers at age sample
-#' @param params growth parameter, default FLPar(linf,k,t0)
-#' @param model growth model, only option currently vonbert
-#' @param cv variation in L_a
-#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
-#' @param scale if TRUE scaled to N_a input 
-#' @param lmin minimum length
-#' @param lmax maximum upper length specified lmax*linf
-#' @param bin length bin size, dafault 1
-#' @param ess effective sample size
-#' @param timing t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5
-#' @param unit default is "cm"
-#' @return FLQuant for length
+#{{{
+# condition
+#' Fold length selectivity into an inverse ALK
+#'
+#' Shared helper: re-weights an inverse age-length key (age x len, rows
+#' sum to 1) by a length-selectivity vector on the same length grid, and
+#' renormalises each age row back to sum to 1. Ages with zero selected
+#' probability get an all-zero row rather than a divide-by-zero. Used by
+#' both `build_gear()` and the gear-aware `len.sim()` so the two stay
+#' consistent rather than each carrying its own copy of this logic.
+#'
+#' @param ialk_mat Numeric matrix, age (rows) x len (cols), rows sum to 1.
+#' @param sel_len_vec Numeric vector of length-selectivity, named by
+#'   length. Reordered internally to match `colnames(ialk_mat)`.
+#'
+#' @return Numeric matrix, same dimensions as `ialk_mat`, rows sum to 1
+#'   (or all-zero where no length was selected for that age).
+#'
 #' @export
+condition_alk <- function(ialk_mat, sel_len_vec) {
+  
+  sel_len_vec <- sel_len_vec[colnames(ialk_mat)]
+  
+  weighted <- sweep(ialk_mat, 2, sel_len_vec, "*")
+  row_tot <- rowSums(weighted)
+  cond <- weighted
+  valid <- row_tot > 0
+  cond[valid, ] <- weighted[valid, , drop = FALSE] / row_tot[valid]
+  cond[!valid, ] <- 0
+  cond
+}
+#}}}
 
-len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
-  gp = c(params) 
-  age = an(dimnames(N_a)$age)
-  iters = length(an(dimnames(N_a)$iter))
-  # iter 1
+#' Generate survey (pulse) or continuous length-frequency samples
+#'
+#' Samples a length-frequency distribution from `N_a` by projecting it
+#' through the biological inverse age-length key at one or more
+#' within-year timing events (`timing`), optionally re-weighted by a
+#' gear's length selectivity.
+#'
+#' Unlike [lfd.sim()]'s two-stage fishery-dependent design (a noisy
+#' catch-at-age sample feeding a length draw), `len.sim()` samples length
+#' directly from `N_a` at each timing event and sums across events -- the
+#' single-stage design appropriate for a survey or continuous sampling
+#' programme, where `N_a` is already the relevant numbers/catch-at-age
+#' for that observation process rather than something to be re-sampled
+#' for age first.
+#'
+#' Because growth (`t0 + timing[t]`) shifts within a year, the ALK -- and
+#' therefore any gear-selectivity weighting applied to it via
+#' [condition_alk()] -- is rebuilt fresh at each timing event, rather
+#' than reusing a single pre-built `gear$condALK` as `lfd.sim()` does.
+#'
+#' @param N_a Numbers (or catch)-at-age `FLQuant`.
+#' @param params Growth parameters, `FLPar(linf, k, t0)`.
+#' @param model Growth model. Default `vonbert`.
+#' @param ess Effective sample size, split evenly across `timing` events
+#'   (`round(ess / length(timing))` per event, as in the original).
+#'   Default `250`. If using `gear`, consider passing `gear$ess_len`
+#'   explicitly.
+#' @param timing Within-year timing of sampling events (as fractions of a
+#'   year added to `t0`). Default `seq(0, 11/12, 1/12)` (roughly monthly,
+#'   continuous sampling); pass a single value (e.g. `0.5`) for a single
+#'   survey pulse.
+#' @param unit Length unit label. Default `"cm"`.
+#' @param scale Logical. If `TRUE` (default), rescale the output so its
+#'   per-year/iter total matches `N_a`'s true total.
+#' @param reflen,bin,cv,lmin,lmax Passed to `iALK()`, as in the original.
+#' @param gear Optional gear object as returned by [build_gear()]. If
+#'   supplied, its `sel_len` is folded into the ALK at every timing event
+#'   via [condition_alk()]. If `NULL` (default), no selectivity weighting
+#'   is applied -- reproduces the original `len.sim()` behaviour exactly.
+#' @param u Optional list of length `length(timing)`, each element a
+#'   `[ess_t, year, iter]` array of pre-generated `Uniform(0,1)` deviates
+#'   (`ess_t = round(ess / length(timing))`) for CRN-safe sampling via
+#'   [rmultinom_crn()] -- see [rUnif_len()]. If `NULL` (default), falls
+#'   back to `stats::rmultinom()` against the live RNG, i.e. the
+#'   original behaviour.
+#'
+#' @return `FLQuant` with a `len` dimension, the sampled length-frequency
+#'   by year and iter.
+#'
+#' @examples
+#' \dontrun{
+#' ## original behaviour, unchanged: no gear, no CRN
+#' lfd_survey <- len.sim(stock.n(om)[, "2024"], params = lhpar, ess = 300,
+#'                        timing = 0.5)
+#'
+#' ## gear-aware, CRN-safe
+#' u_len <- rUnif_len(trawl, timing = seq(0, 11/12, 1/12),
+#'                     years = an(dimnames(N_a)$year), nsim = dims(N_a)$iter,
+#'                     seed = 456)
+#' lfd_survey_g <- len.sim(N_a, params = lhpar, ess = trawl$ess_len,
+#'                          timing = seq(0, 11/12, 1/12),
+#'                          gear = trawl, u = u_len)
+#' }
+#'
+#' @export
+len.sim <- function(N_a, params, model = vonbert, ess = 250,
+                    timing = seq(0, 11/12, 1/12), unit = "cm", scale = TRUE,
+                    reflen = NULL, bin = 1, cv = 0.1, lmin = 5, lmax = 1.2,
+                    gear = NULL, u = NULL) {
   
-  t = 1
-  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
-               model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-  lenls=  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
+  gp <- c(params)
+  age <- an(dimnames(N_a)$age)
+  its <- dims(N_a)$iter
+  yrs <- dimnames(N_a)$year
+  ess_t <- round(ess / length(timing))
   
-  if(length(timing)>1){
-    for(t in 1:length(timing)){
-      ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
-                   model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-      lenls = lenls + lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
+  out <- NULL   # built on the first timing event, once we know the len grid
+  
+  for (t in seq_along(timing)) {
+    
+    ialk <- iALK(
+      params = c(linf = gp[["linf"]], k = gp[["k"]], t0 = gp[["t0"]] + timing[t]),
+      model = model, age = age, lmax = lmax, reflen = reflen, bin = bin, lmin = lmin
+    )
+    ialk_mat <- c(ialk)
+    dim(ialk_mat) <- dim(ialk)[1:2]
+    dimnames(ialk_mat) <- list(age = dimnames(ialk)$age, len = dimnames(ialk)$len)
+    
+    if (is.null(gear)) {
+      cond <- ialk_mat                      # no selectivity: original behaviour
+    } else {
+      sel_len_vec <- as.numeric(gear$sel_len)
+      names(sel_len_vec) <- dimnames(gear$sel_len)$len
+      cond <- condition_alk(ialk_mat, sel_len_vec)
+    }
+    
+    if (is.null(out)) {
+      out <- FLQuant(
+        0,
+        dimnames = list(
+          len = colnames(cond), year = yrs, unit = "unique",
+          season = "all", area = "unique", iter = seq_len(its)
+        )
+      )
+    }
+    
+    for (y in seq_along(yrs)) {
+      for (i in seq_len(its)) {
+        
+        n_a <- as.numeric(N_a[, y, , , , i])
+        if (sum(n_a) == 0) next
+        
+        p_len <- as.numeric((n_a / sum(n_a)) %*% cond)
+        
+        if (is.null(u)) {
+          len_n <- apply(rmultinom(ess_t, 1, prob = p_len), 1, sum)
+        } else {
+          len_n <- rmultinom_crn(u[[t]][, y, i], p_len)
+        }
+        
+        out[, y, , , , i] <- out[, y, , , , i] + len_n
+      }
     }
   }
-  out = lenls
   
-  units(out) = unit
-  fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
-  if(scale){
-     out = out%*%fac #*an(units(N_a))/1000
+  units(out) <- unit
+  
+  if (scale) {
+    fac <- apply(N_a, 2:6, sum) / apply(out, 2:6, sum)
+    fac[!is.finite(fac)] <- 0
+    out <- out %*% fac
   }
-  #attr(out,"scaler") <- fac
-  return(out)
+  
+  out
 }
-# }}}
 
+#' Pre-generate CRN uniform-deviate streams for len.sim()
+#'
+#' Generates one `Uniform(0,1)` array per within-year timing event, each
+#' shaped `[ess_t, year, iter]`, for use with [len.sim()]'s `u` argument
+#' via [rmultinom_crn()]. Analogous to [rUnif_lfd()], but shaped for
+#' `len.sim()`'s timing-event loop rather than the two-stage age/length
+#' design.
+#'
+#' @param gear A gear object as returned by [build_gear()]; used for
+#'   `ess_len` (per [len.sim()]'s `ess` argument, split across timing
+#'   events the same way `len.sim()` does internally).
+#' @param timing Within-year timing vector, as passed to [len.sim()].
+#' @param years Integer vector of years to generate deviates for.
+#' @param nsim Integer. Number of OM iterations.
+#' @param seed Optional integer seed. If `NULL` (default), the current
+#'   RNG state is used as-is.
+#'
+#' @return A list of length `length(timing)`, each element an array of
+#'   dimension `[round(gear$ess_len / length(timing)), length(years), nsim]`.
+#'
+#' @examples
+#' \dontrun{
+#' u_len <- rUnif_len(trawl, timing = seq(0, 11/12, 1/12),
+#'                     years = 2025:2054, nsim = 100, seed = 456)
+#' length(u_len)          # one array per timing event
+#' dim(u_len[[1]])        # ess_t x years x nsim
+#' }
+#'
+#' @export
+rUnif_len <- function(gear, timing, years, nsim, seed = NULL) {
+  
+  if (!is.null(seed)) set.seed(seed)
+  
+  ess_t <- round(gear$ess_len / length(timing))
+  yrs <- as.character(years)
+  
+  lapply(seq_along(timing), function(t) {
+    array(
+      stats::runif(ess_t * length(yrs) * nsim),
+      dim = c(ess_t, length(yrs), nsim),
+      dimnames = list(draw = seq_len(ess_t), year = yrs, iter = seq_len(nsim))
+    )
+  })
+}
 
 # {{{
-# lfd.sim()
+# lfd.sim
 #
-#' function to generate survey (pulse) and continuous LFDs
-#' @param object *FLQuant* numbers at age sample
-#' @param stock *FLStock* object 
-#' @param sel selectivity, default catch.sel(stock)
-#' @param params growth parameter, default FLPar(linf,k,t0)
-#' @param model growth model, only option currently vonbert
-#' @param cv variation in L_a
-#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
-#' @param scale if TRUE scaled to N_a input 
-#' @param lmin minimum length
-#' @param lmax maximum upper length specified lmax*linf
-#' @param bin length bin size, dafault 1
-#' @param ess effective sample size
-#' @param timing default constinoues seq(0,11/12,1/12), but can be single event 0.5
-#' @param timeref reference timing of the sample, default 0.5 (e.g. survey or catch.n)
-#' @param unit default is "cm"
-#' @return FLQuant for length
-#' @export
+# Depends on ca.sim() (ca_sim_crn.R) and rmultinom_crn() (rmultinom_crn.R)
+# already being loaded.
 
-lfd.sim <- function(object, stock, sel=catch.sel(stock),params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),timeref=0.5,unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
-  gp = c(params) 
-  age = an(dimnames(object)$age)
-  year = an(dimnames(object)$year)
-  stock = trim(stock,year=year,age=age)
+#' Two-stage gear-selective length-frequency sample from an operating model
+#'
+#' Generates a length-frequency sample for one gear in two stages:
+#' \enumerate{
+#'   \item a low-effective-sample-size catch-at-age sample is drawn from
+#'     the gear's true catch-at-age (via [ca.sim()]);
+#'   \item that sampled age composition is projected through the gear's
+#'     conditional inverse age-length key,
+#'     \eqn{P(l \mid a, \text{caught by gear})} (built once by
+#'     [build_gear()], so selectivity is already folded in), and a larger
+#'     length sample is drawn from the resulting expected length
+#'     distribution.
+#' }
+#' This mimics a sampling design where a small, possibly more costly,
+#' age-reading sample (e.g. observer-collected otoliths) informs the age
+#' structure applied to a larger, cheaper length sample (e.g. market or
+#' landings-site length measurements) -- rather than treating the two as
+#' independent draws from the true population.
+#'
+#' @param object `FLQuant` of the gear's true catch (or numbers)-at-age,
+#'   e.g. one element of `catch_n_gear` from the operating model.
+#' @param gear A gear object as returned by [build_gear()]; must contain
+#'   `condALK` (age x len matrix, rows sum to 1) and, unless overridden
+#'   below, `ess_age`/`ess_len`.
+#' @param ess_age,ess_len Integer. Effective sample sizes for the two
+#'   stages. Default to `gear$ess_age`/`gear$ess_len`.
+#' @param u_age Optional `[ess_age, year, iter]` array of pre-generated
+#'   `Uniform(0,1)` deviates for the stage-1 draw (see [rUnif_lfd()]). If
+#'   `NULL` (default), stage 1 falls back to `ca.sim()`'s own
+#'   `stats::rmultinom()` behaviour (no CRN).
+#' @param u_len Optional `[ess_len, year, iter]` array of pre-generated
+#'   `Uniform(0,1)` deviates for the stage-2 draw. If `NULL` (default),
+#'   stage 2 falls back to a plain `stats::rmultinom()` draw (no CRN).
+#' @param scale Logical. If `TRUE` (default), rescale the returned length
+#'   sample so its per-year/iter total matches the true total in `object`,
+#'   rather than returning raw counts on the `ess_len` scale.
+#'
+#' @return `FLQuant` with a `len` dimension (matching `gear$len_bins`),
+#'   the sampled length frequencies by year and iter.
+#'
+#' @examples
+#' \dontrun{
+#' ## trawl <- build_gear(...) from build_gear.R examples
+#' ## catch_n_gear$Trawl : FLQuant, true catch-at-age for Trawl, from the OM
+#'
+#' lfd_trawl <- lfd.sim(catch_n_gear$Trawl, trawl)
+#'
+#' ## sanity check: shape should show the dome, not just decline with length
+#' plot(lfd_trawl)
+#'
+#' ## CRN-safe version, reproducible across calls
+#' devs <- rUnif_lfd(om_gears, years = an(dimnames(catch_n_gear$Trawl)$year),
+#'                    nsim = dim(catch_n_gear$Trawl)[6], seed = 456)
+#' lfd_trawl_a <- lfd.sim(catch_n_gear$Trawl, trawl,
+#'                         u_age = devs$age$Trawl, u_len = devs$len$Trawl)
+#' lfd_trawl_b <- lfd.sim(catch_n_gear$Trawl, trawl,
+#'                         u_age = devs$age$Trawl, u_len = devs$len$Trawl)
+#' stopifnot(identical(lfd_trawl_a, lfd_trawl_b))
+#' }
+#'
+#' @export
+lfd.sim <- function(object, gear,
+                    ess_age = gear$ess_age, ess_len = gear$ess_len,
+                    u_age = NULL, u_len = NULL, scale = TRUE) {
   
+  age <- an(dimnames(object)$age)
+  years <- dimnames(object)$year
+  its <- dims(object)$iter
   
-  t = 1
-  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
-               model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-  lenls=  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
+  condALK <- gear$condALK
+  if (!identical(dimnames(condALK)$age, as.character(age))) {
+    stop(
+      "'gear$condALK' age dimension does not match 'object' age dimension. ",
+      "Check 'object' and 'gear' were built for the same age range."
+    )
+  }
   
-  if(length(timing)>1){
-    for(t in 1:length(timing)){
-      ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+timing[t]),
-                   model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-      lenls = lenls + lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))   
+  len_lower <- colnames(condALK)
+  out <- FLQuant(
+    NA_real_,
+    dimnames = list(
+      len = len_lower, year = years, unit = "unique",
+      season = "all", area = "unique", iter = seq_len(its)
+    )
+  )
+  
+  ## --- stage 1: low-ESS catch-at-age sample ------------------------------
+  age_n_flq <- ca.sim(object, ess = ess_age, u = u_age)
+  
+  ## --- stage 2: larger length sample via the conditional ALK -------------
+  for (y in seq_along(years)) {
+    for (i in seq_len(its)) {
+      
+      age_n <- as.numeric(age_n_flq[, y, , , , i])
+      
+      if (sum(age_n) == 0) {
+        ## degenerate stage-1 draw (e.g. ~zero catch that year/iter):
+        ## fall back on the true age proportions so stage 2 isn't handed
+        ## an all-zero mixture
+        age_n <- as.numeric(object[, y, , , , i])
+      }
+      
+      age_p <- age_n / sum(age_n)
+      p_len <- as.numeric(age_p %*% condALK)
+      
+      if (is.null(u_len)) {
+        len_n <- apply(rmultinom(ess_len, 1, prob = p_len), 1, sum)
+      } else {
+        len_n <- rmultinom_crn(u_len[, y, i], p_len)
+      }
+      
+      out[, y, , , , i] <- len_n
     }
   }
-  out = lenls
-  out = lenls
-  units(out) = unit
-  if(scale){
-    fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
-    out = out%*%fac #*an(units(N_a))/1000
+  
+  units(out) <- "cm"
+  
+  if (scale) {
+    fac <- apply(object, 2:6, sum) / apply(out, 2:6, sum)
+    fac[!is.finite(fac)] <- 0
+    out <- out %*% fac
   }
   
-  return(out)
+  out
 }
-# }}}
-
 
 # {{{
-# SOP corrections 
+# rUnif_lfd 
 #
-#' scales catch-at-age to total catch with error (optional)
-#' @param object FLQuant catch.n, discard.n, landings.n
-#' @param stock FLStock
-#' @param sigma observation error
-#' @param what type c("catch", "landings", "discards")
-#' @return FLQuant
-sops <- function(object,stock,sigma=0.1,what=c("catch","landings","discards")[1]){
- dmo = dimnames(object) 
- stock = stock[dmo$age,dmo$year]
- if(what=="catch") out = (catch(stock)/quantSums(object*catch.wt(stock)))%*%object
- if(what=="landings") out = (landings(stock)/quantSums(object*landings.wt(stock)))%*%object
- if(what=="landings") out = (discards(stock)/quantSums(object*discards.wt(stock)))%*%object
- 
-devs = rlnorm(dims(object)$iter*dims(object)$year,0,sigma)
-for(i in seq(dims(object)$age)){
-  out[i,] = out[i,]*devs 
+#' Pre-generate CRN uniform-deviate streams for a two-stage length OEM
+#'
+#' Generates one `Uniform(0,1)` array per gear per sampling stage (age,
+#' length), each shaped `[draw, year, iter]`, for use with
+#' [rmultinom_crn()]. Intended to be called once per MSE run/scenario set
+#' and reused everywhere the length OEM draws a sample, so the same
+#' underlying randomness is shared across MP variants (CRN).
+#'
+#' @param om_gears Named list of gear objects as returned by
+#'   [build_gear()]; must each contain `ess_age` and `ess_len`.
+#' @param years Integer vector of years to generate deviates for
+#'   (typically the full projection horizon).
+#' @param nsim Integer. Number of OM iterations.
+#' @param seed Optional integer seed, set via `set.seed()` before
+#'   generation for reproducibility across sessions. If `NULL` (default),
+#'   the current RNG state is used as-is.
+#'
+#' @return A list with two elements, `age` and `len`, each a named list
+#'   (one array per gear) of dimension `[ess, length(years), nsim]`.
+#'
+#' @examples
+#' \dontrun{
+#' om_gears <- list(Trawl = trawl, Gillnet = gillnet)   # from build_gear()
+#' devs <- rUnif_lfd(om_gears, years = 2025:2054, nsim = 100, seed = 456)
+#'
+#' dim(devs$age$Trawl)     # 50 x 30 x 100  (ess_age x years x nsim)
+#' dim(devs$len$Gillnet)   # 300 x 30 x 100 (ess_len x years x nsim)
+#' }
+#'
+#' @export
+rUnif_lfd <- function(om_gears, years, nsim, seed = NULL) {
+  
+  if (!is.null(seed)) set.seed(seed)
+  
+  gears <- names(om_gears)
+  yrs <- as.character(years)
+  
+  mk <- function(field) {
+    stats::setNames(lapply(gears, function(g) {
+      n <- om_gears[[g]][[field]]
+      array(
+        stats::runif(n * length(yrs) * nsim),
+        dim = c(n, length(yrs), nsim),
+        dimnames = list(draw = seq_len(n), year = yrs, iter = seq_len(nsim))
+      )
+    }), gears)
+  }
+  
+  list(age = mk("ess_age"), len = mk("ess_len"))
 }
- out = out*devs
- #out[out==0] = NA
- return(out)
-}
+#}}}
 
 
 
@@ -849,4 +1157,31 @@ updCatch.n <- function(stk) {
   cn[z == 0] <- 0
   catch.n(stk) <- cn
   stk
+}
+
+
+
+# {{{
+# SOP corrections 
+#
+#' scales catch-at-age to total catch with error (optional)
+#' @param object FLQuant catch.n, discard.n, landings.n
+#' @param stock FLStock
+#' @param sigma observation error
+#' @param what type c("catch", "landings", "discards")
+#' @return FLQuant
+sops <- function(object,stock,sigma=0.1,what=c("catch","landings","discards")[1]){
+  dmo = dimnames(object) 
+  stock = stock[dmo$age,dmo$year]
+  if(what=="catch") out = (catch(stock)/quantSums(object*catch.wt(stock)))%*%object
+  if(what=="landings") out = (landings(stock)/quantSums(object*landings.wt(stock)))%*%object
+  if(what=="landings") out = (discards(stock)/quantSums(object*discards.wt(stock)))%*%object
+  
+  devs = rlnorm(dims(object)$iter*dims(object)$year,0,sigma)
+  for(i in seq(dims(object)$age)){
+    out[i,] = out[i,]*devs 
+  }
+  out = out*devs
+  #out[out==0] = NA
+  return(out)
 }

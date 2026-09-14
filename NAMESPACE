@@ -94,4 +94,11 @@ export(plot_sel_la)
 export(combine_sel_age)
 export(plot_sel_age)
 
-
+export(build_gear)
+export(condition_alk)
+export(plot_condALK)
+export(plot_condALK_bias)
+export(plot_lfd_compare)
+export(rmultinom_crn)
+export(rUnif_lfd)
+export(rUnif_len)
