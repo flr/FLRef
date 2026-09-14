@@ -104,7 +104,6 @@ The following selectivity curves are supported:
   \item normal, specified by `Lpeak` and `sd`;
   \item double-normal, specified by `Lpeak`, `sd_left`, and `sd_right`.
 }
-
 The helper functions `sel_logistic_len()`, `sel_normal_len()` and
 `sel_dnormal_len()` must be available in the namespace.
 }

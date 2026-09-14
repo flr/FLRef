@@ -1,3 +1,4 @@
+
 #' Logistic selectivity at length
 #'
 #' Computes asymptotic logistic selectivity as a function of length.
@@ -9,6 +10,7 @@
 #' @param L95 Length at 95% selectivity.
 #'
 #' @return Numeric vector of selectivity values between 0 and 1.
+#' @export
 sel_logistic_len <- function(L, L50, L95) {
   1 / (1 + exp(-log(19) * (L - L50) / (L95 - L50)))
 }
@@ -24,6 +26,8 @@ sel_logistic_len <- function(L, L50, L95) {
 #' @param sd Standard deviation controlling the width of the dome.
 #'
 #' @return Numeric vector of selectivity values scaled to a maximum of 1.
+#' @export
+
 sel_normal_len <- function(L, Lpeak, sd) {
   s <- exp(-0.5 * ((L - Lpeak) / sd)^2)
   s / max(s, na.rm = TRUE)
@@ -42,6 +46,8 @@ sel_normal_len <- function(L, Lpeak, sd) {
 #' @param sd_right Standard deviation for lengths above `Lpeak`.
 #'
 #' @return Numeric vector of selectivity values scaled to a maximum of 1.
+#' @export
+
 sel_dnormal_len <- function(L, Lpeak, sd_left, sd_right) {
   s <- ifelse(
     L <= Lpeak,
@@ -119,7 +125,6 @@ sel_dnormal_len <- function(L, Lpeak, sd_left, sd_right) {
 #'   \item normal, specified by `Lpeak` and `sd`;
 #'   \item double-normal, specified by `Lpeak`, `sd_left`, and `sd_right`.
 #' }
-#'
 #' The helper functions `sel_logistic_len()`, `sel_normal_len()` and
 #' `sel_dnormal_len()` must be available in the namespace.
 #'
