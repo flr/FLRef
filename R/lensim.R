@@ -484,6 +484,149 @@ rUnif_len <- function(gear, timing, years, nsim, seed = NULL) {
 #'   or length 1.
 #'
 #' @export
+lfd.sim <- function(object, gear,
+                    ess_age = gear$ess_age, ess_len = gear$ess_len,
+                    u_age = NULL, u_len = NULL, scale = TRUE,
+                    timing = NULL, params = NULL, model = vonbert,
+                    reflen = NULL, cv = 0.1, lmin = 5, lmax_mult = 1.2, bin = 1) {
+  
+  age <- an(dimnames(object)$age)
+  years <- dimnames(object)$year
+  its <- dims(object)$iter
+  
+  ## 'rebuild_alk': any timing supplied at all (scalar or vector) means
+  ## gear$condALK (built once, at build_gear()'s own timing) must NOT be
+  ## reused -- the ALK has to be rebuilt fresh at this call's own timing.
+  ## 'multi_timing': timing has more than one element, i.e. this single
+  ## call must sum length draws across several within-year timing events
+  ## (e.g. continuous/monthly sampling within one year). A single scalar
+  ## timing (e.g. lfd.sim.season()'s one-timing-per-season call) rebuilds
+  ## the ALK but does NOT enter the summed-draws path -- it behaves exactly
+  ## like the no-rebuild branch otherwise (same ess_len, same plain u_len
+  ## array shape, not a list), which matters once u_len/u_age are wired up
+  ## from rUnif_lfd()'s CRN streams.
+  rebuild_alk <- !is.null(timing)
+  multi_timing <- rebuild_alk && length(timing) > 1L
+  
+  if (rebuild_alk && is.null(params)) {
+    stop("'params' (FLPar(linf, k, t0)) is required when 'timing' is supplied.")
+  }
+  
+  build_condALK_at <- function(t) {
+    ialk_t <- iALK(
+      params = c(linf = c(params["linf"]), k = c(params["k"]), t0 = c(params["t0"]) - t),
+      model = model, age = age, lmax = lmax_mult, reflen = reflen,
+      bin = bin, lmin = lmin, cv = cv
+    )
+    ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
+    dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
+    condition_alk(ialk_mat, sel_len_vec)
+  }
+  
+  ## per-timing-event conditioned ALKs, built once up front (not per
+  ## year/iter -- growth timing doesn't depend on year or iteration)
+  if (rebuild_alk) {
+    sel_len_vec <- as.numeric(gear$sel_len)
+    names(sel_len_vec) <- dimnames(gear$sel_len)$len
+  }
+  
+  if (multi_timing) {
+    
+    cond_list <- lapply(timing, build_condALK_at)
+    
+    ## split_ess(): largest-remainder split so the per-timing ESS values
+    ## sum exactly to ess_len, rather than rep(round(ess_len/S), S), which
+    ## can silently over/under-count (e.g. 50/4 -> 4*12=48, not 50)
+    split_ess <- function(n, S) {
+      rep(n %/% S, S) + (seq_len(S) <= n %% S)
+    }
+    ess_len_t <- split_ess(ess_len, length(timing))
+    len_lower <- colnames(cond_list[[1]])
+    
+  } else if (rebuild_alk) {
+    ## single scalar timing: rebuild once, then behave exactly like the
+    ## no-rebuild branch below (same ess_len, same condALK-shaped object)
+    condALK <- build_condALK_at(timing)
+    len_lower <- colnames(condALK)
+    
+  } else {
+    condALK <- gear$condALK
+    len_lower <- colnames(condALK)
+  }
+  
+  if (!identical(dimnames(gear$condALK)$age, as.character(age))) {
+    stop(
+      "'gear$condALK' age dimension does not match 'object' age dimension. ",
+      "Check 'object' and 'gear' were built for the same age range."
+    )
+  }
+  
+  out <- FLQuant(
+    NA_real_,
+    dimnames = list(
+      len = len_lower, year = years, unit = "unique",
+      season = "all", area = "unique", iter = seq_len(its)
+    )
+  )
+  
+  ## --- stage 1: low-ESS catch-at-age sample, single annual draw ---------
+  age_n_flq <- ca.sim(object, ess = ess_age, u = u_age)
+  
+  ## --- stage 2: larger length sample, optionally summed across timing --
+  for (y in seq_along(years)) {
+    for (i in seq_len(its)) {
+      
+      age_n <- as.numeric(age_n_flq[, y, , , , i])
+      
+      if (sum(age_n) == 0) {
+        age_n <- as.numeric(object[, y, , , , i])
+      }
+      
+      age_p <- age_n / sum(age_n)
+      
+      if (multi_timing) {
+        
+        len_n <- rep(0, length(len_lower))
+        for (t in seq_along(timing)) {
+          p_len_t <- as.numeric(age_p %*% cond_list[[t]])
+          
+          if (is.null(u_len)) {
+            draw_t <- apply(rmultinom(ess_len_t[t], 1, prob = p_len_t), 1, sum)
+          } else {
+            ## u_len must be a list of length(timing), each element a
+            ## [ess_len_t, year, iter] array -- see rUnif_lfd()'s
+            ## per-timing extension
+            draw_t <- rmultinom_crn(u_len[[t]][, y, i], p_len_t)
+          }
+          len_n <- len_n + draw_t
+        }
+        
+      } else {
+        p_len <- as.numeric(age_p %*% condALK)
+        
+        if (is.null(u_len)) {
+          len_n <- apply(rmultinom(ess_len, 1, prob = p_len), 1, sum)
+        } else {
+          len_n <- rmultinom_crn(u_len[, y, i], p_len)
+        }
+      }
+      
+      out[, y, , , , i] <- len_n
+    }
+  }
+  
+  units(out) <- "cm"
+  
+  if (scale) {
+    fac <- apply(object, 2:6, sum) / apply(out, 2:6, sum)
+    fac[!is.finite(fac)] <- 0
+    out <- out %*% fac
+  }
+  
+  out
+}
+
+
 
 
 # lfd_sim_season.R

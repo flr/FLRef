@@ -2,17 +2,11 @@
 % Please edit documentation in R/sel_la.R
 \name{build_gear}
 \alias{build_gear}
-\title{Build a single gear's selectivity, conditional ALK, and sampling config
-Depends on FLRef::sel_la() and FLRef::iALK() already being available.}
+\title{Build all gears' selectivity, conditional ALK, and sampling config}
 \usage{
 build_gear(
-  name,
+  gear_cfg,
   lhpar,
-  type = c("logistic", "normal", "dnormal"),
-  sel_pars,
-  f_mult,
-  ess_age,
-  ess_len,
   age,
   amin = min(age),
   amax = max(age),
@@ -20,33 +14,19 @@ build_gear(
   lmax_mult = 1.2,
   bin = 1,
   cv = 0.1,
+  timing = 0,
   scale = TRUE
 )
 }
 \arguments{
-\item{name}{Character. Gear name, stored on the returned object.}
+\item{gear_cfg}{Named list of per-gear configs (see file header for an
+example). Each gear's list must include `type`
+(`"logistic"`/`"normal"`/`"dnormal"`), `f_mult`, `ess_age`, `ess_len`;
+every other entry is passed to `sel_la()` as a selectivity parameter
+for that `type` (e.g. `Lpeak`/`sd_left`/`sd_right` for `"dnormal"`).}
 
 \item{lhpar}{`FLPar` or named numeric vector with at least `linf`, `k`,
-`t0`. Passed to both `sel_la()` and `iALK()`.}
-
-\item{type}{Character. One of `"logistic"`, `"normal"`, `"dnormal"`,
-passed to `sel_la()`.}
-
-\item{sel_pars}{Named list of the selectivity parameters `sel_la()`
-needs for `type` (e.g. `list(L50=35, L95=50)` for `"logistic"`,
-`list(Lpeak=35, sd=10)` for `"normal"`,
-`list(Lpeak=30, sd_left=8, sd_right=25)` for `"dnormal"`).}
-
-\item{f_mult}{Numeric. This gear's relative apical-F weight in the OM
-(operating-model truth, not an observation-process assumption -- kept
-here for convenience but conceptually separate from `ess_age`/`ess_len`,
-see Details).}
-
-\item{ess_age}{Integer. Effective sample size for the stage-1
-catch-at-age sample (observation-process assumption).}
-
-\item{ess_len}{Integer. Effective sample size for the stage-2
-length sample (observation-process assumption).}
+`t0`. Passed to both `sel_la()` and `iALK()`, shared across all gears.}
 
 \item{age}{Integer vector of ages, e.g. `0:30`.}
 
@@ -64,11 +44,34 @@ Default `1.2`.}
 
 \item{cv}{Numeric. CV of length-at-age used by `iALK()`. Default `0.1`.}
 
+\item{timing}{Numeric, fraction of a year. Within-year growth timing
+  applied to each gear's internal `iALK()` (used for
+  `sel_len`/`sel_a`/`condALK`), via `t0' = t0 - timing` (so
+  `L(age + timing)` is evaluated on the unmodified integer `age` grid --
+  the same sign convention used elsewhere in this OM, e.g.
+  `t0 - sample_timing` for `invALK_bio`). Default `0` (growth evaluated
+  exactly at each integer age) for backward compatibility; pass
+  `timing = sample_timing` to make every gear's own ALK consistent with
+  a mid-year (or other) convention used elsewhere in the OM.
+
+`sel_a` is NOT taken from `sel_la()`'s own `sel_a` output. `sel_la()`
+evaluates the selectivity curve at a single length-at-age value,
+\eqn{s_g(\bar L(a))} (and, in some versions, does so at the wrong
+within-year timing internally -- check your installed `sel_la()`
+against the sign convention above before trusting it standalone). What
+a gear actually catches at age \eqn{a} is the length-selectivity curve
+integrated over the full distribution of length at that age,
+\eqn{s_{g,a}=\sum_l P(l\mid a,t)\,s_g(l)} -- exactly the row totals
+already computed below while building `condALK`, before they are
+renormalised to sum to 1. `build_gear()` uses that integrated value
+instead, so `sel_a` and `condALK` are always mutually consistent and
+correctly timed, regardless of `sel_la()`'s own internal correctness.}
+
 \item{scale}{Logical. Passed to `sel_la()`; scale `sel_len`/`sel_a`
 independently to a max of 1. Default `TRUE`.}
 }
 \value{
-A named list with:
+A named list (names = `names(gear_cfg)`), each element a list:
 \describe{
   \item{name}{Gear name.}
   \item{sel_len}{`FLQuant`, selectivity-at-length (from `sel_la()`).}
@@ -77,25 +80,24 @@ A named list with:
     `sel_len` and `condALK`.}
   \item{condALK}{Numeric matrix, age (rows) x len (cols), rows sum to 1:
     \eqn{P(l \mid a, \text{caught by gear})}.}
-  \item{f_mult}{As supplied.}
-  \item{ess_age, ess_len}{As supplied.}
+  \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
+  \item{lhpar}{As supplied (needed as `lfd.sim()`'s default `params`).}
 }
 }
 \description{
-Consolidates everything a length-sampling OEM needs for one gear into a
-single object: selectivity-at-length, selectivity-at-age (both via
-`sel_la()`), the conditional inverse age-length key
-\eqn{P(l \mid a, \text{caught by gear})} (via `iALK()`), and the gear's
+Consolidates everything a length-sampling OEM needs, for every gear in
+`gear_cfg`, into one call: selectivity-at-length, selectivity-at-age
+(both via `sel_la()`), the conditional inverse age-length key
+\eqn{P(l \mid a, \text{caught by gear})} (via `iALK()`), and each gear's
 observation-process assumptions (`ess_age`, `ess_len`).
 }
 \details{
 `sel_la()` and `iALK()` express their length-range argument differently:
 `sel_la(lmax=...)` is an *absolute* upper length, while `iALK(lmax=...)`
 is a *multiplier on linf*. `build_gear()` takes a single `lmax_mult` and
-derives the correct form for each, then asserts the two resulting length
-grids are identical before returning -- if they are not, every downstream
-sampler would silently misalign length bins between `sel_len` and
-`condALK`, so this fails loudly instead.
+derives the correct form for each, then reconciles the two resulting
+length grids (they can legitimately differ by one bin at the top: see
+the reconciliation block below).
 
 The conditional ALK is built as
 \deqn{P(l \mid a, g) = \dfrac{P(l \mid a)\, s_g(l)}{\sum_l P(l \mid a)\, s_g(l)}}
@@ -105,28 +107,23 @@ gear-selected probability are set to 0 rather than divided by zero).
 }
 \examples{
 \dontrun{
-lhpar <- FLPar(linf = 55.662, k = 0.08, t0 = -2.77)
-ages  <- 0:30
+lhpars <- FLPar(linf = 45, k = 0.4, t0 = -0.3, a = 0.00000612, b = 3.03)
+ages   <- 0:5
 
-trawl <- build_gear(
-  name = "Trawl", lhpar = lhpar, type = "dnormal",
-  sel_pars = list(Lpeak = 18, sd_left = 5, sd_right = 12),
-  f_mult = 0.70, ess_age = 50, ess_len = 500, age = ages
+gear_cfg <- list(
+  Ringnet = list(type = "dnormal", Lpeak = 7.3, sd_left = 0.7,
+                  sd_right = 11.4, f_mult = 0.70, ess_age = 50, ess_len = 500),
+  Gillnet = list(type = "normal", Lpeak = 39.7, sd = 10.6,
+                  f_mult = 0.30, ess_age = 30, ess_len = 300)
 )
+
+om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = ages,
+                        timing = 0.5)
 
 ## sanity checks before trusting it further
-plot_sel_la(trawl, len_by = 5, age_by = 2)
-stopifnot(isTRUE(all.equal(unname(rowSums(trawl$condALK)),
-                          rep(1, nrow(trawl$condALK)), tolerance = 1e-6)))
-image(trawl$condALK, main = "P(len | age, caught by Trawl)")
-
-gillnet <- build_gear(
-  name = "Gillnet", lhpar = lhpar, type = "normal",
-  sel_pars = list(Lpeak = 38, sd = 10),
-  f_mult = 0.30, ess_age = 30, ess_len = 300, age = ages
-)
-
-om_gears <- list(Trawl = trawl, Gillnet = gillnet)
+plot_sel_la(om_gears, len_by = 5, age_by = 1)
+stopifnot(all.equal(rowSums(om_gears$Ringnet$condALK),
+                     rep(1, nrow(om_gears$Ringnet$condALK)), tolerance = 1e-6))
 }
 
 }
