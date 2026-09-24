@@ -35,7 +35,7 @@ A `ggplot` object.
 }
 \description{
 ggplot equivalent of `image(gear$condALK)`: a length-at-age probability
-heatmap, \eqn{P(l \mid a, \text{caught by gear})}, with proper axis
+heatmap, \eqn{P(l \mid a,g)}, with labelled axes
 labels and a colour scale instead of `image()`'s default palette.
 }
 \details{

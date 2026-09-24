@@ -2,34 +2,28 @@
 % Please edit documentation in R/lensim.R
 \name{rUnif_len}
 \alias{rUnif_len}
-\title{Pre-generate CRN uniform-deviate streams for len.sim()}
+\title{Generate common random numbers for length sampling}
 \usage{
 rUnif_len(gear, timing, years, nsim, seed = NULL)
 }
 \arguments{
-\item{gear}{A gear object as returned by [build_gear()]; used for
-`ess_len` (per [len.sim()]'s `ess` argument, split across timing
-events the same way `len.sim()` does internally).}
+\item{gear}{Gear object returned by [build_gear()]. `gear$ess_len` defines
+the total length-sample size.}
 
-\item{timing}{Within-year timing vector, as passed to [len.sim()].}
+\item{timing}{Numeric vector of within-year sampling times.}
 
-\item{years}{Integer vector of years to generate deviates for.}
+\item{years}{Vector of years.}
 
-\item{nsim}{Integer. Number of OM iterations.}
+\item{nsim}{Integer number of simulation iterations.}
 
-\item{seed}{Optional integer seed. If `NULL` (default), the current
-RNG state is used as-is.}
+\item{seed}{Optional integer random seed.}
 }
 \value{
-A list of length `length(timing)`, each element an array of
-  dimension `[round(gear$ess_len / length(timing)), length(years), nsim]`.
+A list with one `[draw, year, iter]` array per timing event.
 }
 \description{
-Generates one `Uniform(0,1)` array per within-year timing event, each
-shaped `[ess_t, year, iter]`, for use with [len.sim()]'s `u` argument
-via [rmultinom_crn()]. Analogous to [rUnif_lfd()], but shaped for
-`len.sim()`'s timing-event loop rather than the two-stage age/length
-design.
+Generates one array of uniform deviates for each within-year timing event
+for use by [len.sim()].
 }
 \examples{
 \dontrun{

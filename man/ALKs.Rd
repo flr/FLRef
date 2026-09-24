@@ -2,18 +2,25 @@
 % Please edit documentation in R/lensim.R
 \name{ALKs}
 \alias{ALKs}
-\title{annual ALK function}
+\title{Construct annual age-length keys}
 \usage{
 ALKs(object, iALK)
 }
 \arguments{
-\item{object}{FLQuant with numbers at age}
+\item{object}{An `FLQuant` containing numbers-at-age by year and iteration.}
 
-\item{iALK}{from iALK() outout}
+\item{iALK}{Inverse age-length key returned by [iALK()].}
 }
 \value{
-FLPars of ALK
+An `FLPars` object with one age-length key per year.
 }
 \description{
-annual ALK function
+Combines annual numbers-at-age with an inverse age-length key and returns
+age proportions within each length class for every year and iteration.
+}
+\examples{
+\dontrun{
+alks <- ALKs(stock.n(stk), ialk)
+}
+
 }

@@ -7,20 +7,19 @@
 condition_alk(ialk_mat, sel_len_vec)
 }
 \arguments{
-\item{ialk_mat}{Numeric matrix, age (rows) x len (cols), rows sum to 1.}
+\item{ialk_mat}{Numeric matrix with ages in rows and length classes in
+columns. Each age row should sum to one.}
 
-\item{sel_len_vec}{Numeric vector of length-selectivity, named by
-length. Reordered internally to match `colnames(ialk_mat)`.}
+\item{sel_len_vec}{Named numeric vector of selectivity-at-length. Values are
+reordered to match `colnames(ialk_mat)`.}
 }
 \value{
-Numeric matrix, same dimensions as `ialk_mat`, rows sum to 1
-  (or all-zero where no length was selected for that age).
+A numeric matrix with the same dimensions as `ialk_mat`. Rows sum
+  to one, except ages with zero selected probability, which are returned as
+  zero rows.
 }
 \description{
-Shared helper: re-weights an inverse age-length key (age x len, rows
-sum to 1) by a length-selectivity vector on the same length grid, and
-renormalises each age row back to sum to 1. Ages with zero selected
-probability get an all-zero row rather than a divide-by-zero. Used by
-both `build_gear()` and the gear-aware `len.sim()` so the two stay
-consistent rather than each carrying its own copy of this logic.
+Reweights an inverse age-length key by selectivity-at-length and normalises
+each age row to obtain the conditional distribution of length among fish
+caught by a gear.
 }

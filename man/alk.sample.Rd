@@ -2,22 +2,34 @@
 % Please edit documentation in R/lensim.R
 \name{alk.sample}
 \alias{alk.sample}
-\title{generates annual ALK sample with length stratified sampling}
+\title{Sample annual age-length keys by length class}
 \usage{
 alk.sample(lfds, alks, nbin = 20, n.sample = 1)
 }
 \arguments{
-\item{lfds}{length frequency *FLQuant*}
+\item{lfds}{An `FLQuant` containing length-frequency data by year and
+iteration.}
 
-\item{alks}{annual ALK proportions at age output form ALKs() *FLPars*}
+\item{alks}{An `FLPars` object containing annual age-length keys, typically
+returned by [ALKs()].}
 
-\item{nbin}{number of samples per length bin}
+\item{nbin}{Maximum number of age observations sampled per length class.
+Defaults to `20`.}
 
-\item{n.sample}{sample size of lfd}
+\item{n.sample}{Optional total length-sample size used to rescale `lfds`.
+A value of `1` uses the supplied frequencies without rescaling.}
 }
 \value{
-FLPars of sampled ALK
+An `FLPars` object containing sampled annual age-length keys.
 }
 \description{
-generates annual ALK sample with length stratified sampling
+Generates multinomial age samples within length classes from annual
+age-length keys. The number sampled in each length class is limited by
+`nbin` and by the corresponding length-frequency sample.
+}
+\examples{
+\dontrun{
+sampled_alks <- alk.sample(lfds, alks, nbin = 20)
+}
+
 }

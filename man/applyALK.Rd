@@ -2,18 +2,26 @@
 % Please edit documentation in R/lensim.R
 \name{applyALK}
 \alias{applyALK}
-\title{applyALK function to length to age}
+\title{Convert length frequencies to numbers-at-age}
 \usage{
 applyALK(lfds, alks)
 }
 \arguments{
-\item{alks}{*FLPars* annual ALKs}
+\item{lfds}{An `FLQuant` containing numbers-at-length.}
 
-\item{lfd}{*FLQuant* with numbers at length}
+\item{alks}{An annual `FLPars` collection returned by [ALKs()], or a single
+`FLPar` applied to every year.}
 }
 \value{
-FLQuant for numbers at age
+An `FLQuant` containing estimated numbers-at-age.
 }
 \description{
-applyALK function to length to age
+Applies annual age-length keys to length-frequency data to estimate
+numbers-at-age by year and iteration.
+}
+\examples{
+\dontrun{
+numbers_at_age <- applyALK(lfds, alks)
+}
+
 }

@@ -2,43 +2,35 @@
 % Please edit documentation in R/lensim.R
 \name{seasonalize_catch_n_gear}
 \alias{seasonalize_catch_n_gear}
-\title{Disaggregate an annual OM's gear catch-at-age into within-year seasons}
+\title{Disaggregate gear catch-at-age by season}
 \usage{
 seasonalize_catch_n_gear(stock, f_age_gear, n_seasons)
 }
 \arguments{
-\item{stock}{`FLStock` (or `FLStockR`), the OM's true annual stock --
-`stock.n(stock)`, `harvest(stock)`, `m(stock)` are used directly.}
+\item{stock}{An `FLStock` or `FLStockR` containing annual stock numbers,
+fishing mortality, and natural mortality.}
 
-\item{f_age_gear}{Named list of `FLQuant`s, one per gear, the OM's true
-annual fishing-mortality-at-age by gear (same dimensions as
-`harvest(stock)`; `Reduce("+", f_age_gear)` should be close to
-`harvest(stock)` -- worth checking directly if this function's
-output doesn't round-trip cleanly).}
+\item{f_age_gear}{Named list of gear-specific fishing-mortality-at-age
+`FLQuant` objects.}
 
-\item{n_seasons}{Integer. Number of within-year seasons.}
+\item{n_seasons}{Integer number of equal within-year seasons.}
 }
 \value{
-Named list, one `FLQuant` per gear, each with a real `season`
-  dimension of length `n_seasons` (all other dimensions matching
-  `stock.n(stock)`). `seasonSums(out[[g]])` should closely match the
-  true annual `catch.n` for that gear.
+A named list of gear-specific `FLQuant` objects with a populated
+  season dimension.
 }
 \description{
-Splits `stock`'s total instantaneous mortality (`harvest(stock) +
-m(stock)`) evenly across `n_seasons`, propagates numbers-at-age through
-each season via standard exponential decay, and allocates catch to
-each gear proportional to that gear's share of total F
-(`f_age_gear[[g]] / z_total`) -- `f_age_gear` shapes *which* catch goes
-to which gear; it does not drive the survival/decay rate, which comes
-from the OM's own already-validated total Z.
+Disaggregates annual gear-specific catch-at-age into equal within-year
+seasons under constant instantaneous fishing and natural mortality.
+}
+\details{
+Population numbers at the start of season `s` are
+\eqn{N_s=N_0\exp[-Z(s-1)/S]}, where `S` is `n_seasons`. Gear catch in
+that season is calculated with the corresponding partial fishing mortality.
 }
 \examples{
 \dontrun{
 seasonal_catch <- seasonalize_catch_n_gear(om_hist, f_age_gear, n_seasons = 4)
-
-## round-trip check: should closely match the true annual catch per gear
-plot(seasonSums(seasonal_catch$Trawl) - catch_n_gear$Trawl)
 }
 
 }

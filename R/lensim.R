@@ -1,19 +1,42 @@
-# iALK() {{{
-#
-#' inverse ALK function with lmin added to FLCore::invALK 
-#' @param params growth parameter, default FLPar(linf,k,t0)
-#' @param model growth model, only option currently vonbert
-#' @param age age vector
-#' @param cv of length-at-age
-#' @param lmax maximum upper length specified lmax*linf
-#' @param max maximum size value
-#' @param lmin milonimum length
-#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
-#' @param bin length bin size, dafault 1
-#' @param timing t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5
-#' @param unit default is "cm"
-#' @return FLPar age-length matrix
-#' @export 
+#' Construct an inverse age-length key
+#'
+#' Constructs the probability distribution of length conditional on age from
+#' a growth model and a coefficient of variation in length-at-age.
+#'
+#' @param params Growth parameters coercible to an `FLPar`. Parameters required
+#'   by `model` must be named; the default von Bertalanffy model uses `linf`,
+#'   `k`, and `t0`.
+#' @param model Growth function or model object used to predict mean
+#'   length-at-age. Defaults to `vonbert`.
+#' @param age Numeric vector of ages.
+#' @param cv Numeric coefficient of variation in length-at-age. Defaults to
+#'   `0.1`.
+#' @param lmin Numeric lower limit of the length grid. Defaults to `5`.
+#' @param lmax Numeric multiplier applied to `linf` when calculating the upper
+#'   length limit. Defaults to `1.2`.
+#' @param bin Numeric length-bin width. Defaults to `1`.
+#' @param max Numeric upper limit of the length grid. Defaults to
+#'   `ceiling(linf * lmax)`.
+#' @param reflen Optional reference length used to define a constant standard
+#'   deviation as `cv * reflen`. When `NULL`, the standard deviation is
+#'   `cv` times predicted length-at-age.
+#'
+#' @return An `FLPar` containing an age-by-length inverse age-length key. Rows
+#'   represent ages, columns represent length classes, and each age row sums
+#'   to one.
+#'
+#' @examples
+#' \dontrun{
+#' ialk <- iALK(
+#'   params = FLPar(linf = 45, k = 0.4, t0 = -0.3),
+#'   age = 0:5,
+#'   lmin = 5,
+#'   lmax = 1.2,
+#'   bin = 1
+#' )
+#' }
+#'
+#' @export
 
 iALK <- function(params, model=vonbert, age, cv=0.1,lmin=5, lmax=1.2, bin=1,
                  max=ceiling(linf * lmax), reflen=NULL) {
@@ -54,13 +77,22 @@ iALK <- function(params, model=vonbert, age, cv=0.1,lmin=5, lmax=1.2, bin=1,
 } 
 # }}}
 
-# ALK() {{{
-#
-#' ALK function
-#' @param N_a numbers at age sample for single event
-#' @param iALK from iALK() outout
-#' @return FLPar of ALK
-#' @export 
+#' Convert an inverse age-length key to an age-length key
+#'
+#' Combines numbers-at-age with an inverse age-length key and conditions the
+#' result on length to obtain age proportions within each length class.
+#'
+#' @param N_a Numeric vector of numbers-at-age for one sampling event.
+#' @param iALK Inverse age-length key returned by [iALK()].
+#'
+#' @return An `FLPar` containing age proportions by length class.
+#'
+#' @examples
+#' \dontrun{
+#' alk <- ALK(N_a = c(100, 80, 50, 20), iALK = ialk)
+#' }
+#'
+#' @export
 ALK <- function(N_a,iALK){
   alk = iALK
   alk[] = N_a
@@ -73,15 +105,29 @@ ALK <- function(N_a,iALK){
 }
 # }}}
 
-# alk.sample() {{{
-#
-#' generates annual ALK sample with length stratified sampling
-#' @param lfds length frequency *FLQuant*
-#' @param alks annual ALK proportions at age output form ALKs() *FLPars*
-#' @param nbin number of samples per length bin
-#' @param n.sample sample size of lfd 
-#' @return FLPars of sampled ALK
-#' @export 
+#' Sample annual age-length keys by length class
+#'
+#' Generates multinomial age samples within length classes from annual
+#' age-length keys. The number sampled in each length class is limited by
+#' `nbin` and by the corresponding length-frequency sample.
+#'
+#' @param lfds An `FLQuant` containing length-frequency data by year and
+#'   iteration.
+#' @param alks An `FLPars` object containing annual age-length keys, typically
+#'   returned by [ALKs()].
+#' @param nbin Maximum number of age observations sampled per length class.
+#'   Defaults to `20`.
+#' @param n.sample Optional total length-sample size used to rescale `lfds`.
+#'   A value of `1` uses the supplied frequencies without rescaling.
+#'
+#' @return An `FLPars` object containing sampled annual age-length keys.
+#'
+#' @examples
+#' \dontrun{
+#' sampled_alks <- alk.sample(lfds, alks, nbin = 20)
+#' }
+#'
+#' @export
 
 alk.sample <- function(lfds,alks,nbin = 20,n.sample=1){
   res = alks
@@ -106,13 +152,22 @@ alk.sample <- function(lfds,alks,nbin = 20,n.sample=1){
 }  
 # }}}
 
-# ALKs() {{{
-#
-#' annual ALK function
-#' @param object FLQuant with numbers at age
-#' @param iALK from iALK() outout
-#' @return FLPars of ALK
-#' @export 
+#' Construct annual age-length keys
+#'
+#' Combines annual numbers-at-age with an inverse age-length key and returns
+#' age proportions within each length class for every year and iteration.
+#'
+#' @param object An `FLQuant` containing numbers-at-age by year and iteration.
+#' @param iALK Inverse age-length key returned by [iALK()].
+#'
+#' @return An `FLPars` object with one age-length key per year.
+#'
+#' @examples
+#' \dontrun{
+#' alks <- ALKs(stock.n(stk), ialk)
+#' }
+#'
+#' @export
 ALKs <- function(object,iALK){
   it = dim(object)[6]
   nyr= dim(object)[2]
@@ -132,13 +187,23 @@ ALKs <- function(object,iALK){
 }
 # }}}
 
-# applyALK() {{{
-#
-#' applyALK function to length to age
-#' @param lfd *FLQuant* with numbers at length
-#' @param alks *FLPars* annual ALKs
-#' @return FLQuant for numbers at age
-#' @export 
+#' Convert length frequencies to numbers-at-age
+#'
+#' Applies annual age-length keys to length-frequency data to estimate
+#' numbers-at-age by year and iteration.
+#'
+#' @param lfds An `FLQuant` containing numbers-at-length.
+#' @param alks An annual `FLPars` collection returned by [ALKs()], or a single
+#'   `FLPar` applied to every year.
+#'
+#' @return An `FLQuant` containing estimated numbers-at-age.
+#'
+#' @examples
+#' \dontrun{
+#' numbers_at_age <- applyALK(lfds, alks)
+#' }
+#'
+#' @export
 
 applyALK <- function(lfds,alks){
   yr = dimnames(lfds)$year
@@ -170,23 +235,20 @@ applyALK <- function(lfds,alks){
 
 
 
-#{{{
-# condition
 #' Fold length selectivity into an inverse ALK
 #'
-#' Shared helper: re-weights an inverse age-length key (age x len, rows
-#' sum to 1) by a length-selectivity vector on the same length grid, and
-#' renormalises each age row back to sum to 1. Ages with zero selected
-#' probability get an all-zero row rather than a divide-by-zero. Used by
-#' both `build_gear()` and the gear-aware `len.sim()` so the two stay
-#' consistent rather than each carrying its own copy of this logic.
+#' Reweights an inverse age-length key by selectivity-at-length and normalises
+#' each age row to obtain the conditional distribution of length among fish
+#' caught by a gear.
 #'
-#' @param ialk_mat Numeric matrix, age (rows) x len (cols), rows sum to 1.
-#' @param sel_len_vec Numeric vector of length-selectivity, named by
-#'   length. Reordered internally to match `colnames(ialk_mat)`.
+#' @param ialk_mat Numeric matrix with ages in rows and length classes in
+#'   columns. Each age row should sum to one.
+#' @param sel_len_vec Named numeric vector of selectivity-at-length. Values are
+#'   reordered to match `colnames(ialk_mat)`.
 #'
-#' @return Numeric matrix, same dimensions as `ialk_mat`, rows sum to 1
-#'   (or all-zero where no length was selected for that age).
+#' @return A numeric matrix with the same dimensions as `ialk_mat`. Rows sum
+#'   to one, except ages with zero selected probability, which are returned as
+#'   zero rows.
 #'
 #' @export
 condition_alk <- function(ialk_mat, sel_len_vec) {
@@ -201,64 +263,44 @@ condition_alk <- function(ialk_mat, sel_len_vec) {
   cond[!valid, ] <- 0
   cond
 }
-#}}}
-
-#' Generate survey (pulse) or continuous length-frequency samples
+#' Simulate length-frequency samples from numbers-at-age
 #'
-#' Samples a length-frequency distribution from `N_a` by projecting it
-#' through the biological inverse age-length key at one or more
-#' within-year timing events (`timing`), optionally re-weighted by a
-#' gear's length selectivity.
+#' Projects numbers-at-age through an inverse age-length key at one or more
+#' within-year sampling times and draws a multinomial length sample. When a
+#' gear is supplied, the inverse key is conditioned on its
+#' selectivity-at-length.
 #'
-#' Unlike [lfd.sim()]'s two-stage fishery-dependent design (a noisy
-#' catch-at-age sample feeding a length draw), `len.sim()` samples length
-#' directly from `N_a` at each timing event and sums across events -- the
-#' single-stage design appropriate for a survey or continuous sampling
-#' programme, where `N_a` is already the relevant numbers/catch-at-age
-#' for that observation process rather than something to be re-sampled
-#' for age first.
-#'
-#' Because growth (`t0 + timing[t]`) shifts within a year, the ALK -- and
-#' therefore any gear-selectivity weighting applied to it via
-#' [condition_alk()] -- is rebuilt fresh at each timing event, rather
-#' than reusing a single pre-built `gear$condALK` as `lfd.sim()` does.
-#'
-#' @param N_a Numbers (or catch)-at-age `FLQuant`.
-#' @param params Growth parameters, `FLPar(linf, k, t0)`.
-#' @param model Growth model. Default `vonbert`.
-#' @param ess Effective sample size, split evenly across `timing` events
-#'   (`round(ess / length(timing))` per event, as in the original).
-#'   Default `250`. If using `gear`, consider passing `gear$ess_len`
-#'   explicitly.
-#' @param timing Within-year timing of sampling events (as fractions of a
-#'   year added to `t0`). Default `seq(0, 11/12, 1/12)` (roughly monthly,
-#'   continuous sampling); pass a single value (e.g. `0.5`) for a single
-#'   survey pulse.
-#' @param unit Length unit label. Default `"cm"`.
-#' @param scale Logical. If `TRUE` (default), rescale the output so its
-#'   per-year/iter total matches `N_a`'s true total.
-#' @param reflen,bin,cv,lmin,lmax Passed to `iALK()`, as in the original.
+#' @param N_a An `FLQuant` containing numbers-at-age or catch-at-age.
+#' @param params Growth parameters coercible to an `FLPar`; the default growth
+#'   model requires `linf`, `k`, and `t0`.
+#' @param model Growth function or model object. Defaults to `vonbert`.
+#' @param ess Integer effective sample size. It is divided equally, after
+#'   rounding, among the values in `timing`. Defaults to `250`.
+#' @param timing Numeric vector of sampling times expressed as fractions of a
+#'   year. Growth at time `t` is evaluated using `t0 - t`. Defaults to monthly
+#'   sampling times from `0` to `11/12`.
+#' @param unit Character label for the length unit. Defaults to `"cm"`.
+#' @param scale Logical; if `TRUE`, rescale each year and iteration to the
+#'   corresponding total in `N_a`.
+#' @param reflen,bin,cv,lmin,lmax Arguments passed to [iALK()].
 #' @param gear Optional gear object as returned by [build_gear()]. If
-#'   supplied, its `sel_len` is folded into the ALK at every timing event
-#'   via [condition_alk()]. If `NULL` (default), no selectivity weighting
-#'   is applied -- reproduces the original `len.sim()` behaviour exactly.
-#' @param u Optional list of length `length(timing)`, each element a
-#'   `[ess_t, year, iter]` array of pre-generated `Uniform(0,1)` deviates
-#'   (`ess_t = round(ess / length(timing))`) for CRN-safe sampling via
-#'   [rmultinom_crn()] -- see [rUnif_len()]. If `NULL` (default), falls
-#'   back to `stats::rmultinom()` against the live RNG, i.e. the
-#'   original behaviour.
+#'   supplied, `gear$sel_len` is incorporated through [condition_alk()].
+#' @param u Optional list of common-random-number arrays, one per timing
+#'   event, as returned by [rUnif_len()]. If `NULL`, multinomial samples are
+#'   drawn from the current random-number stream.
 #'
-#' @return `FLQuant` with a `len` dimension, the sampled length-frequency
-#'   by year and iter.
+#' @return An `FLQuant` containing sampled length frequencies by year and
+#'   iteration.
+#'
+#' @details
+#' This is a single-stage length sampler. In contrast, [lfd.sim()] first
+#' samples catch-at-age at low effective sample size and then conditions the
+#' length draw on that sampled age composition.
 #'
 #' @examples
 #' \dontrun{
-#' ## original behaviour, unchanged: no gear, no CRN
 #' lfd_survey <- len.sim(stock.n(om)[, "2024"], params = lhpar, ess = 300,
 #'                        timing = 0.5)
-#'
-#' ## gear-aware, CRN-safe
 #' u_len <- rUnif_len(trawl, timing = seq(0, 11/12, 1/12),
 #'                     years = an(dimnames(N_a)$year), nsim = dims(N_a)$iter,
 #'                     seed = 456)
@@ -339,25 +381,19 @@ len.sim <- function(N_a, params, model = vonbert, ess = 250,
   out
 }
 
-#' Pre-generate CRN uniform-deviate streams for len.sim()
+#' Generate common random numbers for length sampling
 #'
-#' Generates one `Uniform(0,1)` array per within-year timing event, each
-#' shaped `[ess_t, year, iter]`, for use with [len.sim()]'s `u` argument
-#' via [rmultinom_crn()]. Analogous to [rUnif_lfd()], but shaped for
-#' `len.sim()`'s timing-event loop rather than the two-stage age/length
-#' design.
+#' Generates one array of uniform deviates for each within-year timing event
+#' for use by [len.sim()].
 #'
-#' @param gear A gear object as returned by [build_gear()]; used for
-#'   `ess_len` (per [len.sim()]'s `ess` argument, split across timing
-#'   events the same way `len.sim()` does internally).
-#' @param timing Within-year timing vector, as passed to [len.sim()].
-#' @param years Integer vector of years to generate deviates for.
-#' @param nsim Integer. Number of OM iterations.
-#' @param seed Optional integer seed. If `NULL` (default), the current
-#'   RNG state is used as-is.
+#' @param gear Gear object returned by [build_gear()]. `gear$ess_len` defines
+#'   the total length-sample size.
+#' @param timing Numeric vector of within-year sampling times.
+#' @param years Vector of years.
+#' @param nsim Integer number of simulation iterations.
+#' @param seed Optional integer random seed.
 #'
-#' @return A list of length `length(timing)`, each element an array of
-#'   dimension `[round(gear$ess_len / length(timing)), length(years), nsim]`.
+#' @return A list with one `[draw, year, iter]` array per timing event.
 #'
 #' @examples
 #' \dontrun{
@@ -386,102 +422,55 @@ rUnif_len <- function(gear, timing, years, nsim, seed = NULL) {
 
 
 
-# lfd_sim.R
-# Draft, not yet run against a live R session.
-#
-# Completes FLRef::lfd.sim() (R/OMsim.R), which as currently committed
-# takes a `sel` argument but never uses it, and references an undefined
-# `N_a` instead of its own `object` argument. This version:
-#   1. actually folds gear selectivity into the ALK (via a pre-built
-#      build_gear() condALK, so the reweighting only happens once, at
-#      build_gear() time, not on every sampling call), and
-#   2. implements the two-stage design explicitly: a low-ESS catch-at-age
-#      sample (ca.sim()) feeds the length draw, rather than sampling
-#      length straight from the true age composition.
-#
-# Depends on ca.sim() (ca_sim_crn.R) and rmultinom_crn() (rmultinom_crn.R)
-# already being loaded.
-
-#' Two-stage gear-selective length-frequency sample from an operating model
+#' Simulate a two-stage gear-specific length-frequency sample
 #'
-#' Generates a length-frequency sample for one gear in two stages:
+#' Generates fishery-dependent length-frequency data from gear-specific
+#' catch-at-age using a two-stage sampling design.
+#'
+#' @param object An `FLQuant` containing true catch-at-age or numbers-at-age
+#'   for one gear.
+#' @param gear Gear object returned by [build_gear()].
+#' @param ess_age Integer effective sample size for the catch-at-age draw.
+#' @param ess_len Integer effective sample size for the length draw.
+#' @param u_age Optional common-random-number array with dimensions
+#'   `[ess_age, year, iter]` for the age draw.
+#' @param u_len Optional common-random-number array for one sampling time, or
+#'   a list of arrays when `timing` contains multiple values.
+#' @param scale Logical; if `TRUE`, rescale each sampled length distribution
+#'   to the corresponding total in `object`.
+#' @param timing Optional numeric vector of within-year sampling times. If
+#'   `NULL`, use the conditional ALK stored in `gear`. Otherwise, rebuild the
+#'   conditional ALK at each time using `t0 - timing`.
+#' @param params Growth parameters coercible to an `FLPar`. Required when
+#'   `timing` is supplied.
+#' @param model Growth function or model object. Defaults to `vonbert`.
+#' @param reflen,cv,lmin,lmax_mult,bin Arguments passed to [iALK()] when the
+#'   conditional ALK is rebuilt.
+#'
+#' @return An `FLQuant` containing sampled length frequencies by year and
+#'   iteration.
+#'
+#' @details
+#' Sampling proceeds as follows:
 #' \enumerate{
-#'   \item a low-effective-sample-size catch-at-age sample is drawn from
-#'     the gear's true catch-at-age (via [ca.sim()]);
-#'   \item that sampled age composition is projected through the gear's
-#'     conditional inverse age-length key,
-#'     \eqn{P(l \mid a, \text{caught by gear})} (built once by
-#'     [build_gear()], so selectivity is already folded in), and a larger
-#'     length sample is drawn from the resulting expected length
-#'     distribution.
+#'   \item A catch-at-age composition is sampled with effective sample size
+#'     `ess_age` using [ca.sim()].
+#'   \item The sampled age composition is projected through
+#'     \eqn{P(l \mid a, g)} and sampled at effective sample size `ess_len`.
 #' }
-#' This mimics a sampling design where a small, possibly more costly,
-#' age-reading sample (e.g. observer-collected otoliths) informs the age
-#' structure applied to a larger, cheaper length sample (e.g. market or
-#' landings-site length measurements) -- rather than treating the two as
-#' independent draws from the true population.
-#'
-#' @param object `FLQuant` of the gear's true catch (or numbers)-at-age,
-#'   e.g. one element of `catch_n_gear` from the operating model.
-#' @param gear A gear object as returned by [build_gear()]; must contain
-#'   `condALK` (age x len matrix, rows sum to 1) and, unless overridden
-#'   below, `ess_age`/`ess_len`.
-#' @param ess_age,ess_len Integer. Effective sample sizes for the two
-#'   stages. Default to `gear$ess_age`/`gear$ess_len`.
-#' @param u_age Optional `[ess_age, year, iter]` array of pre-generated
-#'   `Uniform(0,1)` deviates for the stage-1 draw (see [rUnif_lfd()]). If
-#'   `NULL` (default), stage 1 falls back to `ca.sim()`'s own
-#'   `stats::rmultinom()` behaviour (no CRN).
-#' @param u_len Optional `[ess_len, year, iter]` array of pre-generated
-#'   `Uniform(0,1)` deviates for the stage-2 draw. If `NULL` (default),
-#'   stage 2 falls back to a plain `stats::rmultinom()` draw (no CRN).
-#' @param scale Logical. If `TRUE` (default), rescale the returned length
-#'   sample so its per-year/iter total matches the true total in `object`,
-#'   rather than returning raw counts on the `ess_len` scale.
-#'
-#' @return `FLQuant` with a `len` dimension (matching `gear$len_bins`),
-#'   the sampled length frequencies by year and iter.
 #'
 #' @examples
 #' \dontrun{
-#' ## trawl <- build_gear(...) from build_gear.R examples
-#' ## catch_n_gear$Trawl : FLQuant, true catch-at-age for Trawl, from the OM
-#'
 #' lfd_trawl <- lfd.sim(catch_n_gear$Trawl, trawl)
-#'
-#' ## sanity check: shape should show the dome, not just decline with length
-#' plot(lfd_trawl)
-#'
-#' ## CRN-safe version, reproducible across calls
 #' devs <- rUnif_lfd(om_gears, years = an(dimnames(catch_n_gear$Trawl)$year),
 #'                    nsim = dim(catch_n_gear$Trawl)[6], seed = 456)
-#' lfd_trawl_a <- lfd.sim(catch_n_gear$Trawl, trawl,
-#'                         u_age = devs$age$Trawl, u_len = devs$len$Trawl)
-#' lfd_trawl_b <- lfd.sim(catch_n_gear$Trawl, trawl,
-#'                         u_age = devs$age$Trawl, u_len = devs$len$Trawl)
-#' stopifnot(identical(lfd_trawl_a, lfd_trawl_b))
+#' lfd_trawl_crn <- lfd.sim(
+#'   catch_n_gear$Trawl,
+#'   trawl,
+#'   u_age = devs$age$Trawl,
+#'   u_len = devs$len$Trawl
+#' )
 #' }
-#'
-#' @param timing Optional. Within-year timing of the length-sampling stage
-#'   only (as fractions of a year added to `t0`), e.g.
-#'   `seq(0, 11/12, 1/12)` for roughly monthly, continuous sampling. The
-#'   age-sampling stage (stage 1) is NOT split by timing -- it remains a
-#'   single annual draw regardless -- on the assumption that age-reading
-#'   (e.g. a limited observer programme) and length measurement (e.g.
-#'   ongoing market/landings sampling) are typically different sampling
-#'   programmes with different temporal coverage. If that assumption
-#'   doesn't match your fishery, this needs a different design, not just
-#'   a different `timing` value. If `NULL` (default) or length 1, `gear`'s
-#'   pre-built `condALK` is used directly, exactly as before -- no ALK
-#'   rebuilding, and `params`/`model`/etc. below are unused.
-#' @param params Growth parameters, `FLPar(linf, k, t0)`. Required only
-#'   if `timing` has length > 1 (the ALK must be rebuilt fresh at each
-#'   within-year timing event, since growth advances within the year --
-#'   `gear$condALK` alone, built at one fixed timing, cannot be reused
-#'   across several).
-#' @param model,reflen,cv,lmin,lmax_mult,bin Passed to `iALK()` when
-#'   rebuilding the ALK per timing event; ignored if `timing` is `NULL`
-#'   or length 1.
 #'
 #' @export
 lfd.sim <- function(object, gear,
@@ -629,56 +618,34 @@ lfd.sim <- function(object, gear,
 
 
 
-# lfd_sim_season.R
-
-#' Seasonal length-frequency samples from a season-structured operating model
+#' Simulate seasonal length-frequency samples
 #'
-#' Thin wrapper around [lfd.sim()] that loops over each season of a
-#' season-structured `object` (e.g. from [seasonalize_catch_n_gear()]),
-#' calling `lfd.sim()` once per season with a within-year `timing` offset
-#' of `(s - 0.5) / n_seasons`, and assembling the results into a genuine
-#' `season`-dimensioned `FLQuant` (not a list keyed by season number), so
-#' `seasonSums()` gives a free round-trip check against the annual total.
+#' Applies [lfd.sim()] separately to each season of a season-structured
+#' catch-at-age object. Seasonal midpoint timing is
+#' `(season - 0.5) / n_seasons`.
 #'
-#' `ess_age` and `ess_len` each accept either:
-#' \itemize{
-#'   \item a single value -- interpreted as a fixed annual total, split
-#'     evenly across seasons (`rep(round(ess / n_seasons), n_seasons)`),
-#'     so the season-summed total matches `gear$ess_age`/`gear$ess_len`
-#'     exactly (same invariant as the non-seasonal round-trip check); or
-#'   \item a vector of length `n_seasons` -- interpreted as already being
-#'     per-season effective sample sizes, used as-is (e.g. `c(20, 10, 50,
-#'     30)` for uneven seasonal sampling effort, such as a closed season
-#'     or a fleet that's mostly active in one quarter).
-#' }
+#' @param object An `FLQuant` containing catch-at-age with a populated season
+#'   dimension.
+#' @param gear Gear object returned by [build_gear()].
+#' @param n_seasons Integer number of seasons. Defaults to the size of the
+#'   season dimension in `object`.
+#' @param ess_age,ess_len Effective sample sizes. A scalar is divided equally,
+#'   after rounding, among seasons; a vector of length `n_seasons` specifies
+#'   season-specific values.
+#' @param params Growth parameters coercible to an `FLPar`; must contain
+#'   `linf`, `k`, and `t0`.
+#' @param ... Additional arguments passed to [lfd.sim()].
 #'
-#' Each season's stage-1 age sample is drawn independently (not shared
-#' across seasons) -- a real modeling choice (an annual observer
-#' programme would typically NOT be redrawn each quarter), not just an
-#' implementation detail. If that doesn't match your sampling design,
-#' this function needs a different approach (e.g. drawing one annual age
-#' sample up front and reusing it across seasons).
+#' @return An `FLQuant` containing sampled length frequencies by season, year,
+#'   and iteration.
 #'
-#' @param object `FLQuant` with a real `season` dimension (`dim 4 > 1`),
-#'   e.g. one element of the list returned by [seasonalize_catch_n_gear()].
-#' @param gear A gear object as returned by [build_gear()].
-#' @param n_seasons Integer. Number of seasons; defaults to `dim(object)[4]`.
-#' @param ess_age,ess_len Single value or length-`n_seasons` vector; see
-#'   Details. Default to `gear$ess_age`/`gear$ess_len` (annual total,
-#'   split evenly).
-#' @param params Growth parameters, `FLPar(linf, k, t0)`. Passed to
-#'   [lfd.sim()]; required for the within-season `timing` adjustment.
-#' @param ... Passed through to [lfd.sim()] (e.g. `u_age`, `u_len`,
-#'   `scale`, `model`, `reflen`, `cv`, `lmin`, `lmax_mult`, `bin`).
-#'
-#' @return `FLQuant` with a real `season` dimension (`1:n_seasons`).
+#' @details
+#' A separate stage-1 age sample is drawn for each season. Scalar sample sizes
+#' are divided using `round(ess / n_seasons)` in every season.
 #'
 #' @examples
 #' \dontrun{
-#' ## even split (default): total ess_len matches gear$ess_len
 #' lfd.sim.season(obj, trawl, n_seasons = 4, params = lhpars)
-#'
-#' ## uneven seasonal effort, e.g. closed season in Q1
 #' lfd.sim.season(obj, trawl, n_seasons = 4, ess_len = c(0, 200, 200, 100),
 #'                 params = lhpars)
 #' }
@@ -743,36 +710,23 @@ lfd.sim.season <- function(object, gear, n_seasons = dim(object)[4],
 }
 
 
-# {{{
-# rUnif_lfd 
-#
-#' Pre-generate CRN uniform-deviate streams for a two-stage length OEM
+#' Generate common random numbers for two-stage length sampling
 #'
-#' Generates one `Uniform(0,1)` array per gear per sampling stage (age,
-#' length), each shaped `[draw, year, iter]`, for use with
-#' [rmultinom_crn()]. Intended to be called once per MSE run/scenario set
-#' and reused everywhere the length OEM draws a sample, so the same
-#' underlying randomness is shared across MP variants (CRN).
+#' Generates uniform-deviate arrays for the age and length stages of
+#' [lfd.sim()] for every gear.
 #'
-#' @param om_gears Named list of gear objects as returned by
-#'   [build_gear()]; must each contain `ess_age` and `ess_len`.
-#' @param years Integer vector of years to generate deviates for
-#'   (typically the full projection horizon).
-#' @param nsim Integer. Number of OM iterations.
-#' @param seed Optional integer seed, set via `set.seed()` before
-#'   generation for reproducibility across sessions. If `NULL` (default),
-#'   the current RNG state is used as-is.
+#' @param om_gears Named list of gear objects returned by [build_gear()].
+#' @param years Vector of years.
+#' @param nsim Integer number of simulation iterations.
+#' @param seed Optional integer random seed.
 #'
-#' @return A list with two elements, `age` and `len`, each a named list
-#'   (one array per gear) of dimension `[ess, length(years), nsim]`.
+#' @return A list with components `age` and `len`. Each component is a named
+#'   list of `[draw, year, iter]` arrays, one per gear.
 #'
 #' @examples
 #' \dontrun{
-#' om_gears <- list(Trawl = trawl, Gillnet = gillnet)   # from build_gear()
+#' om_gears <- list(Trawl = trawl, Gillnet = gillnet)
 #' devs <- rUnif_lfd(om_gears, years = 2025:2054, nsim = 100, seed = 456)
-#'
-#' dim(devs$age$Trawl)     # 50 x 30 x 100  (ess_age x years x nsim)
-#' dim(devs$len$Gillnet)   # 300 x 30 x 100 (ess_len x years x nsim)
 #' }
 #'
 #' @export
@@ -796,60 +750,45 @@ rUnif_lfd <- function(om_gears, years, nsim, seed = NULL) {
   
   list(age = mk("ess_age"), len = mk("ess_len"))
 }
-#}}}
-
-# seasonalize_catch_n_gear.R
-# generalised to multiple gears sharing one total Z, and to use the OM's
-# own harvest(stock)+m(stock) rather than re-summing f_age_gear (which
-# only shapes each gear's share of catch, not the total decay rate).
-#
-# Stores output as a genuine FLQuant with the 'season' dimension populated
-# (not a list keyed by "season1", "season2", ...), so seasonSums() gives a
-# free round-trip check against the annual truth, and any FLQuant-aware
-# plotting/aggregation works without custom list-handling.
-
-#' Disaggregate an annual OM's gear catch-at-age into within-year seasons
+#' Disaggregate gear catch-at-age by season
 #'
-#' Splits `stock`'s total instantaneous mortality (`harvest(stock) +
-#' m(stock)`) evenly across `n_seasons`, propagates numbers-at-age through
-#' each season via standard exponential decay, and allocates catch to
-#' each gear proportional to that gear's share of total F
-#' (`f_age_gear[[g]] / z_total`) -- `f_age_gear` shapes *which* catch goes
-#' to which gear; it does not drive the survival/decay rate, which comes
-#' from the OM's own already-validated total Z.
+#' Disaggregates annual gear-specific catch-at-age into equal within-year
+#' seasons under constant instantaneous fishing and natural mortality.
 #'
-#' @param stock `FLStock` (or `FLStockR`), the OM's true annual stock --
-#'   `stock.n(stock)`, `harvest(stock)`, `m(stock)` are used directly.
-#' @param f_age_gear Named list of `FLQuant`s, one per gear, the OM's true
-#'   annual fishing-mortality-at-age by gear (same dimensions as
-#'   `harvest(stock)`; `Reduce("+", f_age_gear)` should be close to
-#'   `harvest(stock)` -- worth checking directly if this function's
-#'   output doesn't round-trip cleanly).
-#' @param n_seasons Integer. Number of within-year seasons.
+#' @param stock An `FLStock` or `FLStockR` containing annual stock numbers,
+#'   fishing mortality, and natural mortality.
+#' @param f_age_gear Named list of gear-specific fishing-mortality-at-age
+#'   `FLQuant` objects.
+#' @param n_seasons Integer number of equal within-year seasons.
 #'
-#' @return Named list, one `FLQuant` per gear, each with a real `season`
-#'   dimension of length `n_seasons` (all other dimensions matching
-#'   `stock.n(stock)`). `seasonSums(out[[g]])` should closely match the
-#'   true annual `catch.n` for that gear.
+#' @return A named list of gear-specific `FLQuant` objects with a populated
+#'   season dimension.
+#'
+#' @details
+#' Population numbers at the start of season `s` are
+#' \eqn{N_s=N_0\exp[-Z(s-1)/S]}, where `S` is `n_seasons`. Gear catch in
+#' that season is calculated with the corresponding partial fishing mortality.
 #'
 #' @examples
 #' \dontrun{
 #' seasonal_catch <- seasonalize_catch_n_gear(om_hist, f_age_gear, n_seasons = 4)
-#'
-#' ## round-trip check: should closely match the true annual catch per gear
-#' plot(seasonSums(seasonal_catch$Trawl) - catch_n_gear$Trawl)
 #' }
 #'
 #' @export
 seasonalize_catch_n_gear <- function(stock, f_age_gear, n_seasons) {
-  
   gears <- names(f_age_gear)
   stock_n <- stock.n(stock)
   z_total <- harvest(stock) + m(stock)   # OM's own aggregate Z
   
+  ## f_age_gear may span the full projection (e.g. 1972:2024) while `stock`
+  ## has already been subset to a shorter window (e.g. the last 5 data
+  ## years) -- align years before any arithmetic against z_total/stock_n,
+  ## or the division below is non-conformable
+  yrs <- dimnames(stock)$year
+  f_age_gear <- lapply(f_age_gear, function(x) x[, yrs])
+  
   mk_season_template <- function(x) {
-    d <- dimnames(x)
-    d$season <- ac(seq_len(n_seasons))
+    d <- dimnames(x); d$season <- ac(seq_len(n_seasons))
     FLQuant(NA_real_, dimnames = d)
   }
   
@@ -870,16 +809,49 @@ seasonalize_catch_n_gear <- function(stock, f_age_gear, n_seasons) {
   catch_season
 }
 
-# plot_lfd_season_ggplot.R
-#' Season-coloured length-frequency diagnostic, one panel per gear
+
+#' Calculate population numbers-at-age by season
 #'
-#' @param lfd_season Named list of `FLQuant`s, one per gear, each with a
-#'   populated `season` dimension (e.g. from [lfd.sim.season()]).
-#' @param year Character or numeric. Which year to plot.
-#' @param iter Integer. Which iteration to plot. Default `1`.
+#' Propagates annual beginning-of-year numbers-at-age through equal
+#' within-year seasons under constant total instantaneous mortality.
 #'
-#' @return A `ggplot` object: length on x, sampled count on y, one line
-#'   per season (coloured), faceted by gear.
+#' @param stock An `FLStock` or `FLStockR` containing annual stock numbers,
+#'   fishing mortality, and natural mortality.
+#' @param n_seasons Integer number of equal within-year seasons.
+#'
+#' @return An `FLQuant` containing numbers-at-age at the start of each season.
+#'
+#' @examples
+#' \dontrun{
+#' seasonal_numbers <- pop_n_season(om_hist, n_seasons = 4)
+#' }
+#'
+#' @export
+pop_n_season <- function(stock, n_seasons) {
+  stock_n <- stock.n(stock)
+  z_total <- harvest(stock) + m(stock)
+
+  d <- dimnames(stock_n); d$season <- ac(seq_len(n_seasons))
+  n_season <- FLQuant(NA_real_, dimnames = d)
+
+  for (s in seq_len(n_seasons)) {
+    n_season[, , , s, , ] <- stock_n * exp(-z_total * (s - 1) / n_seasons)
+  }
+
+  n_season
+}
+
+
+#' Plot seasonal length-frequency distributions
+#'
+#' Plots seasonal length-frequency distributions for a selected year, with
+#' seasons distinguished by colour and gears shown in separate panels.
+#'
+#' @param lfd_season Named list of seasonal length-frequency `FLQuant` objects.
+#' @param year Character or numeric year to plot.
+#' @param iter Integer simulation iteration. Defaults to `1`.
+#'
+#' @return A `ggplot` object.
 #'
 #' @examples
 #' \dontrun{
@@ -909,61 +881,50 @@ plot_lfd_season <- function(lfd_season, year, iter = 1) {
     ) +
     ggplot2::theme_bw()
 }
-# plot_lfd_ridgeline.R
-
-#' Ridgeline plot of length-frequency samples over time (annual or seasonal)
+#' Plot length-frequency distributions as temporal ridgelines
 #'
-#' Plots one or more length-frequency `FLQuant`s (e.g. sampled LFDs from
-#' [lfd.sim()]/[lfd.sim.season()], keyed by gear) as ridges along a
-#' continuous time axis via `geom_ribbon()` + `coord_flip()`, faceted by
-#' panel (gear).
+#' Displays annual or seasonal length-frequency distributions along a
+#' continuous time axis, with one panel per gear. Optional von Bertalanffy
+#' cohort trajectories can be overlaid for reference.
 #'
-#' If any panel carries a real `season` dimension, each season's ridge is
-#' placed at its actual fractional-year position (`year + (season - 0.5)
-#' / n_seasons`), so seasons appear in chronological order within each
-#' year rather than as separate facet rows, and are distinguished by
-#' fill colour rather than by expanding the grid.
-#'
-#' Cohort-tracking VBGF reference lines are optional: pass `lhpar` to
-#' overlay them, or leave `NULL` (default) for ridges only.
-#'
-#' @param panels Named list of `FLQuant`s (names become facet/panel
-#'   labels, typically gear names), each with `len` and `year`
-#'   dimensions, single iteration. May carry a real `season` dimension.
-#' @param lhpar Optional `FLPar`/named vector with `linf`, `k`, `t0` for
-#'   dashed diagonal cohort reference lines. `NULL` (default) skips them.
-#' @param scale Numeric. Controls how far each ridge protrudes, relative
-#'   to the spacing between time points (a year, or a season-slot if
-#'   seasonal). Default `0.9`.
-#' @param cohort_pad Integer. Extra cohorts drawn beyond the plotted time
-#'   range at each end (only used when `lhpar` is supplied). Default `15`.
+#' @param panels Named list of length-frequency `FLQuant` objects. List names
+#'   determine panel order and labels.
+#' @param lhpar Optional growth parameters containing `linf`, `k`, and `t0`
+#'   for cohort reference lines.
+#' @param scale Numeric ridge-height multiplier. Defaults to `0.9`.
+#' @param cohort_pad Integer number of additional cohorts generated beyond
+#'   each end of the plotted time range. Defaults to `15`.
+#' @param annual Logical; if `TRUE`, sum the season dimension before plotting.
 #'
 #' @return A `ggplot` object.
 #'
+#' @details
+#' For seasonal data, ridge positions are calculated as
+#' `year + (season - 0.5) / n_seasons`. When `annual = TRUE`, seasonal data
+#' are aggregated with `seasonSums()`.
+#'
 #' @examples
 #' \dontrun{
-#' ## annual, one ridge column per gear
-#' plot_lfd_ridgeline(lapply(lfds, function(x) iter(x, test_iter)),lhpar=lhpars)
-#'
-#' ## seasonal, colour-coded by season, same layout
-#' plot_lfd_ridgeline(lapply(lfd_season, function(x) iter(x, test_iter)))
+#' plot_lfd_ridgeline(lfds, lhpar = lhpars)
+#' plot_lfd_ridgeline(lfd_season, annual = TRUE, lhpar = lhpars)
 #' }
 #'
 #' @export
 plot_lfd_ridgeline <- function(panels, lhpar = NULL, scale = 0.9, cohort_pad = 15,
                                annual = FALSE) {
   
-  if (annual) {
-    panels <- lapply(panels, seasonSums)
-  }
+  if (annual) panels <- lapply(panels, seasonSums)
   
-  df <- do.call(rbind, lapply(names(panels), function(p) {
+  panel_levels <- names(panels)
+  
+  df <- do.call(rbind, lapply(panel_levels, function(p) {
     d <- as.data.frame(panels[[p]], cohort = FALSE)
     d$len <- as.numeric(as.character(d$len))
     d$year <- as.numeric(as.character(d$year))
     d$panel <- p
     d
   }))
+  df$panel <- factor(df$panel, levels = panel_levels)
   
   has_season <- !annual && length(unique(df$season)) > 1
   
@@ -989,26 +950,26 @@ plot_lfd_ridgeline <- function(panels, lhpar = NULL, scale = 0.9, cohort_pad = 1
   
   df$grp <- interaction(df$panel, df$time)
   
-  p <- ggplot2::ggplot(df)
+  p <- ggplot(df)
   
   if (has_season) {
-    p <- p + ggplot2::geom_ribbon(
-      ggplot2::aes(x = len, ymin = time, ymax = time + dens, group = grp, fill = season),
+    p <- p + geom_ribbon(
+      aes(x = len, ymin = time, ymax = time + dens, group = grp, fill = season),
       alpha = 0.8, colour = NA
-    ) + ggplot2::scale_fill_brewer(palette = "Set2", name = "Season")
+    ) + scale_fill_viridis_d(name = "Month", option = "D")
   } else {
-    p <- p + ggplot2::geom_ribbon(
-      ggplot2::aes(x = len, ymin = time, ymax = time + dens, group = grp),
+    p <- p + geom_ribbon(
+      aes(x = len, ymin = time, ymax = time + dens, group = grp),
       fill = "#5B9BD5", alpha = 0.75, colour = NA
     )
   }
   
   p <- p +
-    ggplot2::coord_flip() +
-    ggplot2::facet_wrap(~panel, ncol = 1) +
-    ggplot2::labs(x = "Length (cm)", y = "Year") +
-    ggplot2::theme_bw() +
-    ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
+    coord_flip() +
+    facet_wrap(~panel, ncol = 1) +
+    labs(x = "Length (cm)", y = "Year") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank())
   
   if (!is.null(lhpar)) {
     yr_range <- range(df$time)
@@ -1018,14 +979,14 @@ plot_lfd_ridgeline <- function(panels, lhpar = NULL, scale = 0.9, cohort_pad = 1
     age_grid <- seq(0, -log(1 - 0.98) / k, by = 0.1)
     
     ref <- do.call(rbind, lapply(cohorts, function(cy) {
-      L <- linf * (1 - exp(-k * (age_grid + t0)))
+      L <- linf * (1 - exp(-k * (age_grid - t0)))
       data.frame(t = age_grid + cy, L = L, cohort = cy)
     }))
     ref <- ref[ref$t >= yr_range[1] & ref$t <= yr_range[2] &
                  ref$L >= len_range[1] & ref$L <= len_range[2], ]
     
-    p <- p + ggplot2::geom_line(
-      data = ref, ggplot2::aes(x = L, y = t, group = cohort),
+    p <- p + geom_line(
+      data = ref, aes(x = L, y = t, group = cohort),
       colour = "grey50", linetype = 2, linewidth = 0.3, inherit.aes = FALSE
     )
   }

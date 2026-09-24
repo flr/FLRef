@@ -106,4 +106,4 @@ export(lfd.sim.season)
 export(seasonalize_catch_n_gear)
 export(plot_lfd_season)
 export(plot_lfd_ridgeline)
-
+export(sel_a_seasonal_avg)

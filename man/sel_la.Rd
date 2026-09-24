@@ -2,7 +2,7 @@
 % Please edit documentation in R/sel_la.R
 \name{sel_la}
 \alias{sel_la}
-\title{Generate selectivity-at-length and selectivity-at-age}
+\title{Construct selectivity-at-length and selectivity-at-age}
 \usage{
 sel_la(
   lhpar,
@@ -23,93 +23,53 @@ sel_la(
 )
 }
 \arguments{
-\item{lhpar}{Named numeric vector or named object containing life-history
-parameters. Must include at least `linf`, `k`, and `t0`.}
+\item{lhpar}{Life-history parameters containing `linf`, `k`, and `t0`.}
 
-\item{amin}{Integer. Minimum age for the age-based selectivity vector.
-Default is `0`.}
+\item{amin, amax}{Integer minimum and maximum ages. Defaults to `0` and `20`.}
 
-\item{amax}{Integer. Maximum age for the age-based selectivity vector.
-Default is `20`.}
+\item{type}{Selectivity curve: `"logistic"`, `"normal"`, or `"dnormal"`.}
 
-\item{type}{Character. Selectivity type. One of `"logistic"`, `"normal"`,
-or `"dnormal"`.}
+\item{lmin}{Numeric lower limit of the length grid. Defaults to `3`.}
 
-\item{lmin}{Numeric. Lower bound of the first length bin. Default is `3`.}
+\item{lmax}{Optional numeric upper limit of the length grid. When `NULL`,
+it is calculated from `linf * lmax_mult`.}
 
-\item{lmax}{Numeric. Upper length limit used to construct length bins.
-If `NULL`, this is set to `ceiling(linf * lmax_mult)`.}
+\item{binwidth}{Numeric length-bin width. Defaults to `1`.}
 
-\item{binwidth}{Numeric. Width of length bins. Default is `1`.}
+\item{lmax_mult}{Numeric multiplier applied to `linf` when `lmax` is
+`NULL`. Defaults to `1.1`.}
 
-\item{lmax_mult}{Numeric. Multiplier applied to `linf` when `lmax = NULL`.
-Default is `1.1`.}
+\item{L50, L95}{Lengths at 50 and 95 percent selectivity for a logistic
+curve.}
 
-\item{L50}{Numeric. Length at 50 percent selectivity for logistic
-selectivity. Required when `type = "logistic"`.}
+\item{Lpeak}{Length at maximum selectivity for normal and double-normal
+curves.}
 
-\item{L95}{Numeric. Length at 95 percent selectivity for logistic
-selectivity. Required when `type = "logistic"`.}
+\item{sd}{Standard deviation of a normal curve.}
 
-\item{Lpeak}{Numeric. Peak selectivity length for normal or double-normal
-selectivity. Required when `type = "normal"` or `type = "dnormal"`.}
+\item{sd_left, sd_right}{Standard deviations of the ascending and descending
+limbs of a double-normal curve.}
 
-\item{sd}{Numeric. Standard deviation of the normal selectivity curve.
-Required when `type = "normal"`.}
-
-\item{sd_left}{Numeric. Standard deviation of the ascending limb of the
-double-normal selectivity curve. Required when `type = "dnormal"`.
-Default is `0.3`.}
-
-\item{sd_right}{Numeric. Standard deviation of the descending limb of the
-double-normal selectivity curve. Required when `type = "dnormal"`.
-Default is `0.6`.}
-
-\item{scale}{Logical. Should selectivity-at-length and selectivity-at-age be
-scaled independently to a maximum of one? Default is `TRUE`.}
+\item{scale}{Logical; if `TRUE`, scale the length and age curves separately
+to a maximum of one.}
 }
 \value{
-A named list with:
-\itemize{
-  \item `sel_len`: selectivity-at-length as an `FLQuant`, with the `len`
-  dimension storing lower length-bin limits.
-  \item `sel_a`: selectivity-at-age as an `FLQuant`.
-  \item `len_bins`: data frame containing lower, upper and midpoint of each
-  length bin.
-}
+A list with components `sel_len`, an `FLQuant` of
+  selectivity-at-length; `sel_a`, an `FLQuant` of selectivity-at-age; and
+  `len_bins`, a data frame of lower, upper, and midpoint lengths.
 }
 \description{
-Generates length-based gear selectivity and converts it to selectivity-at-age
-using von Bertalanffy growth parameters. The function returns both
-selectivity-at-length and selectivity-at-age as `FLQuant` objects.
+Evaluates a logistic, normal, or double-normal selectivity curve on a
+length grid and maps the same curve to predicted length-at-age.
 }
 \details{
-Length bins are stored in the `FLQuant` `len` dimension as lower bin limits.
-Selectivity is evaluated at the corresponding bin midpoints:
-
-`mid = lower + binwidth / 2`
-
-Selectivity-at-age is obtained by predicting length-at-age from the
-von Bertalanffy growth curve:
-
-`L[a] = Linf * (1 - exp(-k * (a - t0)))`
-
-The function uses `t0 + 0.5` when predicting length-at-age, which approximates
-mid-year length-at-age.
-
-The following selectivity curves are supported:
-
-\itemize{
-  \item logistic, specified by `L50` and `L95`;
-  \item normal, specified by `Lpeak` and `sd`;
-  \item double-normal, specified by `Lpeak`, `sd_left`, and `sd_right`.
-}
-The helper functions `sel_logistic_len()`, `sel_normal_len()` and
-`sel_dnormal_len()` must be available in the namespace.
+Length-dimension labels contain lower bin limits, while selectivity is
+evaluated at bin midpoints. The returned age curve is a point evaluation at
+predicted length-at-age. Use [build_gear()] when selectivity-at-age must be
+integrated over a length-at-age distribution.
 }
 \examples{
 \dontrun{
-## Logistic linefish selectivity
 linefish <- sel_la(
   lhpar = lhpar,
   amin = 0,
@@ -118,16 +78,12 @@ linefish <- sel_la(
   L50 = 35,
   L95 = 50
 )
-
-## Dome-shaped gillnet selectivity
 gillnet <- sel_la(
   lhpar = lhpar,
   type = "normal",
   Lpeak = 35,
   sd = 10
 )
-
-## Asymmetric double-normal trap selectivity
 traps <- sel_la(
   lhpar = lhpar,
   type = "dnormal",
@@ -135,7 +91,6 @@ traps <- sel_la(
   sd_left = 8,
   sd_right = 25
 )
-
 plot_sel_la(traps)
 }
 

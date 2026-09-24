@@ -2,24 +2,23 @@
 % Please edit documentation in R/lensim.R
 \name{plot_lfd_season}
 \alias{plot_lfd_season}
-\title{Season-coloured length-frequency diagnostic, one panel per gear}
+\title{Plot seasonal length-frequency distributions}
 \usage{
 plot_lfd_season(lfd_season, year, iter = 1)
 }
 \arguments{
-\item{lfd_season}{Named list of `FLQuant`s, one per gear, each with a
-populated `season` dimension (e.g. from [lfd.sim.season()]).}
+\item{lfd_season}{Named list of seasonal length-frequency `FLQuant` objects.}
 
-\item{year}{Character or numeric. Which year to plot.}
+\item{year}{Character or numeric year to plot.}
 
-\item{iter}{Integer. Which iteration to plot. Default `1`.}
+\item{iter}{Integer simulation iteration. Defaults to `1`.}
 }
 \value{
-A `ggplot` object: length on x, sampled count on y, one line
-  per season (coloured), faceted by gear.
+A `ggplot` object.
 }
 \description{
-Season-coloured length-frequency diagnostic, one panel per gear
+Plots seasonal length-frequency distributions for a selected year, with
+seasons distinguished by colour and gears shown in separate panels.
 }
 \examples{
 \dontrun{

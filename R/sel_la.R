@@ -58,79 +58,42 @@ sel_dnormal_len <- function(L, Lpeak, sd_left, sd_right) {
 }
 
 
-#' Generate selectivity-at-length and selectivity-at-age
+#' Construct selectivity-at-length and selectivity-at-age
 #'
-#' Generates length-based gear selectivity and converts it to selectivity-at-age
-#' using von Bertalanffy growth parameters. The function returns both
-#' selectivity-at-length and selectivity-at-age as `FLQuant` objects.
+#' Evaluates a logistic, normal, or double-normal selectivity curve on a
+#' length grid and maps the same curve to predicted length-at-age.
 #'
-#' @param lhpar Named numeric vector or named object containing life-history
-#'   parameters. Must include at least `linf`, `k`, and `t0`.
-#' @param amin Integer. Minimum age for the age-based selectivity vector.
-#'   Default is `0`.
-#' @param amax Integer. Maximum age for the age-based selectivity vector.
-#'   Default is `20`.
-#' @param type Character. Selectivity type. One of `"logistic"`, `"normal"`,
-#'   or `"dnormal"`.
-#' @param lmin Numeric. Lower bound of the first length bin. Default is `3`.
-#' @param lmax Numeric. Upper length limit used to construct length bins.
-#'   If `NULL`, this is set to `ceiling(linf * lmax_mult)`.
-#' @param binwidth Numeric. Width of length bins. Default is `1`.
-#' @param lmax_mult Numeric. Multiplier applied to `linf` when `lmax = NULL`.
-#'   Default is `1.1`.
-#' @param L50 Numeric. Length at 50 percent selectivity for logistic
-#'   selectivity. Required when `type = "logistic"`.
-#' @param L95 Numeric. Length at 95 percent selectivity for logistic
-#'   selectivity. Required when `type = "logistic"`.
-#' @param Lpeak Numeric. Peak selectivity length for normal or double-normal
-#'   selectivity. Required when `type = "normal"` or `type = "dnormal"`.
-#' @param sd Numeric. Standard deviation of the normal selectivity curve.
-#'   Required when `type = "normal"`.
-#' @param sd_left Numeric. Standard deviation of the ascending limb of the
-#'   double-normal selectivity curve. Required when `type = "dnormal"`.
-#'   Default is `0.3`.
-#' @param sd_right Numeric. Standard deviation of the descending limb of the
-#'   double-normal selectivity curve. Required when `type = "dnormal"`.
-#'   Default is `0.6`.
-#' @param scale Logical. Should selectivity-at-length and selectivity-at-age be
-#'   scaled independently to a maximum of one? Default is `TRUE`.
+#' @param lhpar Life-history parameters containing `linf`, `k`, and `t0`.
+#' @param amin,amax Integer minimum and maximum ages. Defaults to `0` and `20`.
+#' @param type Selectivity curve: `"logistic"`, `"normal"`, or `"dnormal"`.
+#' @param lmin Numeric lower limit of the length grid. Defaults to `3`.
+#' @param lmax Optional numeric upper limit of the length grid. When `NULL`,
+#'   it is calculated from `linf * lmax_mult`.
+#' @param binwidth Numeric length-bin width. Defaults to `1`.
+#' @param lmax_mult Numeric multiplier applied to `linf` when `lmax` is
+#'   `NULL`. Defaults to `1.1`.
+#' @param L50,L95 Lengths at 50 and 95 percent selectivity for a logistic
+#'   curve.
+#' @param Lpeak Length at maximum selectivity for normal and double-normal
+#'   curves.
+#' @param sd Standard deviation of a normal curve.
+#' @param sd_left,sd_right Standard deviations of the ascending and descending
+#'   limbs of a double-normal curve.
+#' @param scale Logical; if `TRUE`, scale the length and age curves separately
+#'   to a maximum of one.
 #'
-#' @return A named list with:
-#' \itemize{
-#'   \item `sel_len`: selectivity-at-length as an `FLQuant`, with the `len`
-#'   dimension storing lower length-bin limits.
-#'   \item `sel_a`: selectivity-at-age as an `FLQuant`.
-#'   \item `len_bins`: data frame containing lower, upper and midpoint of each
-#'   length bin.
-#' }
+#' @return A list with components `sel_len`, an `FLQuant` of
+#'   selectivity-at-length; `sel_a`, an `FLQuant` of selectivity-at-age; and
+#'   `len_bins`, a data frame of lower, upper, and midpoint lengths.
 #'
 #' @details
-#' Length bins are stored in the `FLQuant` `len` dimension as lower bin limits.
-#' Selectivity is evaluated at the corresponding bin midpoints:
-#'
-#' `mid = lower + binwidth / 2`
-#'
-#' Selectivity-at-age is obtained by predicting length-at-age from the
-#' von Bertalanffy growth curve:
-#'
-#' `L[a] = Linf * (1 - exp(-k * (a - t0)))`
-#'
-#' The function uses `t0 + 0.5` when predicting length-at-age, which approximates
-#' mid-year length-at-age.
-#'
-#' The following selectivity curves are supported:
-#'
-#' \itemize{
-#'   \item logistic, specified by `L50` and `L95`;
-#'   \item normal, specified by `Lpeak` and `sd`;
-#'   \item double-normal, specified by `Lpeak`, `sd_left`, and `sd_right`.
-#' }
-#' The helper functions `sel_logistic_len()`, `sel_normal_len()` and
-#' `sel_dnormal_len()` must be available in the namespace.
+#' Length-dimension labels contain lower bin limits, while selectivity is
+#' evaluated at bin midpoints. The returned age curve is a point evaluation at
+#' predicted length-at-age. Use [build_gear()] when selectivity-at-age must be
+#' integrated over a length-at-age distribution.
 #'
 #' @examples
 #' \dontrun{
-#' ## Logistic linefish selectivity
 #' linefish <- sel_la(
 #'   lhpar = lhpar,
 #'   amin = 0,
@@ -139,16 +102,12 @@ sel_dnormal_len <- function(L, Lpeak, sd_left, sd_right) {
 #'   L50 = 35,
 #'   L95 = 50
 #' )
-#'
-#' ## Dome-shaped gillnet selectivity
 #' gillnet <- sel_la(
 #'   lhpar = lhpar,
 #'   type = "normal",
 #'   Lpeak = 35,
 #'   sd = 10
 #' )
-#'
-#' ## Asymmetric double-normal trap selectivity
 #' traps <- sel_la(
 #'   lhpar = lhpar,
 #'   type = "dnormal",
@@ -156,7 +115,6 @@ sel_dnormal_len <- function(L, Lpeak, sd_left, sd_right) {
 #'   sd_left = 8,
 #'   sd_right = 25
 #' )
-#'
 #' plot_sel_la(traps)
 #' }
 #'
@@ -911,105 +869,47 @@ plot_sel_age <- function(object,
   
   p
 }
-# {{{ 
-# build_gear.R
-#
-# Consolidated, gear_cfg-based build_gear(): takes a flat, named list of
-# per-gear configs and returns a named list of built gears in one call.
-#
-#   om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = ages,
-#                           lmin = len_min, lmax_mult = len_max, bin = len_bin,
-#                           timing = sample_timing)
-#
-# gear_cfg is e.g.:
-#   gear_cfg <- list(
-#     Ringnet = list(type = "dnormal", Lpeak = 7.3, sd_left = 0.7,
-#                     sd_right = 11.4, f_mult = 0.70, ess_age = 50, ess_len = 500),
-#     Gillnet = list(type = "normal", Lpeak = 39.7, sd = 10.6,
-#                     f_mult = 0.30, ess_age = 30, ess_len = 300)
-#   )
-#
-# Reserved keys per gear (everything else in a gear's list is passed
-# straight through to sel_la() as its selectivity parameters):
-#   type, f_mult, ess_age, ess_len
-#
-# Depends on FLRef::sel_la() and FLRef::iALK() already being available.
-
-#' Build all gears' selectivity, conditional ALK, and sampling config
+#' Build gear selectivity and sampling configurations
 #'
-#' Consolidates everything a length-sampling OEM needs, for every gear in
-#' `gear_cfg`, into one call: selectivity-at-length, selectivity-at-age
-#' (both via `sel_la()`), the conditional inverse age-length key
-#' \eqn{P(l \mid a, \text{caught by gear})} (via `iALK()`), and each gear's
-#' observation-process assumptions (`ess_age`, `ess_len`).
+#' Constructs selectivity-at-length, integrated selectivity-at-age, a
+#' capture-conditioned inverse age-length key, and observation sample sizes
+#' for each gear in a multigear operating model.
 #'
-#' `sel_la()` and `iALK()` express their length-range argument differently:
-#' `sel_la(lmax=...)` is an *absolute* upper length, while `iALK(lmax=...)`
-#' is a *multiplier on linf*. `build_gear()` takes a single `lmax_mult` and
-#' derives the correct form for each, then reconciles the two resulting
-#' length grids (they can legitimately differ by one bin at the top: see
-#' the reconciliation block below).
+#' @param gear_cfg Named list of gear configurations. Each gear must contain
+#'   `type`, `f_mult`, `ess_age`, and `ess_len`; remaining entries are passed
+#'   to [sel_la()] as selectivity parameters.
+#' @param lhpar Life-history parameters containing `linf`, `k`, and `t0`.
+#' @param age Numeric vector of ages.
+#' @param amin,amax Integer minimum and maximum ages passed to [sel_la()].
+#' @param lmin Numeric lower limit of the length grid. Defaults to `5`.
+#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
+#'   limit. Defaults to `1.2`.
+#' @param bin Numeric length-bin width. Defaults to `1`.
+#' @param cv Numeric coefficient of variation in length-at-age. Defaults to
+#'   `0.1`.
+#' @param timing Numeric within-year timing expressed as a fraction of a year.
+#'   Growth at time `t` is evaluated using `t0 - t`. Defaults to `0`.
+#' @param scale Logical; if `TRUE`, scale selectivity curves to a maximum of
+#'   one.
 #'
-#' The conditional ALK is built as
-#' \deqn{P(l \mid a, g) = \dfrac{P(l \mid a)\, s_g(l)}{\sum_l P(l \mid a)\, s_g(l)}}
-#' i.e. the biological inverse ALK re-weighted by the gear's length
-#' selectivity and renormalised so each age row sums to 1 (rows with zero
-#' gear-selected probability are set to 0 rather than divided by zero).
-#'
-#' @param gear_cfg Named list of per-gear configs (see file header for an
-#'   example). Each gear's list must include `type`
-#'   (`"logistic"`/`"normal"`/`"dnormal"`), `f_mult`, `ess_age`, `ess_len`;
-#'   every other entry is passed to `sel_la()` as a selectivity parameter
-#'   for that `type` (e.g. `Lpeak`/`sd_left`/`sd_right` for `"dnormal"`).
-#' @param lhpar `FLPar` or named numeric vector with at least `linf`, `k`,
-#'   `t0`. Passed to both `sel_la()` and `iALK()`, shared across all gears.
-#' @param age Integer vector of ages, e.g. `0:30`.
-#' @param amin,amax Integer. Passed through to `sel_la()`; default to
-#'   `range(age)` if not supplied.
-#' @param lmin Numeric. Lower bound of the first length bin. Default `5`.
-#' @param lmax_mult Numeric. Multiplier on `linf` defining the upper length
-#'   bound, applied consistently to both `sel_la()` and `iALK()`.
-#'   Default `1.2`.
-#' @param bin Numeric. Length-bin width, passed to both functions as
-#'   `binwidth`/`bin`. Default `1`.
-#' @param cv Numeric. CV of length-at-age used by `iALK()`. Default `0.1`.
-#' @param timing Numeric, fraction of a year. Within-year growth timing
-#'   applied to each gear's internal `iALK()` (used for
-#'   `sel_len`/`sel_a`/`condALK`), via `t0' = t0 - timing` (so
-#'   `L(age + timing)` is evaluated on the unmodified integer `age` grid --
-#'   the same sign convention used elsewhere in this OM, e.g.
-#'   `t0 - sample_timing` for `invALK_bio`). Default `0` (growth evaluated
-#'   exactly at each integer age) for backward compatibility; pass
-#'   `timing = sample_timing` to make every gear's own ALK consistent with
-#'   a mid-year (or other) convention used elsewhere in the OM.
-#'
-#' `sel_a` is NOT taken from `sel_la()`'s own `sel_a` output. `sel_la()`
-#' evaluates the selectivity curve at a single length-at-age value,
-#' \eqn{s_g(\bar L(a))} (and, in some versions, does so at the wrong
-#' within-year timing internally -- check your installed `sel_la()`
-#' against the sign convention above before trusting it standalone). What
-#' a gear actually catches at age \eqn{a} is the length-selectivity curve
-#' integrated over the full distribution of length at that age,
-#' \eqn{s_{g,a}=\sum_l P(l\mid a,t)\,s_g(l)} -- exactly the row totals
-#' already computed below while building `condALK`, before they are
-#' renormalised to sum to 1. `build_gear()` uses that integrated value
-#' instead, so `sel_a` and `condALK` are always mutually consistent and
-#' correctly timed, regardless of `sel_la()`'s own internal correctness.
-#' @param scale Logical. Passed to `sel_la()`; scale `sel_len`/`sel_a`
-#'   independently to a max of 1. Default `TRUE`.
-#'
-#' @return A named list (names = `names(gear_cfg)`), each element a list:
+#' @return A named list with one gear object per element. Each gear contains:
 #' \describe{
 #'   \item{name}{Gear name.}
-#'   \item{sel_len}{`FLQuant`, selectivity-at-length (from `sel_la()`).}
-#'   \item{sel_a}{`FLQuant`, selectivity-at-age (from `sel_la()`).}
-#'   \item{len_bins}{`data.frame` of length-bin lower/upper/mid, shared by
-#'     `sel_len` and `condALK`.}
-#'   \item{condALK}{Numeric matrix, age (rows) x len (cols), rows sum to 1:
-#'     \eqn{P(l \mid a, \text{caught by gear})}.}
-#'   \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
-#'   \item{lhpar}{As supplied (needed as `lfd.sim()`'s default `params`).}
+#'   \item{sel_len}{Selectivity-at-length as an `FLQuant`.}
+#'   \item{sel_a}{ALK-integrated selectivity-at-age as an `FLQuant`.}
+#'   \item{len_bins}{Data frame of length-bin limits and midpoints.}
+#'   \item{condALK}{Matrix containing \eqn{P(l \mid a,g)}.}
+#'   \item{f_mult, ess_age, ess_len}{Values supplied in `gear_cfg`.}
+#'   \item{lhpar}{Life-history parameters supplied in `lhpar`.}
 #' }
+#'
+#' @details
+#' Integrated selectivity-at-age is
+#' \deqn{s_{g,a}=\sum_l P(l\mid a,t)s_g(l).}
+#' The conditional inverse age-length key is
+#' \deqn{P(l\mid a,g)=\frac{P(l\mid a,t)s_g(l)}{s_{g,a}}.}
+#' The length grids created by [sel_la()] and [iALK()] are reconciled at the
+#' upper plus group before these quantities are calculated.
 #'
 #' @examples
 #' \dontrun{
@@ -1025,11 +925,6 @@ plot_sel_age <- function(object,
 #'
 #' om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = ages,
 #'                         timing = 0.5)
-#'
-#' ## sanity checks before trusting it further
-#' plot_sel_la(om_gears, len_by = 5, age_by = 1)
-#' stopifnot(all.equal(rowSums(om_gears$Ringnet$condALK),
-#'                      rep(1, nrow(om_gears$Ringnet$condALK)), tolerance = 1e-6))
 #' }
 #'
 #' @export
@@ -1132,8 +1027,8 @@ build_gear <- function(gear_cfg, lhpar, age,
         "Gear '", name, "': iALK()'s plus-group bin ('", extra_in_ialk,
         "'+) has no corresponding sel_la() bin. Carrying the last modelled ",
         "selectivity value (", round(tail(sel_len_vec, 1), 3),
-        ") forward to cover it -- confirm selectivity has genuinely plateaued ",
-        "by this length before trusting that assumption."
+        ") forward to cover it. Confirm that selectivity has plateaued ",
+        "by this length."
       )
       sel_len_vec[extra_in_ialk] <- tail(sel_len_vec, 1)
     }
@@ -1196,12 +1091,179 @@ build_gear <- function(gear_cfg, lhpar, age,
   )
 }
 
+
+#' Calculate seasonally averaged selectivity-at-age
+#'
+#' Integrates selectivity-at-length over the length-at-age distribution at
+#' seasonal midpoint timings and averages the resulting selectivity-at-age
+#' curves across seasons.
+#'
+#' @param lhpar Life-history parameters containing `linf`, `k`, and `t0`.
+#' @param sel_len Selectivity-at-length as an `FLQuant` or named numeric
+#'   vector.
+#' @param age Numeric vector of ages.
+#' @param n_seasons Integer number of equal within-year seasons.
+#' @param model Growth function or model object. Defaults to `vonbert`.
+#' @param reflen Optional reference length passed to [iALK()].
+#' @param cv Numeric coefficient of variation in length-at-age.
+#' @param lmin Numeric lower limit of the length grid.
+#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
+#'   limit.
+#' @param bin Numeric length-bin width.
+#' @param scale Logical; if `TRUE`, scale the averaged curve to a maximum of
+#'   one.
+#'
+#' @return A named numeric vector of seasonally averaged selectivity-at-age.
+#'
+#' @details
+#' Seasonal midpoint `s` is evaluated at
+#' `t = (s - 0.5) / n_seasons`. Within-year growth is represented by replacing
+#' `t0` with `t0 - t` in the growth parameters.
+#'
+#' @examples
+#' \dontrun{
+#' sel_a <- sel_a_seasonal_avg(
+#'   lhpars,
+#'   om_gears$Trawl$sel_len,
+#'   age = 0:5,
+#'   n_seasons = 4
+#' )
+#' }
+#'
+#' @export
+sel_a_seasonal_avg <- function(lhpar, sel_len, age, n_seasons,
+                               model = vonbert, reflen = NULL, cv = 0.1,
+                               lmin = 5, lmax_mult = 1.2, bin = 1, scale = TRUE) {
+  
+  sel_len_vec <- if (inherits(sel_len, "FLQuant")) {
+    v <- as.numeric(sel_len); names(v) <- dimnames(sel_len)$len; v
+  } else sel_len
+  
+  linf <- c(lhpar["linf"]); k <- c(lhpar["k"]); t0 <- c(lhpar["t0"])
+  
+  sel_a_mat <- sapply(seq_len(n_seasons), function(s) {
+    t <- (s - 0.5) / n_seasons
+    ialk_t <- iALK(
+      params = c(linf = linf, k = k, t0 = t0 - t),   # note: t0 - t, see note above
+      model = model, age = age, lmax = lmax_mult, reflen = reflen,
+      bin = bin, lmin = lmin
+    )
+    ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
+    dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
+    
+    sv <- sel_len_vec[colnames(ialk_mat)]; sv[is.na(sv)] <- 0
+    as.numeric(ialk_mat %*% sv)
+  })
+  
+  sel_a <- rowMeans(sel_a_mat)
+  names(sel_a) <- as.character(age)
+  
+  if (scale) sel_a <- sel_a / max(sel_a)
+  
+  sel_a
+}
+
+#' Calculate seasonally weighted weight-at-age
+#'
+#' Calculates weight-at-age at seasonal midpoint timings and averages across
+#' seasons using seasonal numbers-at-age as weights.
+#'
+#' @param n_season An `FLQuant` containing seasonal population or catch
+#'   numbers-at-age.
+#' @param params Life-history parameters containing `linf`, `k`, `t0`, `a`,
+#'   and `b`.
+#' @param gear Optional gear object returned by [build_gear()]. If supplied,
+#'   the age-length key is conditioned on the gear's selectivity-at-length.
+#' @param n_seasons Integer number of equal within-year seasons.
+#' @param model Growth function or model object. Defaults to `vonbert`.
+#' @param reflen Optional reference length passed to [iALK()].
+#' @param cv Numeric coefficient of variation in length-at-age.
+#' @param lmin Numeric lower limit of the length grid.
+#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
+#'   limit.
+#' @param bin Numeric length-bin width.
+#'
+#' @return An `FLQuant` containing seasonally weighted weight-at-age by year
+#'   and iteration.
+#'
+#' @details
+#' When `gear` is supplied, seasonal catch numbers weight a
+#' capture-conditioned age-length key. When `gear = NULL`, the biological key
+#' is weighted by seasonal population numbers.
+#'
+#' @examples
+#' \dontrun{
+#' catch_wt <- wt_a_seasonal(
+#'   seasonal_catch$Trawl,
+#'   lhpars,
+#'   gear = om_gears$Trawl,
+#'   n_seasons = 4
+#' )
+#' }
+#'
+#' @export
+wt_a_seasonal <- function(n_season, params, gear = NULL, n_seasons,
+                          model = vonbert, reflen = NULL, cv = 0.1,
+                          lmin = 5, lmax_mult = 1.2, bin = 1) {
+  
+  age <- an(dimnames(n_season)$age)
+  years <- dimnames(n_season)$year
+  its <- dims(n_season)$iter
+  linf <- c(params["linf"]); k <- c(params["k"]); t0 <- c(params["t0"])
+  a_par <- c(params["a"]); b_par <- c(params["b"])
+  
+  sel_len_vec <- if (!is.null(gear)) {
+    v <- as.numeric(gear$sel_len); names(v) <- dimnames(gear$sel_len)$len; v
+  } else NULL
+  
+  W_mat <- sapply(seq_len(n_seasons), function(s) {
+    t <- (s - 0.5) / n_seasons
+    ialk_t <- iALK(
+      params = c(linf = linf, k = k, t0 = t0 - t),   # note: t0 - t, see note above
+      model = model, age = age, lmax = lmax_mult, reflen = reflen,
+      bin = bin, lmin = lmin
+    )
+    ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
+    dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
+    
+    if (!is.null(sel_len_vec)) {
+      sv <- sel_len_vec[colnames(ialk_mat)]; sv[is.na(sv)] <- 0
+      ialk_mat <- condition_alk(ialk_mat, sv)
+    }
+    
+    len_mid <- an(colnames(ialk_mat)) + bin / 2
+    as.numeric(ialk_mat %*% (a_par * len_mid^b_par))
+  })
+  
+  out <- FLQuant(
+    NA_real_,
+    dimnames = list(age = age, year = years, unit = "unique",
+                    season = "all", area = "unique", iter = seq_len(its))
+  )
+  
+  for (y in seq_along(years)) {
+    for (i in seq_len(its)) {
+      n_mat <- sapply(seq_len(n_seasons), function(s)
+        as.numeric(n_season[, y, , s, , i]))
+      
+      num <- rowSums(n_mat * W_mat)
+      den <- rowSums(n_mat)
+      wt <- ifelse(den > 0, num / den, W_mat[, ceiling(n_seasons / 2)])
+      
+      out[, y, , , , i] <- wt
+    }
+  }
+  
+  out
+}
+
+
 # }}}
 
 #' Heatmap of a gear's conditional inverse ALK
 #'
 #' ggplot equivalent of `image(gear$condALK)`: a length-at-age probability
-#' heatmap, \eqn{P(l \mid a, \text{caught by gear})}, with proper axis
+#' heatmap, \eqn{P(l \mid a,g)}, with labelled axes
 #' labels and a colour scale instead of `image()`'s default palette.
 #'
 #' If `params` is supplied, two mean length-at-age lines are overlaid on
@@ -1353,3 +1415,92 @@ plot_condALK_bias <- function(om_gears, params,
     ggplot2::theme_bw()
 }
 
+
+#' Compare single-timing and seasonal selectivity-at-age
+#'
+#' Plots the selectivity-at-age stored in a gear object together with the
+#' corresponding seasonally averaged curve. Individual seasonal curves can
+#' be displayed as reference lines.
+#'
+#' @param gear Gear object returned by [build_gear()].
+#' @param lhpar Life-history parameters containing `linf`, `k`, and `t0`.
+#' @param age Numeric vector of ages.
+#' @param n_seasons Integer number of equal within-year seasons.
+#' @param show_seasons Logical; if `TRUE`, add the individual seasonal curves.
+#' @param model Growth function or model object. Defaults to `vonbert`.
+#' @param reflen Optional reference length passed to [iALK()].
+#' @param cv Numeric coefficient of variation in length-at-age.
+#' @param lmin Numeric lower limit of the length grid.
+#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
+#'   limit.
+#' @param bin Numeric length-bin width.
+#'
+#' @return A `ggplot` object.
+#'
+#' @examples
+#' \dontrun{
+#' plot_sel_a_seasonal(
+#'   om_gears$Trawl,
+#'   lhpars,
+#'   age = 0:5,
+#'   n_seasons = 12
+#' )
+#' }
+#'
+#' @export
+plot_sel_a_seasonal <- function(gear, lhpar, age, n_seasons,
+                                show_seasons = TRUE,
+                                model = vonbert, reflen = NULL, cv = 0.1,
+                                lmin = 5, lmax_mult = 1.2, bin = 1) {
+  
+  sel_len_vec <- as.numeric(gear$sel_len)
+  names(sel_len_vec) <- dimnames(gear$sel_len)$len
+  
+  linf <- c(lhpar["linf"]); k <- c(lhpar["k"]); t0 <- c(lhpar["t0"])
+  
+  season_df <- do.call(rbind, lapply(seq_len(n_seasons), function(s) {
+    t <- (s - 0.5) / n_seasons
+    ialk_t <- iALK(
+      params = c(linf = linf, k = k, t0 = t0 - t),
+      model = model, age = age, lmax = lmax_mult, reflen = reflen,
+      bin = bin, lmin = lmin
+    )
+    ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
+    dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
+    sv <- sel_len_vec[colnames(ialk_mat)]; sv[is.na(sv)] <- 0
+    data.frame(age = age, sel = as.numeric(ialk_mat %*% sv), season = factor(s))
+  }))
+  
+  sel_avg <- sel_a_seasonal_avg(lhpar, gear$sel_len, age, n_seasons,
+                                model = model, reflen = reflen, cv = cv,
+                                lmin = lmin, lmax_mult = lmax_mult, bin = bin)
+  
+  main_df <- rbind(
+    data.frame(age = age, sel = as.numeric(gear$sel_a), method = "Single timing (naive)"),
+    data.frame(age = age, sel = sel_avg, method = "Seasonally averaged")
+  )
+  
+  p <- ggplot()
+  
+  if (show_seasons) {
+    p <- p + geom_line(
+      data = season_df, aes(x = age, y = sel, group = season),
+      colour = "grey20", linewidth = 0.4, linetype = 3
+    )
+  }
+  
+  p +
+    geom_line(data = main_df, aes(x = age, y = sel, colour = method), linewidth = 1) +
+    geom_point(data = main_df, aes(x = age, y = sel, colour = method), size = 1.5) +
+    scale_colour_manual(
+      values = c("Single timing (naive)" = "#C0504D", "Seasonally averaged" = "#5B9BD5"),
+      name = NULL
+    ) +
+    labs(
+      x = "Age", y = "Selectivity",
+      title = paste0(gear$name, ": naive vs seasonally-averaged selectivity-at-age"),
+      subtitle = if (show_seasons) "Grey dotted lines: individual within-year season curves" else NULL
+    ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+}

@@ -2,7 +2,7 @@
 % Please edit documentation in R/lensim.R
 \name{plot_lfd_ridgeline}
 \alias{plot_lfd_ridgeline}
-\title{Ridgeline plot of length-frequency samples over time (annual or seasonal)}
+\title{Plot length-frequency distributions as temporal ridgelines}
 \usage{
 plot_lfd_ridgeline(
   panels,
@@ -13,46 +13,36 @@ plot_lfd_ridgeline(
 )
 }
 \arguments{
-\item{panels}{Named list of `FLQuant`s (names become facet/panel
-labels, typically gear names), each with `len` and `year`
-dimensions, single iteration. May carry a real `season` dimension.}
+\item{panels}{Named list of length-frequency `FLQuant` objects. List names
+determine panel order and labels.}
 
-\item{lhpar}{Optional `FLPar`/named vector with `linf`, `k`, `t0` for
-dashed diagonal cohort reference lines. `NULL` (default) skips them.}
+\item{lhpar}{Optional growth parameters containing `linf`, `k`, and `t0`
+for cohort reference lines.}
 
-\item{scale}{Numeric. Controls how far each ridge protrudes, relative
-to the spacing between time points (a year, or a season-slot if
-seasonal). Default `0.9`.}
+\item{scale}{Numeric ridge-height multiplier. Defaults to `0.9`.}
 
-\item{cohort_pad}{Integer. Extra cohorts drawn beyond the plotted time
-range at each end (only used when `lhpar` is supplied). Default `15`.}
+\item{cohort_pad}{Integer number of additional cohorts generated beyond
+each end of the plotted time range. Defaults to `15`.}
+
+\item{annual}{Logical; if `TRUE`, sum the season dimension before plotting.}
 }
 \value{
 A `ggplot` object.
 }
 \description{
-Plots one or more length-frequency `FLQuant`s (e.g. sampled LFDs from
-[lfd.sim()]/[lfd.sim.season()], keyed by gear) as ridges along a
-continuous time axis via `geom_ribbon()` + `coord_flip()`, faceted by
-panel (gear).
+Displays annual or seasonal length-frequency distributions along a
+continuous time axis, with one panel per gear. Optional von Bertalanffy
+cohort trajectories can be overlaid for reference.
 }
 \details{
-If any panel carries a real `season` dimension, each season's ridge is
-placed at its actual fractional-year position (`year + (season - 0.5)
-/ n_seasons`), so seasons appear in chronological order within each
-year rather than as separate facet rows, and are distinguished by
-fill colour rather than by expanding the grid.
-
-Cohort-tracking VBGF reference lines are optional: pass `lhpar` to
-overlay them, or leave `NULL` (default) for ridges only.
+For seasonal data, ridge positions are calculated as
+`year + (season - 0.5) / n_seasons`. When `annual = TRUE`, seasonal data
+are aggregated with `seasonSums()`.
 }
 \examples{
 \dontrun{
-## annual, one ridge column per gear
-plot_lfd_ridgeline(lapply(lfds, function(x) iter(x, test_iter)),lhpar=lhpars)
-
-## seasonal, colour-coded by season, same layout
-plot_lfd_ridgeline(lapply(lfd_season, function(x) iter(x, test_iter)))
+plot_lfd_ridgeline(lfds, lhpar = lhpars)
+plot_lfd_ridgeline(lfd_season, annual = TRUE, lhpar = lhpars)
 }
 
 }

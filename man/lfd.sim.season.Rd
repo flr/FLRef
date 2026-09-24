@@ -2,7 +2,7 @@
 % Please edit documentation in R/lensim.R
 \name{lfd.sim.season}
 \alias{lfd.sim.season}
-\title{Seasonal length-frequency samples from a season-structured operating model}
+\title{Simulate seasonal length-frequency samples}
 \usage{
 lfd.sim.season(
   object,
@@ -15,60 +15,39 @@ lfd.sim.season(
 )
 }
 \arguments{
-\item{object}{`FLQuant` with a real `season` dimension (`dim 4 > 1`),
-e.g. one element of the list returned by [seasonalize_catch_n_gear()].}
+\item{object}{An `FLQuant` containing catch-at-age with a populated season
+dimension.}
 
-\item{gear}{A gear object as returned by [build_gear()].}
+\item{gear}{Gear object returned by [build_gear()].}
 
-\item{n_seasons}{Integer. Number of seasons; defaults to `dim(object)[4]`.}
+\item{n_seasons}{Integer number of seasons. Defaults to the size of the
+season dimension in `object`.}
 
-\item{ess_age, ess_len}{Single value or length-`n_seasons` vector; see
-Details. Default to `gear$ess_age`/`gear$ess_len` (annual total,
-split evenly).}
+\item{ess_age, ess_len}{Effective sample sizes. A scalar is divided equally,
+after rounding, among seasons; a vector of length `n_seasons` specifies
+season-specific values.}
 
-\item{params}{Growth parameters, `FLPar(linf, k, t0)`. Passed to
-[lfd.sim()]; required for the within-season `timing` adjustment.}
+\item{params}{Growth parameters coercible to an `FLPar`; must contain
+`linf`, `k`, and `t0`.}
 
-\item{...}{Passed through to [lfd.sim()] (e.g. `u_age`, `u_len`,
-`scale`, `model`, `reflen`, `cv`, `lmin`, `lmax_mult`, `bin`).}
+\item{...}{Additional arguments passed to [lfd.sim()].}
 }
 \value{
-`FLQuant` with a real `season` dimension (`1:n_seasons`).
+An `FLQuant` containing sampled length frequencies by season, year,
+  and iteration.
 }
 \description{
-Thin wrapper around [lfd.sim()] that loops over each season of a
-season-structured `object` (e.g. from [seasonalize_catch_n_gear()]),
-calling `lfd.sim()` once per season with a within-year `timing` offset
-of `(s - 0.5) / n_seasons`, and assembling the results into a genuine
-`season`-dimensioned `FLQuant` (not a list keyed by season number), so
-`seasonSums()` gives a free round-trip check against the annual total.
+Applies [lfd.sim()] separately to each season of a season-structured
+catch-at-age object. Seasonal midpoint timing is
+`(season - 0.5) / n_seasons`.
 }
 \details{
-`ess_age` and `ess_len` each accept either:
-\itemize{
-  \item a single value -- interpreted as a fixed annual total, split
-    evenly across seasons (`rep(round(ess / n_seasons), n_seasons)`),
-    so the season-summed total matches `gear$ess_age`/`gear$ess_len`
-    exactly (same invariant as the non-seasonal round-trip check); or
-  \item a vector of length `n_seasons` -- interpreted as already being
-    per-season effective sample sizes, used as-is (e.g. `c(20, 10, 50,
-    30)` for uneven seasonal sampling effort, such as a closed season
-    or a fleet that's mostly active in one quarter).
-}
-
-Each season's stage-1 age sample is drawn independently (not shared
-across seasons) -- a real modeling choice (an annual observer
-programme would typically NOT be redrawn each quarter), not just an
-implementation detail. If that doesn't match your sampling design,
-this function needs a different approach (e.g. drawing one annual age
-sample up front and reusing it across seasons).
+A separate stage-1 age sample is drawn for each season. Scalar sample sizes
+are divided using `round(ess / n_seasons)` in every season.
 }
 \examples{
 \dontrun{
-## even split (default): total ess_len matches gear$ess_len
 lfd.sim.season(obj, trawl, n_seasons = 4, params = lhpars)
-
-## uneven seasonal effort, e.g. closed season in Q1
 lfd.sim.season(obj, trawl, n_seasons = 4, ess_len = c(0, 200, 200, 100),
                 params = lhpars)
 }

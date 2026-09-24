@@ -2,7 +2,7 @@
 % Please edit documentation in R/lensim.R
 \name{len.sim}
 \alias{len.sim}
-\title{Generate survey (pulse) or continuous length-frequency samples}
+\title{Simulate length-frequency samples from numbers-at-age}
 \usage{
 len.sim(
   N_a,
@@ -22,72 +22,53 @@ len.sim(
 )
 }
 \arguments{
-\item{N_a}{Numbers (or catch)-at-age `FLQuant`.}
+\item{N_a}{An `FLQuant` containing numbers-at-age or catch-at-age.}
 
-\item{params}{Growth parameters, `FLPar(linf, k, t0)`.}
+\item{params}{Growth parameters coercible to an `FLPar`; the default growth
+model requires `linf`, `k`, and `t0`.}
 
-\item{model}{Growth model. Default `vonbert`.}
+\item{model}{Growth function or model object. Defaults to `vonbert`.}
 
-\item{ess}{Effective sample size, split evenly across `timing` events
-(`round(ess / length(timing))` per event, as in the original).
-Default `250`. If using `gear`, consider passing `gear$ess_len`
-explicitly.}
+\item{ess}{Integer effective sample size. It is divided equally, after
+rounding, among the values in `timing`. Defaults to `250`.}
 
-\item{timing}{Within-year timing of sampling events (as fractions of a
-year added to `t0`). Default `seq(0, 11/12, 1/12)` (roughly monthly,
-continuous sampling); pass a single value (e.g. `0.5`) for a single
-survey pulse.}
+\item{timing}{Numeric vector of sampling times expressed as fractions of a
+year. Growth at time `t` is evaluated using `t0 - t`. Defaults to monthly
+sampling times from `0` to `11/12`.}
 
-\item{unit}{Length unit label. Default `"cm"`.}
+\item{unit}{Character label for the length unit. Defaults to `"cm"`.}
 
-\item{scale}{Logical. If `TRUE` (default), rescale the output so its
-per-year/iter total matches `N_a`'s true total.}
+\item{scale}{Logical; if `TRUE`, rescale each year and iteration to the
+corresponding total in `N_a`.}
 
-\item{reflen, bin, cv, lmin, lmax}{Passed to `iALK()`, as in the original.}
+\item{reflen, bin, cv, lmin, lmax}{Arguments passed to [iALK()].}
 
 \item{gear}{Optional gear object as returned by [build_gear()]. If
-supplied, its `sel_len` is folded into the ALK at every timing event
-via [condition_alk()]. If `NULL` (default), no selectivity weighting
-is applied -- reproduces the original `len.sim()` behaviour exactly.}
+supplied, `gear$sel_len` is incorporated through [condition_alk()].}
 
-\item{u}{Optional list of length `length(timing)`, each element a
-`[ess_t, year, iter]` array of pre-generated `Uniform(0,1)` deviates
-(`ess_t = round(ess / length(timing))`) for CRN-safe sampling via
-[rmultinom_crn()] -- see [rUnif_len()]. If `NULL` (default), falls
-back to `stats::rmultinom()` against the live RNG, i.e. the
-original behaviour.}
+\item{u}{Optional list of common-random-number arrays, one per timing
+event, as returned by [rUnif_len()]. If `NULL`, multinomial samples are
+drawn from the current random-number stream.}
 }
 \value{
-`FLQuant` with a `len` dimension, the sampled length-frequency
-  by year and iter.
+An `FLQuant` containing sampled length frequencies by year and
+  iteration.
 }
 \description{
-Samples a length-frequency distribution from `N_a` by projecting it
-through the biological inverse age-length key at one or more
-within-year timing events (`timing`), optionally re-weighted by a
-gear's length selectivity.
+Projects numbers-at-age through an inverse age-length key at one or more
+within-year sampling times and draws a multinomial length sample. When a
+gear is supplied, the inverse key is conditioned on its
+selectivity-at-length.
 }
 \details{
-Unlike [lfd.sim()]'s two-stage fishery-dependent design (a noisy
-catch-at-age sample feeding a length draw), `len.sim()` samples length
-directly from `N_a` at each timing event and sums across events -- the
-single-stage design appropriate for a survey or continuous sampling
-programme, where `N_a` is already the relevant numbers/catch-at-age
-for that observation process rather than something to be re-sampled
-for age first.
-
-Because growth (`t0 + timing[t]`) shifts within a year, the ALK -- and
-therefore any gear-selectivity weighting applied to it via
-[condition_alk()] -- is rebuilt fresh at each timing event, rather
-than reusing a single pre-built `gear$condALK` as `lfd.sim()` does.
+This is a single-stage length sampler. In contrast, [lfd.sim()] first
+samples catch-at-age at low effective sample size and then conditions the
+length draw on that sampled age composition.
 }
 \examples{
 \dontrun{
-## original behaviour, unchanged: no gear, no CRN
 lfd_survey <- len.sim(stock.n(om)[, "2024"], params = lhpar, ess = 300,
                        timing = 0.5)
-
-## gear-aware, CRN-safe
 u_len <- rUnif_len(trawl, timing = seq(0, 11/12, 1/12),
                     years = an(dimnames(N_a)$year), nsim = dims(N_a)$iter,
                     seed = 456)

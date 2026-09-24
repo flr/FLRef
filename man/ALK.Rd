@@ -2,18 +2,25 @@
 % Please edit documentation in R/lensim.R
 \name{ALK}
 \alias{ALK}
-\title{ALK function}
+\title{Convert an inverse age-length key to an age-length key}
 \usage{
 ALK(N_a, iALK)
 }
 \arguments{
-\item{N_a}{numbers at age sample for single event}
+\item{N_a}{Numeric vector of numbers-at-age for one sampling event.}
 
-\item{iALK}{from iALK() outout}
+\item{iALK}{Inverse age-length key returned by [iALK()].}
 }
 \value{
-FLPar of ALK
+An `FLPar` containing age proportions by length class.
 }
 \description{
-ALK function
+Combines numbers-at-age with an inverse age-length key and conditions the
+result on length to obtain age proportions within each length class.
+}
+\examples{
+\dontrun{
+alk <- ALK(N_a = c(100, 80, 50, 20), iALK = ialk)
+}
+
 }

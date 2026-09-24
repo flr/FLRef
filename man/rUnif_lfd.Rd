@@ -2,41 +2,31 @@
 % Please edit documentation in R/lensim.R
 \name{rUnif_lfd}
 \alias{rUnif_lfd}
-\title{Pre-generate CRN uniform-deviate streams for a two-stage length OEM}
+\title{Generate common random numbers for two-stage length sampling}
 \usage{
 rUnif_lfd(om_gears, years, nsim, seed = NULL)
 }
 \arguments{
-\item{om_gears}{Named list of gear objects as returned by
-[build_gear()]; must each contain `ess_age` and `ess_len`.}
+\item{om_gears}{Named list of gear objects returned by [build_gear()].}
 
-\item{years}{Integer vector of years to generate deviates for
-(typically the full projection horizon).}
+\item{years}{Vector of years.}
 
-\item{nsim}{Integer. Number of OM iterations.}
+\item{nsim}{Integer number of simulation iterations.}
 
-\item{seed}{Optional integer seed, set via `set.seed()` before
-generation for reproducibility across sessions. If `NULL` (default),
-the current RNG state is used as-is.}
+\item{seed}{Optional integer random seed.}
 }
 \value{
-A list with two elements, `age` and `len`, each a named list
-  (one array per gear) of dimension `[ess, length(years), nsim]`.
+A list with components `age` and `len`. Each component is a named
+  list of `[draw, year, iter]` arrays, one per gear.
 }
 \description{
-Generates one `Uniform(0,1)` array per gear per sampling stage (age,
-length), each shaped `[draw, year, iter]`, for use with
-[rmultinom_crn()]. Intended to be called once per MSE run/scenario set
-and reused everywhere the length OEM draws a sample, so the same
-underlying randomness is shared across MP variants (CRN).
+Generates uniform-deviate arrays for the age and length stages of
+[lfd.sim()] for every gear.
 }
 \examples{
 \dontrun{
-om_gears <- list(Trawl = trawl, Gillnet = gillnet)   # from build_gear()
+om_gears <- list(Trawl = trawl, Gillnet = gillnet)
 devs <- rUnif_lfd(om_gears, years = 2025:2054, nsim = 100, seed = 456)
-
-dim(devs$age$Trawl)     # 50 x 30 x 100  (ess_age x years x nsim)
-dim(devs$len$Gillnet)   # 300 x 30 x 100 (ess_len x years x nsim)
 }
 
 }

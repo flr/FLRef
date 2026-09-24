@@ -2,7 +2,7 @@
 % Please edit documentation in R/sel_la.R
 \name{build_gear}
 \alias{build_gear}
-\title{Build all gears' selectivity, conditional ALK, and sampling config}
+\title{Build gear selectivity and sampling configurations}
 \usage{
 build_gear(
   gear_cfg,
@@ -19,91 +19,56 @@ build_gear(
 )
 }
 \arguments{
-\item{gear_cfg}{Named list of per-gear configs (see file header for an
-example). Each gear's list must include `type`
-(`"logistic"`/`"normal"`/`"dnormal"`), `f_mult`, `ess_age`, `ess_len`;
-every other entry is passed to `sel_la()` as a selectivity parameter
-for that `type` (e.g. `Lpeak`/`sd_left`/`sd_right` for `"dnormal"`).}
+\item{gear_cfg}{Named list of gear configurations. Each gear must contain
+`type`, `f_mult`, `ess_age`, and `ess_len`; remaining entries are passed
+to [sel_la()] as selectivity parameters.}
 
-\item{lhpar}{`FLPar` or named numeric vector with at least `linf`, `k`,
-`t0`. Passed to both `sel_la()` and `iALK()`, shared across all gears.}
+\item{lhpar}{Life-history parameters containing `linf`, `k`, and `t0`.}
 
-\item{age}{Integer vector of ages, e.g. `0:30`.}
+\item{age}{Numeric vector of ages.}
 
-\item{amin, amax}{Integer. Passed through to `sel_la()`; default to
-`range(age)` if not supplied.}
+\item{amin, amax}{Integer minimum and maximum ages passed to [sel_la()].}
 
-\item{lmin}{Numeric. Lower bound of the first length bin. Default `5`.}
+\item{lmin}{Numeric lower limit of the length grid. Defaults to `5`.}
 
-\item{lmax_mult}{Numeric. Multiplier on `linf` defining the upper length
-bound, applied consistently to both `sel_la()` and `iALK()`.
-Default `1.2`.}
+\item{lmax_mult}{Numeric multiplier applied to `linf` for the upper length
+limit. Defaults to `1.2`.}
 
-\item{bin}{Numeric. Length-bin width, passed to both functions as
-`binwidth`/`bin`. Default `1`.}
+\item{bin}{Numeric length-bin width. Defaults to `1`.}
 
-\item{cv}{Numeric. CV of length-at-age used by `iALK()`. Default `0.1`.}
+\item{cv}{Numeric coefficient of variation in length-at-age. Defaults to
+`0.1`.}
 
-\item{timing}{Numeric, fraction of a year. Within-year growth timing
-  applied to each gear's internal `iALK()` (used for
-  `sel_len`/`sel_a`/`condALK`), via `t0' = t0 - timing` (so
-  `L(age + timing)` is evaluated on the unmodified integer `age` grid --
-  the same sign convention used elsewhere in this OM, e.g.
-  `t0 - sample_timing` for `invALK_bio`). Default `0` (growth evaluated
-  exactly at each integer age) for backward compatibility; pass
-  `timing = sample_timing` to make every gear's own ALK consistent with
-  a mid-year (or other) convention used elsewhere in the OM.
+\item{timing}{Numeric within-year timing expressed as a fraction of a year.
+Growth at time `t` is evaluated using `t0 - t`. Defaults to `0`.}
 
-`sel_a` is NOT taken from `sel_la()`'s own `sel_a` output. `sel_la()`
-evaluates the selectivity curve at a single length-at-age value,
-\eqn{s_g(\bar L(a))} (and, in some versions, does so at the wrong
-within-year timing internally -- check your installed `sel_la()`
-against the sign convention above before trusting it standalone). What
-a gear actually catches at age \eqn{a} is the length-selectivity curve
-integrated over the full distribution of length at that age,
-\eqn{s_{g,a}=\sum_l P(l\mid a,t)\,s_g(l)} -- exactly the row totals
-already computed below while building `condALK`, before they are
-renormalised to sum to 1. `build_gear()` uses that integrated value
-instead, so `sel_a` and `condALK` are always mutually consistent and
-correctly timed, regardless of `sel_la()`'s own internal correctness.}
-
-\item{scale}{Logical. Passed to `sel_la()`; scale `sel_len`/`sel_a`
-independently to a max of 1. Default `TRUE`.}
+\item{scale}{Logical; if `TRUE`, scale selectivity curves to a maximum of
+one.}
 }
 \value{
-A named list (names = `names(gear_cfg)`), each element a list:
+A named list with one gear object per element. Each gear contains:
 \describe{
   \item{name}{Gear name.}
-  \item{sel_len}{`FLQuant`, selectivity-at-length (from `sel_la()`).}
-  \item{sel_a}{`FLQuant`, selectivity-at-age (from `sel_la()`).}
-  \item{len_bins}{`data.frame` of length-bin lower/upper/mid, shared by
-    `sel_len` and `condALK`.}
-  \item{condALK}{Numeric matrix, age (rows) x len (cols), rows sum to 1:
-    \eqn{P(l \mid a, \text{caught by gear})}.}
-  \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
-  \item{lhpar}{As supplied (needed as `lfd.sim()`'s default `params`).}
+  \item{sel_len}{Selectivity-at-length as an `FLQuant`.}
+  \item{sel_a}{ALK-integrated selectivity-at-age as an `FLQuant`.}
+  \item{len_bins}{Data frame of length-bin limits and midpoints.}
+  \item{condALK}{Matrix containing \eqn{P(l \mid a,g)}.}
+  \item{f_mult, ess_age, ess_len}{Values supplied in `gear_cfg`.}
+  \item{lhpar}{Life-history parameters supplied in `lhpar`.}
 }
 }
 \description{
-Consolidates everything a length-sampling OEM needs, for every gear in
-`gear_cfg`, into one call: selectivity-at-length, selectivity-at-age
-(both via `sel_la()`), the conditional inverse age-length key
-\eqn{P(l \mid a, \text{caught by gear})} (via `iALK()`), and each gear's
-observation-process assumptions (`ess_age`, `ess_len`).
+Constructs selectivity-at-length, integrated selectivity-at-age, a
+capture-conditioned inverse age-length key, and observation sample sizes
+for each gear in a multigear operating model.
 }
 \details{
-`sel_la()` and `iALK()` express their length-range argument differently:
-`sel_la(lmax=...)` is an *absolute* upper length, while `iALK(lmax=...)`
-is a *multiplier on linf*. `build_gear()` takes a single `lmax_mult` and
-derives the correct form for each, then reconciles the two resulting
-length grids (they can legitimately differ by one bin at the top: see
-the reconciliation block below).
-
-The conditional ALK is built as
-\deqn{P(l \mid a, g) = \dfrac{P(l \mid a)\, s_g(l)}{\sum_l P(l \mid a)\, s_g(l)}}
-i.e. the biological inverse ALK re-weighted by the gear's length
-selectivity and renormalised so each age row sums to 1 (rows with zero
-gear-selected probability are set to 0 rather than divided by zero).
+Integrated selectivity-at-age is
+\deqn{s_{g,a}=\sum_l P(l\mid a,t)s_g(l).}
+The conditional inverse age-length key is
+\deqn{P(l\mid a,g)=\frac{P(l\mid a,t)s_g(l)}{s_{g,a}}.}
+The length grids created by [sel_la()] and [iALK()] are reconciled at the
+upper plus group before these quantities are calculated.
 }
 \examples{
 \dontrun{
@@ -119,11 +84,6 @@ gear_cfg <- list(
 
 om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = ages,
                         timing = 0.5)
-
-## sanity checks before trusting it further
-plot_sel_la(om_gears, len_by = 5, age_by = 1)
-stopifnot(all.equal(rowSums(om_gears$Ringnet$condALK),
-                     rep(1, nrow(om_gears$Ringnet$condALK)), tolerance = 1e-6))
 }
 
 }

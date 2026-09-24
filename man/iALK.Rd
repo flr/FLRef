@@ -2,7 +2,7 @@
 % Please edit documentation in R/lensim.R
 \name{iALK}
 \alias{iALK}
-\title{inverse ALK function with lmin added to FLCore::invALK}
+\title{Construct an inverse age-length key}
 \usage{
 iALK(
   params,
@@ -17,31 +17,50 @@ iALK(
 )
 }
 \arguments{
-\item{params}{growth parameter, default FLPar(linf,k,t0)}
+\item{params}{Growth parameters coercible to an `FLPar`. Parameters required
+by `model` must be named; the default von Bertalanffy model uses `linf`,
+`k`, and `t0`.}
 
-\item{model}{growth model, only option currently vonbert}
+\item{model}{Growth function or model object used to predict mean
+length-at-age. Defaults to `vonbert`.}
 
-\item{age}{age vector}
+\item{age}{Numeric vector of ages.}
 
-\item{cv}{of length-at-age}
+\item{cv}{Numeric coefficient of variation in length-at-age. Defaults to
+`0.1`.}
 
-\item{lmin}{milonimum length}
+\item{lmin}{Numeric lower limit of the length grid. Defaults to `5`.}
 
-\item{lmax}{maximum upper length specified lmax*linf}
+\item{lmax}{Numeric multiplier applied to `linf` when calculating the upper
+length limit. Defaults to `1.2`.}
 
-\item{bin}{length bin size, dafault 1}
+\item{bin}{Numeric length-bin width. Defaults to `1`.}
 
-\item{max}{maximum size value}
+\item{max}{Numeric upper limit of the length grid. Defaults to
+`ceiling(linf * lmax)`.}
 
-\item{reflen}{evokes fixed sd for L_a at sd = cv*reflen}
-
-\item{timing}{t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5}
-
-\item{unit}{default is "cm"}
+\item{reflen}{Optional reference length used to define a constant standard
+deviation as `cv * reflen`. When `NULL`, the standard deviation is
+`cv` times predicted length-at-age.}
 }
 \value{
-FLPar age-length matrix
+An `FLPar` containing an age-by-length inverse age-length key. Rows
+  represent ages, columns represent length classes, and each age row sums
+  to one.
 }
 \description{
-inverse ALK function with lmin added to FLCore::invALK
+Constructs the probability distribution of length conditional on age from
+a growth model and a coefficient of variation in length-at-age.
+}
+\examples{
+\dontrun{
+ialk <- iALK(
+  params = FLPar(linf = 45, k = 0.4, t0 = -0.3),
+  age = 0:5,
+  lmin = 5,
+  lmax = 1.2,
+  bin = 1
+)
+}
+
 }

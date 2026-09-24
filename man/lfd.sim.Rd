@@ -2,7 +2,7 @@
 % Please edit documentation in R/lensim.R
 \name{lfd.sim}
 \alias{lfd.sim}
-\title{Two-stage gear-selective length-frequency sample from an operating model}
+\title{Simulate a two-stage gear-specific length-frequency sample}
 \usage{
 lfd.sim(
   object,
@@ -23,92 +23,64 @@ lfd.sim(
 )
 }
 \arguments{
-\item{object}{`FLQuant` of the gear's true catch (or numbers)-at-age,
-e.g. one element of `catch_n_gear` from the operating model.}
+\item{object}{An `FLQuant` containing true catch-at-age or numbers-at-age
+for one gear.}
 
-\item{gear}{A gear object as returned by [build_gear()]; must contain
-`condALK` (age x len matrix, rows sum to 1) and, unless overridden
-below, `ess_age`/`ess_len`.}
+\item{gear}{Gear object returned by [build_gear()].}
 
-\item{ess_age, ess_len}{Integer. Effective sample sizes for the two
-stages. Default to `gear$ess_age`/`gear$ess_len`.}
+\item{ess_age}{Integer effective sample size for the catch-at-age draw.}
 
-\item{u_age}{Optional `[ess_age, year, iter]` array of pre-generated
-`Uniform(0,1)` deviates for the stage-1 draw (see [rUnif_lfd()]). If
-`NULL` (default), stage 1 falls back to `ca.sim()`'s own
-`stats::rmultinom()` behaviour (no CRN).}
+\item{ess_len}{Integer effective sample size for the length draw.}
 
-\item{u_len}{Optional `[ess_len, year, iter]` array of pre-generated
-`Uniform(0,1)` deviates for the stage-2 draw. If `NULL` (default),
-stage 2 falls back to a plain `stats::rmultinom()` draw (no CRN).}
+\item{u_age}{Optional common-random-number array with dimensions
+`[ess_age, year, iter]` for the age draw.}
 
-\item{scale}{Logical. If `TRUE` (default), rescale the returned length
-sample so its per-year/iter total matches the true total in `object`,
-rather than returning raw counts on the `ess_len` scale.}
+\item{u_len}{Optional common-random-number array for one sampling time, or
+a list of arrays when `timing` contains multiple values.}
 
-\item{timing}{Optional. Within-year timing of the length-sampling stage
-only (as fractions of a year added to `t0`), e.g.
-`seq(0, 11/12, 1/12)` for roughly monthly, continuous sampling. The
-age-sampling stage (stage 1) is NOT split by timing -- it remains a
-single annual draw regardless -- on the assumption that age-reading
-(e.g. a limited observer programme) and length measurement (e.g.
-ongoing market/landings sampling) are typically different sampling
-programmes with different temporal coverage. If that assumption
-doesn't match your fishery, this needs a different design, not just
-a different `timing` value. If `NULL` (default) or length 1, `gear`'s
-pre-built `condALK` is used directly, exactly as before -- no ALK
-rebuilding, and `params`/`model`/etc. below are unused.}
+\item{scale}{Logical; if `TRUE`, rescale each sampled length distribution
+to the corresponding total in `object`.}
 
-\item{params}{Growth parameters, `FLPar(linf, k, t0)`. Required only
-if `timing` has length > 1 (the ALK must be rebuilt fresh at each
-within-year timing event, since growth advances within the year --
-`gear$condALK` alone, built at one fixed timing, cannot be reused
-across several).}
+\item{timing}{Optional numeric vector of within-year sampling times. If
+`NULL`, use the conditional ALK stored in `gear`. Otherwise, rebuild the
+conditional ALK at each time using `t0 - timing`.}
 
-\item{model, reflen, cv, lmin, lmax_mult, bin}{Passed to `iALK()` when
-rebuilding the ALK per timing event; ignored if `timing` is `NULL`
-or length 1.}
+\item{params}{Growth parameters coercible to an `FLPar`. Required when
+`timing` is supplied.}
+
+\item{model}{Growth function or model object. Defaults to `vonbert`.}
+
+\item{reflen, cv, lmin, lmax_mult, bin}{Arguments passed to [iALK()] when the
+conditional ALK is rebuilt.}
 }
 \value{
-`FLQuant` with a `len` dimension (matching `gear$len_bins`),
-  the sampled length frequencies by year and iter.
+An `FLQuant` containing sampled length frequencies by year and
+  iteration.
 }
 \description{
-Generates a length-frequency sample for one gear in two stages:
-\enumerate{
-  \item a low-effective-sample-size catch-at-age sample is drawn from
-    the gear's true catch-at-age (via [ca.sim()]);
-  \item that sampled age composition is projected through the gear's
-    conditional inverse age-length key,
-    \eqn{P(l \mid a, \text{caught by gear})} (built once by
-    [build_gear()], so selectivity is already folded in), and a larger
-    length sample is drawn from the resulting expected length
-    distribution.
+Generates fishery-dependent length-frequency data from gear-specific
+catch-at-age using a two-stage sampling design.
 }
-This mimics a sampling design where a small, possibly more costly,
-age-reading sample (e.g. observer-collected otoliths) informs the age
-structure applied to a larger, cheaper length sample (e.g. market or
-landings-site length measurements) -- rather than treating the two as
-independent draws from the true population.
+\details{
+Sampling proceeds as follows:
+\enumerate{
+  \item A catch-at-age composition is sampled with effective sample size
+    `ess_age` using [ca.sim()].
+  \item The sampled age composition is projected through
+    \eqn{P(l \mid a, g)} and sampled at effective sample size `ess_len`.
+}
 }
 \examples{
 \dontrun{
-## trawl <- build_gear(...) from build_gear.R examples
-## catch_n_gear$Trawl : FLQuant, true catch-at-age for Trawl, from the OM
-
 lfd_trawl <- lfd.sim(catch_n_gear$Trawl, trawl)
-
-## sanity check: shape should show the dome, not just decline with length
-plot(lfd_trawl)
-
-## CRN-safe version, reproducible across calls
 devs <- rUnif_lfd(om_gears, years = an(dimnames(catch_n_gear$Trawl)$year),
                    nsim = dim(catch_n_gear$Trawl)[6], seed = 456)
-lfd_trawl_a <- lfd.sim(catch_n_gear$Trawl, trawl,
-                        u_age = devs$age$Trawl, u_len = devs$len$Trawl)
-lfd_trawl_b <- lfd.sim(catch_n_gear$Trawl, trawl,
-                        u_age = devs$age$Trawl, u_len = devs$len$Trawl)
-stopifnot(identical(lfd_trawl_a, lfd_trawl_b))
+lfd_trawl_crn <- lfd.sim(
+  catch_n_gear$Trawl,
+  trawl,
+  u_age = devs$age$Trawl,
+  u_len = devs$len$Trawl
+)
 }
 
 }
