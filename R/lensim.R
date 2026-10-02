@@ -476,13 +476,22 @@ rUnif_len <- function(gear, timing, years, nsim, seed = NULL) {
 lfd.sim <- function(object, gear,
                     ess_age = gear$ess_age, ess_len = gear$ess_len,
                     u_age = NULL, u_len = NULL, scale = TRUE,
-                    timing = NULL, params = NULL, model = vonbert,
+                    timing = NULL, params = gear$lhpar, model = vonbert,
                     reflen = NULL, cv = 0.1, lmin = 5, lmax_mult = 1.2, bin = 1) {
   
   age <- an(dimnames(object)$age)
   years <- dimnames(object)$year
   its <- dims(object)$iter
   
+  rebuild_alk <- !is.null(timing)
+  multi_timing <- rebuild_alk && length(timing) > 1L
+  
+  if (rebuild_alk && is.null(params)) {
+    stop("'params' (FLPar(linf, k, t0)) is required when 'timing' is supplied ",
+         "-- gear$lhpar was also NULL, so it could not be used as the default. ",
+         "Pass params explicitly, or rebuild gear via build_gear() so it carries ",
+         "its own lhpar.")
+  }
   ## 'rebuild_alk': any timing supplied at all (scalar or vector) means
   ## gear$condALK (built once, at build_gear()'s own timing) must NOT be
   ## reused -- the ALK has to be rebuilt fresh at this call's own timing.

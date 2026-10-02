@@ -727,18 +727,12 @@ ss3devs <- function(om, vcv, Fphi = 0.423, bias.correct = TRUE,...){
 #'
 #' @export
 rmultinom_crn <- function(u, p) {
-  
   p[!is.finite(p) | p < 0] <- 0
-  
-  if (sum(p) <= 0)
-    return(rep(0L, length(p)))
-  
-  p <- p / sum(p)
-  cp <- cumsum(p)
-  cp[length(cp)] <- 1                      # guard against floating-point drift
-  
+  if (sum(p) <= 0) return(rep(0L, length(p)))
+  p  <- p / sum(p)
+  cp <- pmin(cumsum(p), 1)        # <- NEW: never above 1
+  cp[length(cp)] <- 1
   idx <- findInterval(u, cp, rightmost.closed = TRUE) + 1L
   idx <- pmin(idx, length(p))
-  
   tabulate(idx, nbins = length(p))
 }
