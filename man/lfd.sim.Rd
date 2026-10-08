@@ -13,13 +13,13 @@ lfd.sim(
   u_len = NULL,
   scale = TRUE,
   timing = NULL,
-  params = NULL,
+  params = gear$lhpar,
   model = vonbert,
   reflen = NULL,
-  cv = 0.1,
-  lmin = 5,
-  lmax_mult = 1.2,
-  bin = 1
+  cv = gear$grid$cv \%||\% 0.1,
+  lmin = gear$grid$lmin \%||\% 5,
+  lmax_mult = gear$grid$lmax_mult \%||\% 1.2,
+  bin = gear$grid$bin \%||\% 1
 )
 }
 \arguments{
@@ -50,8 +50,9 @@ conditional ALK at each time using `t0 - timing`.}
 
 \item{model}{Growth function or model object. Defaults to `vonbert`.}
 
-\item{reflen, cv, lmin, lmax_mult, bin}{Arguments passed to [iALK()] when the
-conditional ALK is rebuilt.}
+\item{reflen, cv, lmin, lmax_mult, bin}{Arguments for rebuilding the
+conditional ALK when `timing` is supplied; `cv`, `lmin`, `lmax_mult` and
+`bin` default to `gear$grid`, so the rebuilt key always matches the gear.}
 }
 \value{
 An `FLQuant` containing sampled length frequencies by year and

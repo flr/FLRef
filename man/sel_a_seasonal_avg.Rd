@@ -34,10 +34,8 @@ vector.}
 
 \item{cv}{Numeric coefficient of variation in length-at-age.}
 
-\item{lmin}{Numeric lower limit of the length grid.}
-
-\item{lmax_mult}{Numeric multiplier applied to `linf` for the upper length
-limit.}
+\item{lmin, lmax_mult}{Unused; the length grid is taken from the names of
+`sel_len` (e.g. `gear$sel_len`), so it always matches the gear.}
 
 \item{bin}{Numeric length-bin width.}
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/sel_la.R
 \name{build_gear}
 \alias{build_gear}
-\title{Build gear selectivity and sampling configurations}
+\title{Build gear selectivity, F-partition and sampling configurations}
 \usage{
 build_gear(
   gear_cfg,
@@ -15,75 +15,117 @@ build_gear(
   bin = 1,
   cv = 0.1,
   timing = 0,
+  fbar_range = NULL,
   scale = TRUE
 )
 }
 \arguments{
 \item{gear_cfg}{Named list of gear configurations. Each gear must contain
-`type`, `f_mult`, `ess_age`, and `ess_len`; remaining entries are passed
-to [sel_la()] as selectivity parameters.}
+`type` (`"logistic"`, `"normal"` or `"dnormal"`), `f_mult`, `ess_age` and
+`ess_len`; all remaining entries are passed to [sel_la()] as that type's
+selectivity parameters (`L50`/`L95`; `Lpeak`/`sd`;
+`Lpeak`/`sd_left`/`sd_right`).}
 
-\item{lhpar}{Life-history parameters containing `linf`, `k`, and `t0`.}
+\item{lhpar}{`FLPar` with at least `linf`, `k` and `t0`.}
 
-\item{age}{Numeric vector of ages.}
+\item{age}{Numeric vector of ages (the OM's age dimension).}
 
-\item{amin, amax}{Integer minimum and maximum ages passed to [sel_la()].}
+\item{amin, amax}{Minimum and maximum ages passed to [sel_la()].}
 
-\item{lmin}{Numeric lower limit of the length grid. Defaults to `5`.}
+\item{lmin}{Lower limit of the length grid. Default `5`.}
 
-\item{lmax_mult}{Numeric multiplier applied to `linf` for the upper length
-limit. Defaults to `1.2`.}
+\item{lmax_mult}{Multiplier on `linf` for the upper (plus-group) length.
+Default `1.2`.}
 
-\item{bin}{Numeric length-bin width. Defaults to `1`.}
+\item{bin}{Length-bin width. Default `1`.}
 
-\item{cv}{Numeric coefficient of variation in length-at-age. Defaults to
-`0.1`.}
+\item{cv}{Coefficient of variation of length-at-age. Default `0.1`.}
 
-\item{timing}{Numeric within-year timing expressed as a fraction of a year.
-Growth at time `t` is evaluated using `t0 - t`. Defaults to `0`.}
+\item{timing}{Within-year timing (fraction of a year) at which length-at-age
+is evaluated; growth uses `t0 - timing`. Use the mid-point of the fishing
+/ sampling season (e.g. `0.5`). Default `0`.}
 
-\item{scale}{Logical; if `TRUE`, scale selectivity curves to a maximum of
-one.}
+\item{fbar_range}{Optional ages defining Fbar, either the full vector
+(`3:19`) or `c(minfbar, maxfbar)`. When supplied, each gear additionally
+carries `sel_a_fbar` and `f_share` (see Value). Required by
+[f_age_gear()], [joint_sel()] and the static form of [catch_n_gear()].}
+
+\item{scale}{Logical; scale `sel_len` and `sel_a` to a maximum of one.}
 }
 \value{
-A named list with one gear object per element. Each gear contains:
+A named list, one element per gear, each a list with
 \describe{
   \item{name}{Gear name.}
-  \item{sel_len}{Selectivity-at-length as an `FLQuant`.}
-  \item{sel_a}{ALK-integrated selectivity-at-age as an `FLQuant`.}
-  \item{len_bins}{Data frame of length-bin limits and midpoints.}
-  \item{condALK}{Matrix containing \eqn{P(l \mid a,g)}.}
-  \item{f_mult, ess_age, ess_len}{Values supplied in `gear_cfg`.}
-  \item{lhpar}{Life-history parameters supplied in `lhpar`.}
+  \item{type}{Selectivity type.}
+  \item{sel_len}{`FLQuant` selectivity-at-length \eqn{s_g(l)} on the
+    reconciled length grid (lower bin limits as dimnames).}
+  \item{sel_a}{`FLQuant` ALK-integrated selectivity-at-age
+    \eqn{s_{g,a}}, max-scaled if `scale = TRUE`.}
+  \item{sel_a_fbar}{`FLQuant` \eqn{\tilde s_{g,a}=s_{g,a}/\bar s_{g,\mathcal A}},
+    i.e. selectivity scaled to mean one over the Fbar ages, so that
+    \eqn{F_{g,a,y}=\tilde s_{g,a}\,\bar F_{g,y}}. `NULL` without
+    `fbar_range`.}
+  \item{f_share}{`FLQuant` static share of total F-at-age taken by this
+    gear, \eqn{\phi_{g,a}} (see Details). Sums to one over gears at every
+    age with non-zero F. `NULL` without `fbar_range`.}
+  \item{len_bins}{Data frame of lower, upper and mid lengths.}
+  \item{condALK}{Matrix \eqn{P(l \mid a, g)}, ages in rows.}
+  \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
+  \item{lhpar}{`lhpar`, used as the default `params` of [lfd.sim()].}
+  \item{lw}{Length-weight parameters `c(a, b)` taken from `lhpar`
+    (`NULL` if `lhpar` has no `a`/`b`).}
+  \item{wt_len}{Named vector of weight at length,
+    \eqn{W(l)=a\,\bar l^{\,b}} at bin mid-points (same units as
+    `a`/`b`), used by [lfd_sop()] to raise length samples to catch
+    weight.}
+  \item{grid}{List of `lmin`, `lmax_mult`, `bin`, `cv`, `timing`,
+    `fbar_range` used to build the gear. Downstream helpers
+    ([plot_condALK_bias()], [lfd.sim()] when rebuilding the ALK) should
+    default to these instead of repeating the arguments.}
 }
 }
 \description{
-Constructs selectivity-at-length, integrated selectivity-at-age, a
-capture-conditioned inverse age-length key, and observation sample sizes
-for each gear in a multigear operating model.
+Constructs, for each gear of a multigear operating model, the
+selectivity-at-length, the ALK-integrated selectivity-at-age, the
+capture-conditioned inverse age-length key, and (optionally) the
+Fbar-standardised selectivity and the gear's share of total F-at-age.
 }
 \details{
-Integrated selectivity-at-age is
-\deqn{s_{g,a}=\sum_l P(l\mid a,t)s_g(l).}
-The conditional inverse age-length key is
-\deqn{P(l\mid a,g)=\frac{P(l\mid a,t)s_g(l)}{s_{g,a}}.}
-The length grids created by [sel_la()] and [iALK()] are reconciled at the
-upper plus group before these quantities are calculated.
+With \eqn{P(l \mid a,t)} the biological inverse ALK at `timing` \eqn{t}:
+\deqn{s_{g,a}=\sum_l P(l\mid a,t)\,s_g(l),\qquad
+      P(l\mid a,g)=\frac{P(l\mid a,t)\,s_g(l)}{s_{g,a}}.}
+
+\strong{F partition.} With \eqn{\mathcal A} the Fbar ages and \eqn{w_g}
+= `f_mult`, gear Fbar trajectories in the OM are
+\eqn{\bar F_{g,y}=w_g \bar F_y}. Gear F-at-age and the share of total F
+are then
+\deqn{F_{g,a,y}=w_g\tilde s_{g,a}\bar F_y,\qquad
+      \phi_{g,a}=\frac{w_g\tilde s_{g,a}}{\sum_h w_h\tilde s_{h,a}},}
+which does not depend on year or iteration: as long as all gears follow
+proportional Fbar trajectories, the F-share (and hence the gear split of
+catch-at-age) is a property of the gear configuration and belongs here.
+If gear trajectories diverge, compute time-varying shares with
+[f_share_gear()] instead.
+
+All quantities live on one length grid, [len_grid()] (= [iALK()]'s grid,
+last bin a plus group); selectivity is evaluated at its bin mid-points
+with [sel_logistic_len()], [sel_normal_len()] or [sel_dnormal_len()].
+`amin`/`amax` are kept for backward compatibility and are unused.
 }
 \examples{
 \dontrun{
-lhpars <- FLPar(linf = 45, k = 0.4, t0 = -0.3, a = 0.00000612, b = 3.03)
-ages   <- 0:5
-
 gear_cfg <- list(
-  Ringnet = list(type = "dnormal", Lpeak = 7.3, sd_left = 0.7,
-                  sd_right = 11.4, f_mult = 0.70, ess_age = 50, ess_len = 500),
-  Gillnet = list(type = "normal", Lpeak = 39.7, sd = 10.6,
-                  f_mult = 0.30, ess_age = 30, ess_len = 300)
+  Trawl   = list(type = "dnormal", Lpeak = 23.4, sd_left = 3.2,
+                 sd_right = 11.2, f_mult = 0.9, ess_age = 50, ess_len = 150),
+  Gillnet = list(type = "logistic", L50 = 29.7, L95 = 34.1,
+                 f_mult = 0.1, ess_age = 30, ess_len = 100)
 )
-
-om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = ages,
-                        timing = 0.5)
+om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = 0:20,
+                       timing = 0.5, fbar_range = c(3, 19))
+gear_par(om_gears, "f_mult")
+joint_sel(om_gears)
 }
-
+}
+\seealso{
+[joint_sel()], [f_age_gear()], [catch_n_gear()], [lfd.sim()]
 }

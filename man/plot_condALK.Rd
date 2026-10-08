@@ -4,54 +4,27 @@
 \alias{plot_condALK}
 \title{Heatmap of a gear's conditional inverse ALK}
 \usage{
-plot_condALK(
-  gear,
-  params = NULL,
-  cv = 0.1,
-  lmin = 5,
-  lmax_mult = 1.2,
-  bin = 1,
-  low = "#FFFFCC",
-  high = "#7F0000"
-)
+plot_condALK(gear, params = NULL, low = "#FFFFCC", high = "#7F0000", ...)
 }
 \arguments{
-\item{gear}{A gear object as returned by [build_gear()] (needs
-`condALK` and `len_bins`).}
+\item{gear}{Gear object from [build_gear()].}
 
-\item{params}{Optional. `FLPar`/named numeric vector with `linf`, `k`,
-`t0`. If supplied, overlays the raw-vs-conditioned mean length-at-age
-lines; if `NULL` (default), only the heatmap is drawn.}
+\item{params}{Optional `FLPar` (`linf`, `k`, `t0`). If supplied (or
+`TRUE`, meaning `gear$lhpar`), overlays biological vs. capture-conditioned
+mean length-at-age.}
 
-\item{cv, lmin, lmax_mult, bin}{Passed to `iALK()` when building the raw
-comparison line; should match whatever was used to build `gear`.
-Ignored if `params` is `NULL`.}
+\item{low, high}{Fill colours.}
 
-\item{low, high}{Colours for the low/high ends of the probability scale.
-Defaults chosen to read clearly against a white background.}
+\item{...}{Ignored; accepts the former `cv`, `lmin`, `lmax_mult`, `bin`
+arguments, now taken from `gear$grid`.}
 }
 \value{
 A `ggplot` object.
 }
 \description{
-ggplot equivalent of `image(gear$condALK)`: a length-at-age probability
-heatmap, \eqn{P(l \mid a,g)}, with labelled axes
-labels and a colour scale instead of `image()`'s default palette.
-}
-\details{
-If `params` is supplied, two mean length-at-age lines are overlaid on
-the heatmap: the raw biological mean (unconditioned von Bertalanffy
-expectation) and the mean *implied by the heatmap itself*
-(`condALK %*% length`) -- i.e. what the gear actually samples. The gap
-between them is the within-age selectivity bias illustrated in
-[plot_condALK_bias()], shown here directly against the distribution it
-arises from rather than as a separate plot.
-}
-\examples{
-\dontrun{
-plot_condALK(trawl)                    # heatmap only
-plot_condALK(trawl, params = lhpar)    # heatmap + mean-length overlay
-plot_condALK(gillnet, params = lhpar)
-}
-
+UPDATED: the optional mean-length overlay is built with [gear_ialk()], so it
+uses the gear's own grid (any `lmax_mult`) and timing. Previously a
+hard-coded `lmax_mult = 1.2` gave a non-conformable `%*%` whenever the gear
+was built with a different `lmax_mult`, and `t = 0` biology was compared
+to `t = timing` catch.
 }

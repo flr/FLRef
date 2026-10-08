@@ -12,10 +12,10 @@ plot_sel_a_seasonal(
   show_seasons = TRUE,
   model = vonbert,
   reflen = NULL,
-  cv = 0.1,
-  lmin = 5,
-  lmax_mult = 1.2,
-  bin = 1
+  cv = gear$grid$cv \%||\% 0.1,
+  lmin = gear$grid$lmin \%||\% 5,
+  lmax_mult = gear$grid$lmax_mult \%||\% 1.2,
+  bin = gear$grid$bin \%||\% 1
 )
 }
 \arguments{
@@ -33,14 +33,8 @@ plot_sel_a_seasonal(
 
 \item{reflen}{Optional reference length passed to [iALK()].}
 
-\item{cv}{Numeric coefficient of variation in length-at-age.}
-
-\item{lmin}{Numeric lower limit of the length grid.}
-
-\item{lmax_mult}{Numeric multiplier applied to `linf` for the upper length
-limit.}
-
-\item{bin}{Numeric length-bin width.}
+\item{cv, lmin, lmax_mult, bin}{Length-at-age CV and length grid; default
+to `gear$grid`. The key is always built on the grid of `gear$sel_len`.}
 }
 \value{
 A `ggplot` object.

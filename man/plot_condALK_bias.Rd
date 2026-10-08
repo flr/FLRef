@@ -2,46 +2,31 @@
 % Please edit documentation in R/sel_la.R
 \name{plot_condALK_bias}
 \alias{plot_condALK_bias}
-\title{Compare raw vs. gear-conditioned mean length-at-age for one or more gears}
+\title{Raw vs. gear-conditioned mean length-at-age}
 \usage{
 plot_condALK_bias(
   om_gears,
-  params,
-  age = as.numeric(rownames(om_gears[[1]]$condALK)),
-  cv = 0.1,
-  lmin = 5,
-  lmax_mult = 1.2,
-  bin = 1
+  params = om_gears[[1]]$lhpar,
+  timing = om_gears[[1]]$grid$timing \%||\% 0,
+  cv = om_gears[[1]]$grid$cv \%||\% 0.1,
+  lmin = om_gears[[1]]$grid$lmin \%||\% 5,
+  lmax_mult = om_gears[[1]]$grid$lmax_mult \%||\% 1.2,
+  bin = om_gears[[1]]$grid$bin \%||\% 1
 )
 }
 \arguments{
-\item{om_gears}{Named list of gear objects as returned by
-[build_gear()].}
+\item{om_gears}{Named list returned by [build_gear()].}
 
-\item{params}{`FLPar`/named numeric vector with `linf`, `k`, `t0`, used
-to build the raw (unconditioned) inverse ALK for comparison.}
+\item{params}{`FLPar` with `linf`, `k`, `t0`. Default the gear's `lhpar`.}
 
-\item{age}{Integer vector of ages. Defaults to the age range implied
-by `om_gears[[1]]$condALK`'s row names.}
-
-\item{cv, lmin, lmax_mult, bin}{Passed to `iALK()` when building the raw
-ALK; should match whatever was used to build `om_gears`.}
+\item{timing, cv, lmin, lmax_mult, bin}{Default to `om_gears[[1]]$grid`.}
 }
 \value{
-A `ggplot` object, one coloured line per gear plus one for
-  "Raw biology".
+A `ggplot` object.
 }
 \description{
-Overlays the raw biological mean length-at-age against the
-capture-conditioned mean length-at-age for each gear in `om_gears`,
-illustrating how dome-shaped or asymmetric selectivity biases the
-*within-age* length distribution actually observed in the catch --
-distinct from, and in addition to, its effect on which ages are caught
-at all.
-}
-\examples{
-\dontrun{
-plot_condALK_bias(list(Trawl = trawl, Gillnet = gillnet), lhpar)
-}
-
+UPDATED: the raw biological line is now evaluated at the same within-year
+`timing` (and grid) the gears were built with. Previously it was evaluated
+at `timing = 0` while `condALK` used `t0 - timing`, so for
+`timing = 0.5` half a year of growth appeared as "selectivity bias".
 }

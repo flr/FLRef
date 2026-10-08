@@ -13,10 +13,10 @@ len.sim(
   unit = "cm",
   scale = TRUE,
   reflen = NULL,
-  bin = 1,
-  cv = 0.1,
-  lmin = 5,
-  lmax = 1.2,
+  bin = gear$grid$bin \%||\% 1,
+  cv = gear$grid$cv \%||\% 0.1,
+  lmin = gear$grid$lmin \%||\% 5,
+  lmax = gear$grid$lmax_mult \%||\% 1.2,
   gear = NULL,
   u = NULL
 )
@@ -41,7 +41,9 @@ sampling times from `0` to `11/12`.}
 \item{scale}{Logical; if `TRUE`, rescale each year and iteration to the
 corresponding total in `N_a`.}
 
-\item{reflen, bin, cv, lmin, lmax}{Arguments passed to [iALK()].}
+\item{reflen, bin, cv, lmin, lmax}{Arguments passed to [iALK()] (`lmax` is
+the multiplier on `linf`). When `gear` is supplied, `bin`, `cv`, `lmin`
+and `lmax` default to `gear$grid`.}
 
 \item{gear}{Optional gear object as returned by [build_gear()]. If
 supplied, `gear$sel_len` is incorporated through [condition_alk()].}
