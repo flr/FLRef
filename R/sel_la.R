@@ -1,4 +1,3 @@
-
 #' Logistic selectivity at length
 #'
 #' Computes asymptotic logistic selectivity as a function of length.
@@ -256,6 +255,7 @@ sel_la <- function(lhpar,
   )
 }
 
+
 #' Plot selectivity at length and age
 #'
 #' Plots selectivity-at-length and selectivity-at-age side by side for one
@@ -505,7 +505,6 @@ plot_sel_la <- function(object,
   
   p
 }
-
 
 
 #' Combine gear-specific selectivity-at-age using relative apical F
@@ -869,226 +868,311 @@ plot_sel_age <- function(object,
   
   p
 }
-#' Build gear selectivity and sampling configurations
+
+
+#' Build gear selectivity, F-partition and sampling configurations
 #'
-#' Constructs selectivity-at-length, integrated selectivity-at-age, a
-#' capture-conditioned inverse age-length key, and observation sample sizes
-#' for each gear in a multigear operating model.
+#' Constructs, for each gear of a multigear operating model, the
+#' selectivity-at-length, the ALK-integrated selectivity-at-age, the
+#' capture-conditioned inverse age-length key, and (optionally) the
+#' Fbar-standardised selectivity and the gear's share of total F-at-age.
 #'
 #' @param gear_cfg Named list of gear configurations. Each gear must contain
-#'   `type`, `f_mult`, `ess_age`, and `ess_len`; remaining entries are passed
-#'   to [sel_la()] as selectivity parameters.
-#' @param lhpar Life-history parameters containing `linf`, `k`, and `t0`.
-#' @param age Numeric vector of ages.
-#' @param amin,amax Integer minimum and maximum ages passed to [sel_la()].
-#' @param lmin Numeric lower limit of the length grid. Defaults to `5`.
-#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
-#'   limit. Defaults to `1.2`.
-#' @param bin Numeric length-bin width. Defaults to `1`.
-#' @param cv Numeric coefficient of variation in length-at-age. Defaults to
-#'   `0.1`.
-#' @param timing Numeric within-year timing expressed as a fraction of a year.
-#'   Growth at time `t` is evaluated using `t0 - t`. Defaults to `0`.
-#' @param scale Logical; if `TRUE`, scale selectivity curves to a maximum of
-#'   one.
+#'   `type` (`"logistic"`, `"normal"` or `"dnormal"`), `f_mult`, `ess_age` and
+#'   `ess_len`; all remaining entries are passed to [sel_la()] as that type's
+#'   selectivity parameters (`L50`/`L95`; `Lpeak`/`sd`;
+#'   `Lpeak`/`sd_left`/`sd_right`).
+#' @param lhpar `FLPar` with at least `linf`, `k` and `t0`.
+#' @param age Numeric vector of ages (the OM's age dimension).
+#' @param amin,amax Minimum and maximum ages passed to [sel_la()].
+#' @param lmin Lower limit of the length grid. Default `5`.
+#' @param lmax_mult Multiplier on `linf` for the upper (plus-group) length.
+#'   Default `1.2`.
+#' @param bin Length-bin width. Default `1`.
+#' @param cv Coefficient of variation of length-at-age. Default `0.1`.
+#' @param timing Within-year timing (fraction of a year) at which length-at-age
+#'   is evaluated; growth uses `t0 - timing`. Use the mid-point of the fishing
+#'   / sampling season (e.g. `0.5`). Default `0`.
+#' @param fbar_range Optional ages defining Fbar, either the full vector
+#'   (`3:19`) or `c(minfbar, maxfbar)`. When supplied, each gear additionally
+#'   carries `sel_a_fbar` and `f_share` (see Value). Required by
+#'   [f_age_gear()], [joint_sel()] and the static form of [catch_n_gear()].
+#' @param scale Logical; scale `sel_len` and `sel_a` to a maximum of one.
 #'
-#' @return A named list with one gear object per element. Each gear contains:
+#' @return A named list, one element per gear, each a list with
 #' \describe{
 #'   \item{name}{Gear name.}
-#'   \item{sel_len}{Selectivity-at-length as an `FLQuant`.}
-#'   \item{sel_a}{ALK-integrated selectivity-at-age as an `FLQuant`.}
-#'   \item{len_bins}{Data frame of length-bin limits and midpoints.}
-#'   \item{condALK}{Matrix containing \eqn{P(l \mid a,g)}.}
-#'   \item{f_mult, ess_age, ess_len}{Values supplied in `gear_cfg`.}
-#'   \item{lhpar}{Life-history parameters supplied in `lhpar`.}
+#'   \item{type}{Selectivity type.}
+#'   \item{sel_len}{`FLQuant` selectivity-at-length \eqn{s_g(l)} on the
+#'     reconciled length grid (lower bin limits as dimnames).}
+#'   \item{sel_a}{`FLQuant` ALK-integrated selectivity-at-age
+#'     \eqn{s_{g,a}}, max-scaled if `scale = TRUE`.}
+#'   \item{sel_a_fbar}{`FLQuant` \eqn{\tilde s_{g,a}=s_{g,a}/\bar s_{g,\mathcal A}},
+#'     i.e. selectivity scaled to mean one over the Fbar ages, so that
+#'     \eqn{F_{g,a,y}=\tilde s_{g,a}\,\bar F_{g,y}}. `NULL` without
+#'     `fbar_range`.}
+#'   \item{f_share}{`FLQuant` static share of total F-at-age taken by this
+#'     gear, \eqn{\phi_{g,a}} (see Details). Sums to one over gears at every
+#'     age with non-zero F. `NULL` without `fbar_range`.}
+#'   \item{len_bins}{Data frame of lower, upper and mid lengths.}
+#'   \item{condALK}{Matrix \eqn{P(l \mid a, g)}, ages in rows.}
+#'   \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
+#'   \item{lhpar}{`lhpar`, used as the default `params` of [lfd.sim()].}
+#'   \item{lw}{Length-weight parameters `c(a, b)` taken from `lhpar`
+#'     (`NULL` if `lhpar` has no `a`/`b`).}
+#'   \item{wt_len}{Named vector of weight at length,
+#'     \eqn{W(l)=a\,\bar l^{\,b}} at bin mid-points (same units as
+#'     `a`/`b`), used by [lfd_sop()] to raise length samples to catch
+#'     weight.}
+#'   \item{grid}{List of `lmin`, `lmax_mult`, `bin`, `cv`, `timing`,
+#'     `fbar_range` used to build the gear. Downstream helpers
+#'     ([plot_condALK_bias()], [lfd.sim()] when rebuilding the ALK) should
+#'     default to these instead of repeating the arguments.}
 #' }
 #'
 #' @details
-#' Integrated selectivity-at-age is
-#' \deqn{s_{g,a}=\sum_l P(l\mid a,t)s_g(l).}
-#' The conditional inverse age-length key is
-#' \deqn{P(l\mid a,g)=\frac{P(l\mid a,t)s_g(l)}{s_{g,a}}.}
-#' The length grids created by [sel_la()] and [iALK()] are reconciled at the
-#' upper plus group before these quantities are calculated.
+#' With \eqn{P(l \mid a,t)} the biological inverse ALK at `timing` \eqn{t}:
+#' \deqn{s_{g,a}=\sum_l P(l\mid a,t)\,s_g(l),\qquad
+#'       P(l\mid a,g)=\frac{P(l\mid a,t)\,s_g(l)}{s_{g,a}}.}
+#'
+#' \strong{F partition.} With \eqn{\mathcal A} the Fbar ages and \eqn{w_g}
+#' = `f_mult`, gear Fbar trajectories in the OM are
+#' \eqn{\bar F_{g,y}=w_g \bar F_y}. Gear F-at-age and the share of total F
+#' are then
+#' \deqn{F_{g,a,y}=w_g\tilde s_{g,a}\bar F_y,\qquad
+#'       \phi_{g,a}=\frac{w_g\tilde s_{g,a}}{\sum_h w_h\tilde s_{h,a}},}
+#' which does not depend on year or iteration: as long as all gears follow
+#' proportional Fbar trajectories, the F-share (and hence the gear split of
+#' catch-at-age) is a property of the gear configuration and belongs here.
+#' If gear trajectories diverge, compute time-varying shares with
+#' [f_share_gear()] instead.
+#'
+#' All quantities live on one length grid, [len_grid()] (= [iALK()]'s grid,
+#' last bin a plus group); selectivity is evaluated at its bin mid-points
+#' with [sel_logistic_len()], [sel_normal_len()] or [sel_dnormal_len()].
+#' `amin`/`amax` are kept for backward compatibility and are unused.
+#'
+#' @seealso [joint_sel()], [f_age_gear()], [catch_n_gear()], [lfd.sim()]
 #'
 #' @examples
 #' \dontrun{
-#' lhpars <- FLPar(linf = 45, k = 0.4, t0 = -0.3, a = 0.00000612, b = 3.03)
-#' ages   <- 0:5
-#'
 #' gear_cfg <- list(
-#'   Ringnet = list(type = "dnormal", Lpeak = 7.3, sd_left = 0.7,
-#'                   sd_right = 11.4, f_mult = 0.70, ess_age = 50, ess_len = 500),
-#'   Gillnet = list(type = "normal", Lpeak = 39.7, sd = 10.6,
-#'                   f_mult = 0.30, ess_age = 30, ess_len = 300)
+#'   Trawl   = list(type = "dnormal", Lpeak = 23.4, sd_left = 3.2,
+#'                  sd_right = 11.2, f_mult = 0.9, ess_age = 50, ess_len = 150),
+#'   Gillnet = list(type = "logistic", L50 = 29.7, L95 = 34.1,
+#'                  f_mult = 0.1, ess_age = 30, ess_len = 100)
 #' )
-#'
-#' om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = ages,
-#'                         timing = 0.5)
+#' om_gears <- build_gear(gear_cfg, lhpar = lhpars, age = 0:20,
+#'                        timing = 0.5, fbar_range = c(3, 19))
+#' gear_par(om_gears, "f_mult")
+#' joint_sel(om_gears)
 #' }
-#'
 #' @export
 build_gear <- function(gear_cfg, lhpar, age,
                        amin = min(age), amax = max(age),
                        lmin = 5, lmax_mult = 1.2, bin = 1, cv = 0.1,
-                       timing = 0, scale = TRUE) {
-  
+                       timing = 0, fbar_range = NULL, scale = TRUE) {
+
+  if (is.null(names(gear_cfg)) || any(names(gear_cfg) == ""))
+    stop("'gear_cfg' must be a fully named list (one element per gear).")
+
   build_one <- function(cfg, name) {
-    
+
     reserved <- c("type", "f_mult", "ess_age", "ess_len")
     missing_req <- setdiff(reserved, names(cfg))
     if (length(missing_req)) {
-      stop(
-        "Gear '", name, "' is missing required entries: ",
-        paste(missing_req, collapse = ", "),
-        ". Every gear's config list must include type/f_mult/ess_age/ess_len ",
-        "plus that type's own sel_la() selectivity parameters."
-      )
+      stop("Gear '", name, "' is missing required entries: ",
+           paste(missing_req, collapse = ", "), ".")
     }
-    
+
     type     <- match.arg(cfg$type, c("logistic", "normal", "dnormal"))
     sel_pars <- cfg[setdiff(names(cfg), reserved)]
-    f_mult   <- cfg$f_mult
-    ess_age  <- cfg$ess_age
-    ess_len  <- cfg$ess_len
-    
-    linf <- c(lhpar["linf"])
-    ## sel_la()'s 'lmax' appears to be an EXCLUSIVE upper bound (its last
-    ## bin's lower edge sits at lmax - bin, one short of iALK()'s
-    ## plus-group edge). Padding by one bin width here makes the two grids
-    ## align natively in the common case; the reconciliation block below
-    ## remains a safety net for cases where they still don't.
-    lmax_abs <- ceiling(linf * lmax_mult) + bin
-    
-    ## --- selectivity-at-length / -at-age ---------------------------------
-    s <- do.call(
-      sel_la,
-      c(
-        list(
-          lhpar = lhpar, amin = amin, amax = amax, type = type,
-          lmin = lmin, lmax = lmax_abs, binwidth = bin, scale = scale
-        ),
-        sel_pars
-      )
+
+    ## --- ONE length grid: iALK()'s own, from len_grid() -------------------
+    ## Selectivity is evaluated directly at the mid-points of this grid
+    ## (the last bin is iALK()'s plus group). This replaces the former
+    ## sel_la() call + plus-group reconciliation, which was only needed
+    ## because the two functions built their grids differently.
+    grid_g <- list(lmin = lmin, lmax_mult = lmax_mult, bin = bin, cv = cv,
+                   timing = timing)
+    ialk_mat <- gear_ialk(list(lhpar = lhpar, grid = grid_g), age = age)
+    len_ialk_chr <- colnames(ialk_mat)
+    mids <- as.numeric(len_ialk_chr) + bin / 2
+
+    sel_fun_len <- switch(type,
+      logistic = sel_logistic_len,
+      normal   = sel_normal_len,
+      dnormal  = sel_dnormal_len
     )
-    
-    ## --- biological inverse ALK, same grid -------------------------------
-    ## t0 - timing: growth evaluated 'timing' years past each integer age
-    ## on the unmodified age grid (timing = 0 -> exactly at age, the old
-    ## default; see the 'timing' argument doc for the sign convention).
-    ialk <- iALK(
-      params = c(linf = linf, k = c(lhpar["k"]), t0 = c(lhpar["t0"]) - timing),
-      age = age, cv = cv, lmin = lmin, lmax = lmax_mult, bin = bin
-    )
-    
-    ## --- reconcile length grids -------------------------------------------
-    ## sel_la() and iALK() can legitimately disagree by one bin at the top:
-    ## iALK() treats its last bin as a plus-group (P(length >= edge)),
-    ## while sel_la() does not build a plus-group and simply stops one bin
-    ## short. This is a real difference in convention, not necessarily a
-    ## misconfiguration, so it is reconciled rather than treated as an
-    ## error: any length present in iALK()'s grid but not sel_la()'s (the
-    ## plus-group edge) is covered by carrying the last explicitly modelled
-    ## selectivity value forward, on the standard assumption that
-    ## selectivity has plateaued by 'lmax_mult * linf'. Any length present
-    ## in sel_la()'s grid but not iALK()'s is dropped, with a warning. A
-    ## genuinely larger mismatch (more than a couple of bins, or a gap in
-    ## the middle of the range) is NOT something this should silently
-    ## absorb, so that case still stops.
-    len_sel_chr  <- as.character(s$len_bins$lower)
-    len_ialk_chr <- dimnames(ialk)$len
-    
-    extra_in_ialk <- setdiff(len_ialk_chr, len_sel_chr)
-    extra_in_sel  <- setdiff(len_sel_chr, len_ialk_chr)
-    
-    if (length(extra_in_ialk) > 1 || length(extra_in_sel) > 1) {
-      stop(
-        "'sel_la()' and 'iALK()' length grids differ by more than one bin ",
-        "for gear '", name, "' (", length(extra_in_ialk), " extra in iALK(), ",
-        length(extra_in_sel), " extra in sel_la()). This looks like a real ",
-        "'lmin'/'lmax_mult'/'bin' inconsistency rather than the usual ",
-        "plus-group edge-case -- check those arguments before proceeding."
-      )
-    }
-    
-    sel_len_vec <- as.numeric(s$sel_len)
-    names(sel_len_vec) <- len_sel_chr
-    
-    if (length(extra_in_sel) == 1) {
-      warning(
-        "Dropping length bin '", extra_in_sel, "' from gear '", name,
-        "': present in sel_la()'s grid but not iALK()'s plus-group edge."
-      )
-      sel_len_vec <- sel_len_vec[names(sel_len_vec) != extra_in_sel]
-    }
-    
-    if (length(extra_in_ialk) == 1) {
-      message(
-        "Gear '", name, "': iALK()'s plus-group bin ('", extra_in_ialk,
-        "'+) has no corresponding sel_la() bin. Carrying the last modelled ",
-        "selectivity value (", round(tail(sel_len_vec, 1), 3),
-        ") forward to cover it. Confirm that selectivity has plateaued ",
-        "by this length."
-      )
-      sel_len_vec[extra_in_ialk] <- tail(sel_len_vec, 1)
-    }
-    
-    ## reorder to match iALK()'s column order exactly before using sweep()
-    sel_len_vec <- sel_len_vec[len_ialk_chr]
-    
-    ## --- condition the ALK on capture by this gear -----------------------
-    ialk_mat <- c(ialk)                       # coerce FLPar -> plain matrix
-    dim(ialk_mat) <- dim(ialk)[1:2]
-    dimnames(ialk_mat) <- list(age = dimnames(ialk)$age, len = dimnames(ialk)$len)
-    
-    weighted <- sweep(ialk_mat, 2, sel_len_vec, "*")
-    row_tot <- rowSums(weighted)
-    cond <- weighted
-    valid <- row_tot > 0
-    cond[valid, ] <- weighted[valid, , drop = FALSE] / row_tot[valid]
-    cond[!valid, ] <- 0
-    
-    ## --- integrated selectivity-at-age, NOT sel_la()'s own sel_a ---------
-    ## row_tot (pre-normalisation) is exactly s_{g,a} = sum_l P(l|a,t)*s_g(l)
-    ## -- the length-selectivity curve integrated over the length-at-age
-    ## distribution at this gear's own timing, using the same timed,
-    ## reconciled ALK as condALK. This is deliberately NOT sel_la()'s own
-    ## sel_a output, which evaluates s_g() at a single length-at-age value
-    ## (and may use a different, possibly incorrect, within-year timing
-    ## internally) -- see the 'timing' argument doc above.
-    sel_a_vec <- row_tot
-    if (scale && max(sel_a_vec, na.rm = TRUE) > 0) {
-      sel_a_vec <- sel_a_vec / max(sel_a_vec, na.rm = TRUE)
-    }
-    sel_a_out <- FLQuant(sel_a_vec, dimnames = list(age = rownames(ialk_mat)))
-    
-    ## return the RECONCILED grid throughout, not sel_la()'s original one --
-    ## sel_len/len_bins must match condALK's columns exactly, or a naive
-    ## plot(gear$sel_len) against gear$condALK later would silently
-    ## reintroduce the same one-bin mismatch this function just resolved.
-    len_bins_out <- data.frame(
-      lower = as.numeric(len_ialk_chr),
-      upper = as.numeric(len_ialk_chr) + bin,
-      mid   = as.numeric(len_ialk_chr) + bin / 2
-    )
-    
+    bad <- setdiff(names(sel_pars), names(formals(sel_fun_len)))
+    if (length(bad))
+      stop("Gear '", name, "' (", type, "): unknown selectivity parameter(s) ",
+           paste(bad, collapse = ", "), ".")
+    sel_len_vec <- do.call(sel_fun_len, c(list(L = mids), sel_pars))
+    if (scale) sel_len_vec <- sel_len_vec / max(sel_len_vec, na.rm = TRUE)
+    names(sel_len_vec) <- len_ialk_chr
+
+    ## --- capture-conditioned ALK and integrated selectivity-at-age --------
+
+    cond    <- condition_alk(ialk_mat, sel_len_vec)
+    row_tot <- as.numeric(ialk_mat %*% sel_len_vec)        # s_{g,a}
+    if (scale && max(row_tot, na.rm = TRUE) > 0)
+      row_tot <- row_tot / max(row_tot, na.rm = TRUE)
+
+    lens <- as.numeric(len_ialk_chr)
+
+    ## length-weight: W(l) = a * l_mid^b, used to raise LFDs to catch weight
+    lw <- if (all(c("a", "b") %in% dimnames(lhpar)$params))
+      c(a = c(lhpar["a"]), b = c(lhpar["b"])) else NULL
+    wt_len <- if (is.null(lw)) NULL else
+      setNames(lw[["a"]] * mids^lw[["b"]], len_ialk_chr)
+
     list(
-      name = name,
-      sel_len = FLQuant(sel_len_vec, dimnames = list(len = names(sel_len_vec))),
-      sel_a = sel_a_out,
-      len_bins = len_bins_out,
-      condALK = cond,
-      f_mult = f_mult,
-      ess_age = ess_age,
-      ess_len = ess_len,
-      lhpar = lhpar      # needed as lfd.sim()'s default params = gear$lhpar
+      name     = name,
+      type     = type,
+      sel_len  = FLQuant(sel_len_vec, dimnames = list(len = len_ialk_chr)),
+      sel_a    = FLQuant(row_tot, dimnames = list(age = rownames(ialk_mat))),
+      sel_a_fbar = NULL,
+      f_share  = NULL,
+      len_bins = data.frame(lower = lens, upper = lens + bin,
+                            mid = lens + bin / 2),
+      condALK  = cond,
+      f_mult   = cfg$f_mult,
+      ess_age  = cfg$ess_age,
+      ess_len  = cfg$ess_len,
+      lhpar    = lhpar,
+      lw       = lw,
+      wt_len   = wt_len,
+      grid     = list(lmin = lmin, lmax_mult = lmax_mult, bin = bin, cv = cv,
+                      timing = timing, fbar_range = NULL)
     )
   }
-  
-  setNames(
+
+  out <- setNames(
     lapply(names(gear_cfg), function(nm) build_one(gear_cfg[[nm]], nm)),
     names(gear_cfg)
   )
+
+  ## --- cross-gear quantities: Fbar-standardised sel and static F-share -----
+  if (!is.null(fbar_range)) {
+    fb <- if (length(fbar_range) == 2) seq(fbar_range[1], fbar_range[2])
+          else fbar_range
+    fb <- as.character(fb)
+    if (!all(fb %in% as.character(age)))
+      stop("'fbar_range' contains ages not in 'age'.")
+
+    w <- vapply(out, `[[`, numeric(1), "f_mult")
+    sel_fbar <- lapply(out, function(g) g$sel_a / mean(g$sel_a[fb, ]))
+    f_rel    <- Map(function(s, wg) s * wg, sel_fbar, w)   # w_g * s~_{g,a}
+    f_tot    <- Reduce(`+`, f_rel)
+
+    for (g in names(out)) {
+      sh <- f_rel[[g]] / f_tot
+      sh[!is.finite(sh)] <- 0
+      out[[g]]$sel_a_fbar      <- sel_fbar[[g]]
+      out[[g]]$f_share         <- sh
+      out[[g]]$grid$fbar_range <- as.numeric(fb)
+    }
+  }
+
+  out
+}
+
+
+#' Extract a scalar gear entry across all gears
+#'
+#' @param om_gears Named list returned by [build_gear()].
+#' @param what Name of a scalar entry, e.g. `"f_mult"`, `"ess_age"`,
+#'   `"ess_len"`, `"type"`.
+#' @return Named vector (numeric, or character for `"type"`).
+#' @examples
+#' \dontrun{gear_par(om_gears, "f_mult")}
+#' @export
+gear_par <- function(om_gears, what) {
+  v <- lapply(om_gears, `[[`, what)
+  if (any(vapply(v, is.null, logical(1))))
+    stop("'", what, "' missing for at least one gear.")
+  unlist(v)
+}
+
+
+#' Joint (fleet-aggregated) selectivity-at-age
+#'
+#' Combines gear selectivities on the Fbar scale, weighted by each gear's
+#' share of Fbar (`f_mult`):
+#' \deqn{S_a=\frac{\sum_g w_g\tilde s_{g,a}}{\max_a\sum_g w_g\tilde s_{g,a}}.}
+#' This is the selectivity of total F implied by [f_age_gear()], and is what
+#' the aggregate `FLBRP`/`FLStock` must carry for the equilibrium reference
+#' points to be consistent with the multigear dynamics.
+#'
+#' Note that [combine_sel_age()] weights *max-scaled* curves by relative
+#' *apical* F; the two agree only if the weights are converted between bases.
+#' Use `joint_sel()` whenever `f_mult` is defined as a share of Fbar.
+#'
+#' @param om_gears Named list returned by [build_gear()] with `fbar_range`.
+#' @param scale Logical; scale to a maximum of one. Default `TRUE`.
+#' @return `FLQuant` of joint selectivity-at-age.
+#' @export
+joint_sel <- function(om_gears, scale = TRUE) {
+  if (any(vapply(om_gears, function(g) is.null(g$sel_a_fbar), logical(1))))
+    stop("Rebuild om_gears with build_gear(..., fbar_range = ).")
+  tot <- Reduce(`+`, Map(function(g) g$sel_a_fbar * g$f_mult, om_gears))
+  if (scale) tot <- tot / max(tot)
+  tot
+}
+
+
+#' Gear-specific fishing mortality-at-age from gear Fbar trajectories
+#'
+#' \deqn{F_{g,a,y}=\tilde s_{g,a}\,\bar F_{g,y}}
+#' with \eqn{\tilde s_{g,a}} the Fbar-standardised selectivity stored by
+#' [build_gear()]. By construction `fbar()` of each gear's F-at-age equals the
+#' input trajectory.
+#'
+#' @param stock `FLStock` providing the age / year / iter template
+#'   (typically the propagated OM before `fwd()`).
+#' @param om_gears Named list returned by [build_gear()] with `fbar_range`.
+#' @param fbar_gear `FLQuants` of gear Fbar trajectories (year x iter), named
+#'   as `om_gears`.
+#' @return `FLQuants` of F-at-age by gear over the years of `fbar_gear`.
+#' @examples
+#' \dontrun{
+#' fbar_gear <- FLQuants(lapply(gear_par(om_gears, "f_mult"),
+#'                              function(w) f_hist_base * w))
+#' f_age <- f_age_gear(stki, om_gears, fbar_gear)
+#' harvest(stki)[, dimnames(fbar_gear[[1]])$year] <- Reduce(`+`, f_age)
+#' }
+#' @export
+f_age_gear <- function(stock, om_gears, fbar_gear) {
+  if (!setequal(names(om_gears), names(fbar_gear)))
+    stop("names(fbar_gear) must match names(om_gears).")
+  yrs <- dimnames(fbar_gear[[1]])$year
+  FLQuants(setNames(lapply(names(om_gears), function(g) {
+    sel <- om_gears[[g]]$sel_a_fbar
+    if (is.null(sel)) stop("Rebuild om_gears with build_gear(..., fbar_range = ).")
+    sq <- harvest(stock)[, yrs]
+    sq[] <- c(sel)                  # recycled over year / iter
+    sq %*% fbar_gear[[g]]
+  }), names(om_gears)))
+}
+
+
+#' Time-varying share of total F-at-age by gear
+#'
+#' \deqn{\phi_{g,a,y}=F_{g,a,y}\Big/\sum_h F_{h,a,y}}
+#' General form of `om_gears[[g]]$f_share`, needed when gear Fbar
+#' trajectories are not proportional (e.g. an MP that manages one gear only).
+#'
+#' @param f_age `FLQuants` of gear F-at-age, e.g. from [f_age_gear()].
+#' @return `FLQuants` of shares (0 where total F is 0).
+#' @export
+f_share_gear <- function(f_age) {
+  tot <- Reduce(`+`, f_age)
+  FLQuants(lapply(f_age, function(x) {
+    out <- x / tot
+    out[!is.finite(out)] <- 0
+    out
+  }))
 }
 
 
@@ -1106,9 +1190,8 @@ build_gear <- function(gear_cfg, lhpar, age,
 #' @param model Growth function or model object. Defaults to `vonbert`.
 #' @param reflen Optional reference length passed to [iALK()].
 #' @param cv Numeric coefficient of variation in length-at-age.
-#' @param lmin Numeric lower limit of the length grid.
-#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
-#'   limit.
+#' @param lmin,lmax_mult Unused; the length grid is taken from the names of
+#'   `sel_len` (e.g. `gear$sel_len`), so it always matches the gear.
 #' @param bin Numeric length-bin width.
 #' @param scale Logical; if `TRUE`, scale the averaged curve to a maximum of
 #'   one.
@@ -1139,14 +1222,15 @@ sel_a_seasonal_avg <- function(lhpar, sel_len, age, n_seasons,
     v <- as.numeric(sel_len); names(v) <- dimnames(sel_len)$len; v
   } else sel_len
   
+  lens <- an(names(sel_len_vec))          # grid of sel_len (any lmax_mult)
   linf <- c(lhpar["linf"]); k <- c(lhpar["k"]); t0 <- c(lhpar["t0"])
   
   sel_a_mat <- sapply(seq_len(n_seasons), function(s) {
     t <- (s - 0.5) / n_seasons
     ialk_t <- iALK(
       params = c(linf = linf, k = k, t0 = t0 - t),   # note: t0 - t, see note above
-      model = model, age = age, lmax = lmax_mult, reflen = reflen,
-      bin = bin, lmin = lmin
+      model = model, age = age, cv = cv, reflen = reflen,
+      bin = bin, lmin = min(lens), max = max(lens)
     )
     ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
     dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
@@ -1163,6 +1247,7 @@ sel_a_seasonal_avg <- function(lhpar, sel_len, age, n_seasons,
   sel_a
 }
 
+
 #' Calculate seasonally weighted weight-at-age
 #'
 #' Calculates weight-at-age at seasonal midpoint timings and averages across
@@ -1177,11 +1262,8 @@ sel_a_seasonal_avg <- function(lhpar, sel_len, age, n_seasons,
 #' @param n_seasons Integer number of equal within-year seasons.
 #' @param model Growth function or model object. Defaults to `vonbert`.
 #' @param reflen Optional reference length passed to [iALK()].
-#' @param cv Numeric coefficient of variation in length-at-age.
-#' @param lmin Numeric lower limit of the length grid.
-#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
-#'   limit.
-#' @param bin Numeric length-bin width.
+#' @param cv,lmin,lmax_mult,bin Length-at-age CV and length grid; default
+#'   to `gear$grid` when `gear` is supplied, so the key matches the gear.
 #'
 #' @return An `FLQuant` containing seasonally weighted weight-at-age by year
 #'   and iteration.
@@ -1203,8 +1285,11 @@ sel_a_seasonal_avg <- function(lhpar, sel_len, age, n_seasons,
 #'
 #' @export
 wt_a_seasonal <- function(n_season, params, gear = NULL, n_seasons,
-                          model = vonbert, reflen = NULL, cv = 0.1,
-                          lmin = 5, lmax_mult = 1.2, bin = 1) {
+                          model = vonbert, reflen = NULL,
+                          cv = gear$grid$cv %||% 0.1,
+                          lmin = gear$grid$lmin %||% 5,
+                          lmax_mult = gear$grid$lmax_mult %||% 1.2,
+                          bin = gear$grid$bin %||% 1) {
   
   age <- an(dimnames(n_season)$age)
   years <- dimnames(n_season)$year
@@ -1220,8 +1305,8 @@ wt_a_seasonal <- function(n_season, params, gear = NULL, n_seasons,
     t <- (s - 0.5) / n_seasons
     ialk_t <- iALK(
       params = c(linf = linf, k = k, t0 = t0 - t),   # note: t0 - t, see note above
-      model = model, age = age, lmax = lmax_mult, reflen = reflen,
-      bin = bin, lmin = lmin
+      model = model, age = age, cv = cv, reflen = reflen, bin = bin,
+      lmin = lmin, max = max(len_grid(linf, lmin, lmax_mult, bin))
     )
     ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
     dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
@@ -1258,160 +1343,105 @@ wt_a_seasonal <- function(n_season, params, gear = NULL, n_seasons,
 }
 
 
-# }}}
-
 #' Heatmap of a gear's conditional inverse ALK
 #'
-#' ggplot equivalent of `image(gear$condALK)`: a length-at-age probability
-#' heatmap, \eqn{P(l \mid a,g)}, with labelled axes
-#' labels and a colour scale instead of `image()`'s default palette.
+#' UPDATED: the optional mean-length overlay is built with [gear_ialk()], so it
+#' uses the gear's own grid (any `lmax_mult`) and timing. Previously a
+#' hard-coded `lmax_mult = 1.2` gave a non-conformable `%*%` whenever the gear
+#' was built with a different `lmax_mult`, and `t = 0` biology was compared
+#' to `t = timing` catch.
 #'
-#' If `params` is supplied, two mean length-at-age lines are overlaid on
-#' the heatmap: the raw biological mean (unconditioned von Bertalanffy
-#' expectation) and the mean *implied by the heatmap itself*
-#' (`condALK %*% length`) -- i.e. what the gear actually samples. The gap
-#' between them is the within-age selectivity bias illustrated in
-#' [plot_condALK_bias()], shown here directly against the distribution it
-#' arises from rather than as a separate plot.
-#'
-#' @param gear A gear object as returned by [build_gear()] (needs
-#'   `condALK` and `len_bins`).
-#' @param params Optional. `FLPar`/named numeric vector with `linf`, `k`,
-#'   `t0`. If supplied, overlays the raw-vs-conditioned mean length-at-age
-#'   lines; if `NULL` (default), only the heatmap is drawn.
-#' @param cv,lmin,lmax_mult,bin Passed to `iALK()` when building the raw
-#'   comparison line; should match whatever was used to build `gear`.
-#'   Ignored if `params` is `NULL`.
-#' @param low,high Colours for the low/high ends of the probability scale.
-#'   Defaults chosen to read clearly against a white background.
-#'
+#' @param gear Gear object from [build_gear()].
+#' @param params Optional `FLPar` (`linf`, `k`, `t0`). If supplied (or
+#'   `TRUE`, meaning `gear$lhpar`), overlays biological vs. capture-conditioned
+#'   mean length-at-age.
+#' @param low,high Fill colours.
+#' @param ... Ignored; accepts the former `cv`, `lmin`, `lmax_mult`, `bin`
+#'   arguments, now taken from `gear$grid`.
 #' @return A `ggplot` object.
-#'
-#' @examples
-#' \dontrun{
-#' plot_condALK(trawl)                    # heatmap only
-#' plot_condALK(trawl, params = lhpar)    # heatmap + mean-length overlay
-#' plot_condALK(gillnet, params = lhpar)
-#' }
-#'
 #' @export
-plot_condALK <- function(gear, params = NULL, cv = 0.1, lmin = 5,
-                         lmax_mult = 1.2, bin = 1,
-                         low = "#FFFFCC", high = "#7F0000") {
-  
+plot_condALK <- function(gear, params = NULL,
+                         low = "#FFFFCC", high = "#7F0000", ...) {
   m <- gear$condALK
+  bin <- gear$grid$bin %||% 1
   df <- data.frame(
     age = as.numeric(rep(rownames(m), times = ncol(m))),
     len = as.numeric(rep(colnames(m), each = nrow(m))),
     p   = as.numeric(m)
   )
-  
-  p <- ggplot2::ggplot(df, ggplot2::aes(x = age, y = len)) +
+  p <- ggplot2::ggplot(df, ggplot2::aes(age, len)) +
     ggplot2::geom_raster(ggplot2::aes(fill = p)) +
-    ggplot2::scale_fill_gradient(
-      low = low, high = high, name = "P(len | age,\ncaught)"
-    ) +
-    ggplot2::labs(
-      x = "Age", y = "Length (cm)",
-      title = paste0("P(length | age, caught by ", gear$name, ")")
-    ) +
+    ggplot2::scale_fill_gradient(low = low, high = high,
+                                 name = "P(len | age,\ncaught)") +
+    ggplot2::labs(x = "Age", y = "Length (cm)",
+                  title = paste0("P(length | age, caught by ", gear$name, ")")) +
     ggplot2::theme_bw()
-  
-  if (!is.null(params)) {
-    
-    age <- as.numeric(rownames(m))
-    len_mid <- as.numeric(colnames(m)) + bin / 2
-    
-    ialk <- iALK(
-      params = c(linf = c(params["linf"]), k = c(params["k"]), t0 = c(params["t0"])),
-      age = age, cv = cv, lmin = lmin, lmax = lmax_mult, bin = bin
-    )
-    ialk_mat <- c(ialk)
-    dim(ialk_mat) <- dim(ialk)[1:2]
-    
+
+  if (isTRUE(params)) params <- gear$lhpar
+  if (!is.null(params) && !isFALSE(params)) {
+    age  <- as.numeric(rownames(m))
+    mids <- as.numeric(colnames(m)) + bin / 2
+    ialk_mat <- gear_ialk(gear, params = params)
     lines_df <- data.frame(
       age = rep(age, 2),
-      mean_len = c(as.numeric(ialk_mat %*% len_mid), as.numeric(m %*% len_mid)),
-      series = rep(c("Raw biology", "Conditioned on capture"), each = length(age))
+      mean_len = c(as.numeric(ialk_mat %*% mids), as.numeric(m %*% mids)),
+      series = rep(c("Biology", "Conditioned on capture"), each = length(age))
     )
-    
     p <- p +
-      ggplot2::geom_line(
-        data = lines_df,
-        ggplot2::aes(x = age, y = mean_len, linetype = series),
-        colour = "black", linewidth = 0.8, inherit.aes = FALSE
-      ) +
-      ggplot2::scale_linetype_manual(values = c("Raw biology" = "solid",
-                                                "Conditioned on capture" = "dashed"),
-                                     name = NULL) +
+      ggplot2::geom_line(data = lines_df,
+                         ggplot2::aes(age, mean_len, linetype = series),
+                         colour = "black", linewidth = 0.8, inherit.aes = FALSE) +
+      ggplot2::scale_linetype_manual(
+        values = c(Biology = "solid", "Conditioned on capture" = "dashed"),
+        name = NULL) +
       ggplot2::theme(legend.box = "vertical")
   }
-  
   p
 }
 
-#' Compare raw vs. gear-conditioned mean length-at-age for one or more gears
+
+#' Raw vs. gear-conditioned mean length-at-age
 #'
-#' Overlays the raw biological mean length-at-age against the
-#' capture-conditioned mean length-at-age for each gear in `om_gears`,
-#' illustrating how dome-shaped or asymmetric selectivity biases the
-#' *within-age* length distribution actually observed in the catch --
-#' distinct from, and in addition to, its effect on which ages are caught
-#' at all.
+#' UPDATED: the raw biological line is now evaluated at the same within-year
+#' `timing` (and grid) the gears were built with. Previously it was evaluated
+#' at `timing = 0` while `condALK` used `t0 - timing`, so for
+#' `timing = 0.5` half a year of growth appeared as "selectivity bias".
 #'
-#' @param om_gears Named list of gear objects as returned by
-#'   [build_gear()].
-#' @param params `FLPar`/named numeric vector with `linf`, `k`, `t0`, used
-#'   to build the raw (unconditioned) inverse ALK for comparison.
-#' @param age Integer vector of ages. Defaults to the age range implied
-#'   by `om_gears[[1]]$condALK`'s row names.
-#' @param cv,lmin,lmax_mult,bin Passed to `iALK()` when building the raw
-#'   ALK; should match whatever was used to build `om_gears`.
-#'
-#' @return A `ggplot` object, one coloured line per gear plus one for
-#'   "Raw biology".
-#'
-#' @examples
-#' \dontrun{
-#' plot_condALK_bias(list(Trawl = trawl, Gillnet = gillnet), lhpar)
-#' }
-#'
+#' @param om_gears Named list returned by [build_gear()].
+#' @param params `FLPar` with `linf`, `k`, `t0`. Default the gear's `lhpar`.
+#' @param timing,cv,lmin,lmax_mult,bin Default to `om_gears[[1]]$grid`.
+#' @return A `ggplot` object.
 #' @export
-plot_condALK_bias <- function(om_gears, params,
-                              age = as.numeric(rownames(om_gears[[1]]$condALK)),
-                              cv = 0.1, lmin = 5, lmax_mult = 1.2, bin = 1) {
-  
-  ialk <- iALK(
-    params = c(linf = c(params["linf"]), k = c(params["k"]), t0 = c(params["t0"])),
-    age = age, cv = cv, lmin = lmin, lmax = lmax_mult, bin = bin
-  )
-  ialk_mat <- c(ialk)
-  dim(ialk_mat) <- dim(ialk)[1:2]
-  len_mid <- as.numeric(dimnames(ialk)$len) + bin / 2
-  
-  raw_mean_len <- as.numeric(ialk_mat %*% len_mid)
-  
-  gear_lines <- lapply(names(om_gears), function(g) {
-    cm <- om_gears[[g]]$condALK
-    len_mid_g <- as.numeric(colnames(cm)) + bin / 2
-    data.frame(
-      age = age,
-      mean_len = as.numeric(cm %*% len_mid_g),
-      series = g
-    )
-  })
-  
+plot_condALK_bias <- function(om_gears, params = om_gears[[1]]$lhpar,
+                              timing = om_gears[[1]]$grid$timing %||% 0,
+                              cv = om_gears[[1]]$grid$cv %||% 0.1,
+                              lmin = om_gears[[1]]$grid$lmin %||% 5,
+                              lmax_mult = om_gears[[1]]$grid$lmax_mult %||% 1.2,
+                              bin = om_gears[[1]]$grid$bin %||% 1) {
+
+  age <- as.numeric(rownames(om_gears[[1]]$condALK))
+  g1 <- om_gears[[1]]
+  g1$grid <- list(lmin = lmin, lmax_mult = lmax_mult, bin = bin, cv = cv,
+                  timing = timing)
+  ialk_mat <- gear_ialk(g1, age = age, params = params)
+  len_mid <- as.numeric(colnames(ialk_mat)) + bin / 2
+
   df <- rbind(
-    data.frame(age = age, mean_len = raw_mean_len, series = "Raw biology"),
-    do.call(rbind, gear_lines)
+    data.frame(age = age, mean_len = as.numeric(ialk_mat %*% len_mid),
+               series = "Biology"),
+    do.call(rbind, lapply(names(om_gears), function(g) {
+      cm <- om_gears[[g]]$condALK
+      data.frame(age = age,
+                 mean_len = as.numeric(cm %*% (as.numeric(colnames(cm)) + bin / 2)),
+                 series = g)
+    }))
   )
-  
-  ggplot2::ggplot(df, ggplot2::aes(x = age, y = mean_len, colour = series)) +
+
+  ggplot2::ggplot(df, ggplot2::aes(age, mean_len, colour = series)) +
     ggplot2::geom_line(linewidth = 1) +
-    ggplot2::labs(
-      x = "Age", y = "Mean length (cm)", colour = NULL,
-      title = "Raw vs. gear-conditioned mean length-at-age"
-    ) +
+    ggplot2::labs(x = "Age", y = "Mean length (cm)", colour = NULL,
+                  title = paste0("Mean length-at-age at t = ", timing,
+                                 ": biology vs. gear-conditioned")) +
     ggplot2::theme_bw()
 }
 
@@ -1429,11 +1459,8 @@ plot_condALK_bias <- function(om_gears, params,
 #' @param show_seasons Logical; if `TRUE`, add the individual seasonal curves.
 #' @param model Growth function or model object. Defaults to `vonbert`.
 #' @param reflen Optional reference length passed to [iALK()].
-#' @param cv Numeric coefficient of variation in length-at-age.
-#' @param lmin Numeric lower limit of the length grid.
-#' @param lmax_mult Numeric multiplier applied to `linf` for the upper length
-#'   limit.
-#' @param bin Numeric length-bin width.
+#' @param cv,lmin,lmax_mult,bin Length-at-age CV and length grid; default
+#'   to `gear$grid`. The key is always built on the grid of `gear$sel_len`.
 #'
 #' @return A `ggplot` object.
 #'
@@ -1450,20 +1477,24 @@ plot_condALK_bias <- function(om_gears, params,
 #' @export
 plot_sel_a_seasonal <- function(gear, lhpar, age, n_seasons,
                                 show_seasons = TRUE,
-                                model = vonbert, reflen = NULL, cv = 0.1,
-                                lmin = 5, lmax_mult = 1.2, bin = 1) {
+                                model = vonbert, reflen = NULL,
+                                cv = gear$grid$cv %||% 0.1,
+                                lmin = gear$grid$lmin %||% 5,
+                                lmax_mult = gear$grid$lmax_mult %||% 1.2,
+                                bin = gear$grid$bin %||% 1) {
   
   sel_len_vec <- as.numeric(gear$sel_len)
   names(sel_len_vec) <- dimnames(gear$sel_len)$len
   
+  lens <- an(names(sel_len_vec))          # the gear's own length grid
   linf <- c(lhpar["linf"]); k <- c(lhpar["k"]); t0 <- c(lhpar["t0"])
   
   season_df <- do.call(rbind, lapply(seq_len(n_seasons), function(s) {
     t <- (s - 0.5) / n_seasons
     ialk_t <- iALK(
       params = c(linf = linf, k = k, t0 = t0 - t),
-      model = model, age = age, lmax = lmax_mult, reflen = reflen,
-      bin = bin, lmin = lmin
+      model = model, age = age, cv = cv, reflen = reflen,
+      bin = bin, lmin = min(lens), max = max(lens)
     )
     ialk_mat <- c(ialk_t); dim(ialk_mat) <- dim(ialk_t)[1:2]
     dimnames(ialk_mat) <- list(age = dimnames(ialk_t)$age, len = dimnames(ialk_t)$len)
