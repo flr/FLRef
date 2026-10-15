@@ -10,31 +10,45 @@ lfd.sim.season(
   n_seasons = dim(object)[4],
   ess_age = gear$ess_age,
   ess_len = gear$ess_len,
-  params = NULL,
+  params = gear$lhpar,
+  u_age = NULL,
+  u_len = NULL,
+  season = TRUE,
   ...
 )
 }
 \arguments{
 \item{object}{An `FLQuant` containing catch-at-age with a populated season
-dimension.}
+dimension, e.g. annual gear catch-at-age multiplied by
+[season_fraction()].}
 
 \item{gear}{Gear object returned by [build_gear()].}
 
 \item{n_seasons}{Integer number of seasons. Defaults to the size of the
 season dimension in `object`.}
 
-\item{ess_age, ess_len}{Effective sample sizes. A scalar is divided equally,
-after rounding, among seasons; a vector of length `n_seasons` specifies
-season-specific values.}
+\item{ess_age, ess_len}{Effective sample sizes. A scalar is the annual
+total, split among seasons so that the seasonal values sum exactly to it
+(largest remainder, [split_ess()]); a vector of length `n_seasons`
+specifies season-specific values (e.g. `c(0, 200, 200, 100)`).}
 
 \item{params}{Growth parameters coercible to an `FLPar`; must contain
-`linf`, `k`, and `t0`.}
+`linf`, `k`, and `t0`. Defaults to `gear$lhpar`.}
 
-\item{...}{Additional arguments passed to [lfd.sim()].}
+\item{u_age, u_len}{Optional common-random-number streams: lists of length
+`n_seasons`, element `s` a `[draw, year, iter]` array with
+`ess_age[s]` (`ess_len[s]`) draws, as returned by [rUnif_lfd()] for a
+gear with `n_seasons > 1`, subset to the years of `object`.}
+
+\item{season}{Logical. `TRUE` (default, as before) returns the samples in
+the season dimension; `FALSE` returns the annual sample pooled over
+seasons with `seasonSums()`.}
+
+\item{...}{Additional arguments passed to [lfd.sim()] (e.g. `scale`).}
 }
 \value{
-An `FLQuant` containing sampled length frequencies by season, year,
-  and iteration.
+An `FLQuant` of sampled length frequencies by season (or pooled
+  over seasons when `season = FALSE`), year and iteration.
 }
 \description{
 Applies [lfd.sim()] separately to each season of a season-structured
@@ -42,8 +56,15 @@ catch-at-age object. Seasonal midpoint timing is
 `(season - 0.5) / n_seasons`.
 }
 \details{
-A separate stage-1 age sample is drawn for each season. Scalar sample sizes
-are divided using `round(ess / n_seasons)` in every season.
+Each season is an independent sampling event: a stage-1 age sample of size
+`ess_age[s]` and a stage-2 length sample of size `ess_len[s]`, with the
+conditional ALK rebuilt at the season mid-point. Together with
+[season_fraction()] this emulates continuous (monthly or quarterly)
+length sampling of a fishery from an annual operating model.
+
+Scalar sample sizes were previously split with `round(ess / n_seasons)`,
+which does not preserve the total (e.g. 50 / 12 gave 48); they are now
+split exactly.
 }
 \examples{
 \dontrun{

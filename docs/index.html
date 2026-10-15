@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FLRef</title>
+<style>
+  :root { --text: #1f2328; --muted: #57606a; --bg: #ffffff; --panel: #f6f8fa; --accent: #0b5d8a; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --text: #e6edf3; --muted: #9da7b3; --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.6 "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px; }
+  h1 { margin-bottom: 4px; }
+  h2.section { font-size: 1.2rem; margin-top: 32px; }
+  p.sub { color: var(--muted); margin-top: 0; }
+  a { color: var(--accent); }
+  .card { background: var(--panel); border-radius: 8px; padding: 14px 18px; margin: 14px 0; }
+  .card h3 { font-size: 1.05rem; margin: 0 0 4px; }
+  .card p { margin: 0; }
+  .planned h3 { color: var(--muted); }
+  .tag { font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>FLRef</h1>
+<p class="sub">Reference points, operating models and observation models for advice rules</p>
+
+<h2 class="section">Length-frequency simulation</h2>
+
+<div class="card">
+  <h3><a href="lfd-01-single-sex.html">1. Simulating length-frequency data: a step-by-step guideline (single-sex stock)</a></h3>
+  <p>North Sea plaice (<code>ple4</code>, <code>ple4.index</code>): growth from catch weights,
+  inverse ALKs, length selectivity for a commercial fleet and a survey (<code>build_gear()</code>),
+  catch partition by gear, single- and two-stage sampling (<code>len.sim()</code>,
+  <code>lfd.sim()</code>), effective sample size and common random numbers, age-length keys,
+  raising to catch weight. Then a January pulse survey with continuous (quarterly, monthly)
+  fishery sampling, the <code>season</code> switch, and annual versus continuous designs
+  contrasted. Finally both designs in an <code>mse::mp()</code> run with
+  <code>sampling.lfd.oem()</code> and checks.</p>
+</div>
+
+<div class="card planned">
+  <h3>2. Sex-structured stocks (<code>unit.type = "gender"</code>)</h3>
+  <p><span class="tag">In preparation.</span> <code>ple4sex</code> with sex-specific growth,
+  one sampling event per gear on the combined catch, sexed and unsexed length samples.</p>
+</div>
+
+<div class="card planned">
+  <h3>3. Spatial stocks (<code>unit.type = "spatial"</code>)</h3>
+  <p><span class="tag">In preparation.</span> Areas as units with area-specific gears, independent
+  samples per area, raising to catch by area and pooling. Supporting material for the ICES
+  deep-sea working group report.</p>
+</div>
+</main>
+</body>
+</html>

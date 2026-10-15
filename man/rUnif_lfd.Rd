@@ -7,7 +7,8 @@
 rUnif_lfd(om_gears, years, nsim, seed = NULL)
 }
 \arguments{
-\item{om_gears}{Named list of gear objects returned by [build_gear()].}
+\item{om_gears}{Named list of gear objects returned by [build_gear()]
+(one area; for several areas call it once per area).}
 
 \item{years}{Vector of years.}
 
@@ -16,12 +17,19 @@ rUnif_lfd(om_gears, years, nsim, seed = NULL)
 \item{seed}{Optional integer random seed.}
 }
 \value{
-A list with components `age` and `len`. Each component is a named
-  list of `[draw, year, iter]` arrays, one per gear.
+A list with components `age` and `len`. Each is a named list, one
+  element per gear: a `[draw, year, iter]` array for gears sampled once a
+  year, or, for gears with `n_seasons > 1` (see [build_gear()]), a list
+  of `n_seasons` such arrays sized by the seasonal sample sizes
+  ([split_ess()]), as expected by [lfd.sim.season()].
 }
 \description{
 Generates uniform-deviate arrays for the age and length stages of
 [lfd.sim()] for every gear.
+}
+\details{
+Gears sampled once a year get exactly the same deviates as in
+  earlier versions for the same `seed`.
 }
 \examples{
 \dontrun{

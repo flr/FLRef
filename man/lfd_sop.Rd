@@ -7,7 +7,7 @@
 lfd_sop(lfd, wt_len, catch)
 }
 \arguments{
-\item{lfd}{`FLQuant` length sample (len x year x unit x ... x iter).}
+\item{lfd}{`FLQuant` length sample (len x year x unit x season x ... x iter).}
 
 \item{wt_len}{Named numeric weight-at-length (names = length bins of
 `lfd`), e.g. `gear$wt_len` from [build_gear()], or a gear object.}
@@ -25,7 +25,10 @@ Length analogue of `FLRef::sops()` (which raises catch-at-age with
 its sum of products with weight-at-length equals the catch weight,
 \deqn{\tilde N_{l,y,u}=N_{l,y,u}\,
       \frac{C_{y,u}}{\sum_{l'}N_{l',y,u}\,W(l')}.}
-Years/units with zero sample or zero catch return zero.
+Years/units with zero sample or zero catch return zero. For a seasonal
+sample (season dimension > 1) and annual catch, one raising factor per year
+is computed from the sample pooled over seasons and applied to every
+season.
 }
 \seealso{
 [sampling.lfd.oem()] (`lfd.raising = TRUE`)

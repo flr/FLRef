@@ -879,9 +879,22 @@ plot_sel_age <- function(object,
 #'
 #' @param gear_cfg Named list of gear configurations. Each gear must contain
 #'   `type` (`"logistic"`, `"normal"` or `"dnormal"`), `f_mult`, `ess_age` and
-#'   `ess_len`; all remaining entries are passed to [sel_la()] as that type's
-#'   selectivity parameters (`L50`/`L95`; `Lpeak`/`sd`;
-#'   `Lpeak`/`sd_left`/`sd_right`).
+#'   `ess_len`. Optional sampling-design entries:
+#'   \describe{
+#'     \item{`obs`}{`"fishery"` (default) or `"survey"`. A survey removes no
+#'       catch (`f_mult = 0`, the default for surveys) and is sampled from
+#'       numbers-at-age at `timing` weighted by its selectivity-at-age, see
+#'       [survey_n_gear()].}
+#'     \item{`timing`}{Gear-specific within-year timing, overriding the
+#'       `timing` argument (e.g. a survey in January, `1/24`).}
+#'     \item{`n_seasons`}{Sampling resolution of a fishery within the year:
+#'       `1` (default) is one annual sample at `timing`; `4` or `12` emulate
+#'       quarterly or monthly (continuous) sampling, with `ess_age` and
+#'       `ess_len` the annual totals split among seasons (see
+#'       [lfd.sim.season()], [sample_lfd_gears()]).}
+#'   }
+#'   All remaining entries are that type's selectivity parameters
+#'   (`L50`/`L95`; `Lpeak`/`sd`; `Lpeak`/`sd_left`/`sd_right`).
 #' @param lhpar `FLPar` with at least `linf`, `k` and `t0`.
 #' @param age Numeric vector of ages (the OM's age dimension).
 #' @param amin,amax Minimum and maximum ages passed to [sel_la()].
@@ -892,7 +905,8 @@ plot_sel_age <- function(object,
 #' @param cv Coefficient of variation of length-at-age. Default `0.1`.
 #' @param timing Within-year timing (fraction of a year) at which length-at-age
 #'   is evaluated; growth uses `t0 - timing`. Use the mid-point of the fishing
-#'   / sampling season (e.g. `0.5`). Default `0`.
+#'   / sampling season (e.g. `0.5`). Default `0`. Can be overridden per gear
+#'   by a `timing` entry in `gear_cfg`.
 #' @param fbar_range Optional ages defining Fbar, either the full vector
 #'   (`3:19`) or `c(minfbar, maxfbar)`. When supplied, each gear additionally
 #'   carries `sel_a_fbar` and `f_share` (see Value). Required by
@@ -917,6 +931,7 @@ plot_sel_age <- function(object,
 #'   \item{len_bins}{Data frame of lower, upper and mid lengths.}
 #'   \item{condALK}{Matrix \eqn{P(l \mid a, g)}, ages in rows.}
 #'   \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
+#'   \item{obs, n_seasons}{Sampling design (defaults `"fishery"`, `1`).}
 #'   \item{lhpar}{`lhpar`, used as the default `params` of [lfd.sim()].}
 #'   \item{lw}{Length-weight parameters `c(a, b)` taken from `lhpar`
 #'     (`NULL` if `lhpar` has no `a`/`b`).}
@@ -978,8 +993,20 @@ build_gear <- function(gear_cfg, lhpar, age,
 
   build_one <- function(cfg, name) {
 
-    reserved <- c("type", "f_mult", "ess_age", "ess_len")
-    missing_req <- setdiff(reserved, names(cfg))
+    ## sampling-design entries (optional): obs, timing, n_seasons
+    obs <- match.arg(cfg$obs %||% "fishery", c("fishery", "survey"))
+    if (obs == "survey" && is.null(cfg$f_mult)) cfg$f_mult <- 0
+    timing_g <- cfg$timing %||% timing
+    n_seas_g <- as.integer(cfg$n_seasons %||% 1L)
+    if (obs == "survey" && n_seas_g > 1)
+      stop("Gear '", name, "': a survey is a pulse sample at 'timing'; ",
+           "n_seasons > 1 is for continuous fishery sampling.")
+    if (obs == "survey" && cfg$f_mult != 0)
+      stop("Gear '", name, "': a survey must have f_mult = 0.")
+
+    required <- c("type", "f_mult", "ess_age", "ess_len")
+    reserved <- c(required, "obs", "timing", "n_seasons")
+    missing_req <- setdiff(required, names(cfg))
     if (length(missing_req)) {
       stop("Gear '", name, "' is missing required entries: ",
            paste(missing_req, collapse = ", "), ".")
@@ -994,7 +1021,7 @@ build_gear <- function(gear_cfg, lhpar, age,
     ## sel_la() call + plus-group reconciliation, which was only needed
     ## because the two functions built their grids differently.
     grid_g <- list(lmin = lmin, lmax_mult = lmax_mult, bin = bin, cv = cv,
-                   timing = timing)
+                   timing = timing_g)
     ialk_mat <- gear_ialk(list(lhpar = lhpar, grid = grid_g), age = age)
     len_ialk_chr <- colnames(ialk_mat)
     mids <- as.numeric(len_ialk_chr) + bin / 2
@@ -1040,11 +1067,13 @@ build_gear <- function(gear_cfg, lhpar, age,
       f_mult   = cfg$f_mult,
       ess_age  = cfg$ess_age,
       ess_len  = cfg$ess_len,
+      obs      = obs,
+      n_seasons = n_seas_g,
       lhpar    = lhpar,
       lw       = lw,
       wt_len   = wt_len,
       grid     = list(lmin = lmin, lmax_mult = lmax_mult, bin = bin, cv = cv,
-                      timing = timing, fbar_range = NULL)
+                      timing = timing_g, fbar_range = NULL)
     )
   }
 

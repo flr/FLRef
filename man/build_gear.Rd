@@ -22,9 +22,22 @@ build_gear(
 \arguments{
 \item{gear_cfg}{Named list of gear configurations. Each gear must contain
 `type` (`"logistic"`, `"normal"` or `"dnormal"`), `f_mult`, `ess_age` and
-`ess_len`; all remaining entries are passed to [sel_la()] as that type's
-selectivity parameters (`L50`/`L95`; `Lpeak`/`sd`;
-`Lpeak`/`sd_left`/`sd_right`).}
+`ess_len`. Optional sampling-design entries:
+\describe{
+  \item{`obs`}{`"fishery"` (default) or `"survey"`. A survey removes no
+    catch (`f_mult = 0`, the default for surveys) and is sampled from
+    numbers-at-age at `timing` weighted by its selectivity-at-age, see
+    [survey_n_gear()].}
+  \item{`timing`}{Gear-specific within-year timing, overriding the
+    `timing` argument (e.g. a survey in January, `1/24`).}
+  \item{`n_seasons`}{Sampling resolution of a fishery within the year:
+    `1` (default) is one annual sample at `timing`; `4` or `12` emulate
+    quarterly or monthly (continuous) sampling, with `ess_age` and
+    `ess_len` the annual totals split among seasons (see
+    [lfd.sim.season()], [sample_lfd_gears()]).}
+}
+All remaining entries are that type's selectivity parameters
+(`L50`/`L95`; `Lpeak`/`sd`; `Lpeak`/`sd_left`/`sd_right`).}
 
 \item{lhpar}{`FLPar` with at least `linf`, `k` and `t0`.}
 
@@ -43,7 +56,8 @@ Default `1.2`.}
 
 \item{timing}{Within-year timing (fraction of a year) at which length-at-age
 is evaluated; growth uses `t0 - timing`. Use the mid-point of the fishing
-/ sampling season (e.g. `0.5`). Default `0`.}
+/ sampling season (e.g. `0.5`). Default `0`. Can be overridden per gear
+by a `timing` entry in `gear_cfg`.}
 
 \item{fbar_range}{Optional ages defining Fbar, either the full vector
 (`3:19`) or `c(minfbar, maxfbar)`. When supplied, each gear additionally
@@ -71,6 +85,7 @@ A named list, one element per gear, each a list with
   \item{len_bins}{Data frame of lower, upper and mid lengths.}
   \item{condALK}{Matrix \eqn{P(l \mid a, g)}, ages in rows.}
   \item{f_mult, ess_age, ess_len}{As supplied in `gear_cfg`.}
+  \item{obs, n_seasons}{Sampling design (defaults `"fishery"`, `1`).}
   \item{lhpar}{`lhpar`, used as the default `params` of [lfd.sim()].}
   \item{lw}{Length-weight parameters `c(a, b)` taken from `lhpar`
     (`NULL` if `lhpar` has no `a`/`b`).}
