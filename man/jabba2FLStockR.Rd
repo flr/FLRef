@@ -5,6 +5,8 @@
 \title{jabba2FLStockR()}
 \usage{
 jabba2FLStockR(jabba, blim = 0.3, bthr = 0.5, thin = 10, rel = FALSE)
+
+jabba2FLStockR(jabba, blim = 0.3, bthr = 0.5, thin = 10, rel = FALSE)
 }
 \arguments{
 \item{jabba}{fit from JABBA fit_jabba() or jabba$kbtrj}
@@ -19,7 +21,11 @@ jabba2FLStockR(jabba, blim = 0.3, bthr = 0.5, thin = 10, rel = FALSE)
 }
 \value{
 FLStockR with refpts
+
+FLStockR with refpts
 }
 \description{
+jabba2FLStockR()
+
 jabba2FLStockR()
 }

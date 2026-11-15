@@ -429,3 +429,42 @@ fwdF4B =  function (stock, sr, btgt, nfy = 3, niy = 1, ival = niy, imet = "TAC",
   }
   return(out)
 }
+
+
+#' Equilibrium depletion implied by SPR under Beverton-Holt steepness
+#'
+#' Maps a spawning potential ratio (SPR, spawning biomass per recruit
+#' relative to unfished) to equilibrium spawning biomass relative to
+#' unfished, \eqn{B/B_0}, for a Beverton-Holt stock-recruit relationship with
+#' steepness \eqn{s}:
+#' \deqn{\frac{B}{B_0}=\frac{4s\,\mathrm{SPR}-(1-s)}{5s-1},}
+#' truncated at zero below \eqn{\mathrm{SPR}_{crash}=(1-s)/(4s)}. The mapping
+#' is the identity at \eqn{s=1} (constant recruitment).
+#'
+#' @details
+#' With \eqn{R(B)=4sR_0B/[\phi_0R_0(1-s)+(5s-1)B]} and the equilibrium
+#' condition \eqn{B=R\,\phi(F)}, solving for \eqn{B} and dividing by
+#' \eqn{B_0=R_0\phi_0} gives the equation above. Use it to express
+#' per-recruit status estimates (e.g. from length-based SPR methods) on the
+#' biomass scale when recruitment depends on stock size. Relative to an SPR
+#' target, \code{spr2depletion(spr, s) / spr2depletion(spr_tgt, s)} gives
+#' \eqn{B/B_{\mathrm{SPR}tgt}}.
+#'
+#' @param spr Numeric vector or \code{FLQuant} of SPR (0-1).
+#' @param s Beverton-Holt steepness, \code{0.2 < s <= 1}.
+#'
+#' @return Object of the same class as \code{spr}.
+#'
+#' @examples
+#' spr2depletion(c(0.2, 0.4, 0.6, 1), s = 0.75)
+#' ## status relative to an SPR40 target on the biomass scale
+#' spr2depletion(0.3, 0.75) / spr2depletion(0.4, 0.75)
+#'
+#' @export
+spr2depletion <- function(spr, s) {
+  if (length(s) != 1 || s <= 0.2 || s > 1)
+    stop("'s' must be a single value in (0.2, 1].")
+  v <- (4 * s * spr - (1 - s)) / (5 * s - 1)
+  v[] <- pmax(as.numeric(v), 0)
+  v
+}

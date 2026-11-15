@@ -11,7 +11,8 @@ spict2FLStockR(
   rel = FALSE,
   osa = FALSE,
   forecast = NULL,
-  itsCI = 1
+  itsCI = 1,
+  seed = 123
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ spict2FLStockR(
 \item{forecast}{extract forecast TRUE/FALSE}
 
 \item{itsCI}{number of iterations to depict uncertainty in plots}
+
+\item{seed}{random seed for consistent sampling across scenarios}
 }
 \value{
 FLStockR with refpts

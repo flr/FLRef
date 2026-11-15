@@ -4,7 +4,16 @@
 \alias{fwd2type1}
 \title{Function to summarise Type 1 GFCM fishing opportunities}
 \usage{
-fwd2type1(stock, uncertainty, eval.yrs = NULL, dB = NULL, refyr = NULL)
+fwd2type1(
+  stock,
+  uncertainty = NULL,
+  eval.yrs = NULL,
+  dB = NULL,
+  refyr = NULL,
+  rel = NULL,
+  osa = FALSE,
+  maxdec = 2
+)
 }
 \arguments{
 \item{uncertainty}{*FLStocks* with list of *FLStockR* objects and iters}
@@ -12,6 +21,12 @@ fwd2type1(stock, uncertainty, eval.yrs = NULL, dB = NULL, refyr = NULL)
 \item{eval.yrs}{evaluation years of forecast}
 
 \item{refyr}{change in percentage biomass to refyr}
+
+\item{rel}{values of biomass and F are expressed relative to the target}
+
+\item{osa}{one-step-ahead for the biomass evaluation year}
+
+\item{maxdec}{maximum decimal}
 
 \item{stk}{*FLStocks* with list of *FLStockR* objects}
 }

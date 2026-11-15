@@ -208,6 +208,7 @@ newselex<- function(object,selexpars){
 
 bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
   
+  sel = sel%/%apply(sel,2:6,max)
   if(dims(sel)$unit<dims(object)$unit){
     sel <- expand(sel, unit = c("F", "M"))
   }
@@ -215,9 +216,10 @@ bioidx.sim <- function(object,sel=catch.sel(object),sigma=0.2,q=0.001,rho=0){
   years = ac(dimnames(object)$year)
   selinp[] = sel
   idx = survey(object,sel=selinp,biomass=TRUE)
-  idx@index.q[] =  ar1rlnorm(rho=rho,
-                             years=years,iters= dims(object)$iter,meanlog=log(q),sdlog=sigma)
+  qdevs =  FLQuant(rlnormar1(rho=rho,years=years,n= dims(object)$iter,meanlog=0,sdlog=sigma),quant="age")
     
+  idx@index.q = q*qdevs
+
   idx@index.var[] = sigma
   idx@index = idx@index.q*idx@index
   
@@ -304,456 +306,81 @@ pgquant <- function(object,pg){
 }
 # }}}
 
+
+
 # ca.sim() {{{
 
-#' generates catch.n with lognormal annual and multinomial age composition observation error 
-#' @param object FLQuant
-#' @param sel FLQuant with selectivity.pattern e.g. catch.sel()
-#' @param ess effective sample size for age composition
-#' @param what c("catch", "landings", "discards")
-#' @param rescale rescale to the abudance scale of the input 
-#' @return FLQuant with catch.n samples
-#' @export 
-#' @examples 
+# Adds an optional `u`
+# argument for CRN-safe sampling; existing call sites that don't pass `u`
+# are unaffected (falls back to the original stats::rmultinom() behaviour).
+
+#' Generate catch.n with lognormal annual and multinomial age composition
+#' observation error
+#'
+#' @param object `FLQuant` of true numbers/catch-at-age.
+#' @param ess Effective sample size for the age-composition sample.
+#' @param u Optional. A `[ess, year, iter]` array of pre-generated
+#'   `Uniform(0,1)` deviates (e.g. from [rUnif_lfd()]) for CRN-safe
+#'   sampling via [rmultinom_crn()]. If `NULL` (default), sampling falls
+#'   back to `stats::rmultinom()` against the live RNG, i.e. the original
+#'   `ca.sim()` behaviour is unchanged.
+#' @param what One of `"catch"`, `"landings"`, `"discards"` (currently
+#'   unused inside the function body, kept for interface compatibility
+#'   with the original `ca.sim()`).
+#' @param rescale Logical. If `TRUE`, rescale the sampled age composition
+#'   back to the abundance scale of `object` (sampled proportions x true
+#'   total), rather than returning raw counts on the `ess` scale.
+#'
+#' @return `FLQuant`, same dimensions as `object`, with sampled
+#'   catch-at-age (or rescaled proportions x true total, if
+#'   `rescale=TRUE`).
+#'
+#' @examples
+#' \dontrun{
 #' data(ple4)
-#' object = propagate(catch.sel(ple4),10)
-#' ca = ca.sim(object,ess=200)
-#' # Checks
-#' ggplot(ca)+geom_line(aes(year,data,col=ac(iter)))+facet_wrap(~age)+
-#' theme(legend.position = "none")+ylab("Index")
-ca.sim <- function(object,ess=200,what= c("catch", "landings", "discards")[1],rescale=FALSE){
-  res=object
-  ref=res
-  # Sample age-comp from multinomial
-  for(i in seq(dims(object)$iter)){
-    for(y in seq(dims(object)$year)){
-      prob =  c(res[,y,,,,i]%/%apply(res[,y,,,,i],2,sum))
-      res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob),1,sum)
-    }
-  }
-  if(rescale){
-    
-    res = quantSums(ref)%*%(res%/%quantSums(res))  
-    
-  }
-  #fac = apply(ref,2:6,sum)/apply(res,2:6,sum)
-  #res = res%*%fac
-  return(res)
-}
-# }}}
-
-# iALK() {{{
-#
-#' inverse ALK function with lmin added to FLCore::invALK 
-#' @param params growth parameter, default FLPar(linf,k,t0)
-#' @param model growth model, only option currently vonbert
-#' @param age age vector
-#' @param cv of length-at-age
-#' @param lmax maximum upper length specified lmax*linf
-#' @param max maximum size value
-#' @param lmin minimum length
-#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
-#' @param bin length bin size, dafault 1
-#' @param timing t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5
-#' @param unit default is "cm"
-#' @return FLPar age-length matrix
-#' @export 
-
-iALK <- function(params, model=vonbert, age, cv=0.1,lmin=5, lmax=1.2, bin=1,
-                   max=ceiling(linf * lmax), reflen=NULL) {
+#' object <- propagate(catch.n(ple4), 10)
+#'
+#' ## original behaviour, unchanged
+#' ca1 <- ca.sim(object, ess = 200)
+#'
+#' ## CRN-safe: same u -> same sample, even if called twice
+#' u <- array(runif(200 * dim(object)[2] * 10),
+#'            dim = c(200, dim(object)[2], 10))
+#' ca2 <- ca.sim(object, ess = 200, u = u)
+#' ca3 <- ca.sim(object, ess = 200, u = u)
+#' stopifnot(identical(ca2, ca3))
+#' }
+#'
+#' @export
+ca.sim <- function(object, ess = 200, u = NULL,
+                   what = c("catch", "landings", "discards")[1],
+                   rescale = FALSE) {
   
-  linf <- c(params['linf'])
+  res <- object
+  ref <- res
   
-  # FOR each age
-  bins <- seq(lmin, max, bin)
-  
-  # METHOD
-  if(isS4(model))
-    len <- do.call(model, list(age=age,params=params))
-  else {
-    lparams <- as(FLPar(params), "list")
-    len <- do.call(model, c(list(age=age),
-                            lparams[names(lparams) %in% names(formals(model))]))
-  }
-  
-  if(is.null(reflen)) {
-    sd <- abs(len * cv)
-  } else {
-    sd <- reflen * cv
-  }
-  
-  probs <- Map(function(x, y) {
-    p <- c(pnorm(1, x, y),
-           dnorm(bins[-c(1, length(bins))], x, y),
-           pnorm(bins[length(bins)], x, y, lower.tail=FALSE))
-    return(p / sum(p))
-  }, x=len, y=sd)
-  
-  res <- do.call(rbind, probs)
-  
-  alk <- FLPar(array(res, dim=c(length(age), length(bins), 1)),
-               dimnames=list(age=age, len=bins, iter=1), units="")
-  
-  return(alk)
-} 
-# }}}
-
-# ALK() {{{
-#
-#' ALK function
-#' @param N_a numbers at age sample for single event
-#' @param iALK from iALK() outout
-#' @return FLPar of ALK
-#' @export 
-ALK <- function(N_a,iALK){
-  alk = iALK
-  alk[] = N_a
-  alk = alk*iALK
-  alksum =apply(alk,2,sum)
-  for(i in 1:dim(alk)[1]){
-    alk[i,]=alk[i,]/an(alksum)
-  }   
-  return(alk)
-}
-# }}}
-
-# alk.sample() {{{
-#
-#' generates annual ALK sample with length stratified sampling
-#' @param lfds length frequency *FLQuant*
-#' @param alks annual ALK proportions at age output form ALKs() *FLPars*
-#' @param nbin number of samples per length bin
-#' @param n.sample sample size of lfd 
-#' @return FLPars of sampled ALK
-#' @export 
-
-alk.sample <- function(lfds,alks,nbin = 20,n.sample=1){
-  res = alks
-  if(n.sample>1){
-    lfdn = lfds%/%apply(lfds,2:6,sum)*n.sample
-  } else {
-    lfdn = lfds
-  }
-  for(i in seq(dims(lfds)$iter)){
-    for(y in seq(dims(lfds)$year)){
-      nL = pmin(lfdn[,y],nbin )  # check len samples
-      for(l in seq(dim(alks[[1]])[2])){
-        if(nL[l]>1){  
-          res[[y]][,l][] = apply(rmultinom(nL[l], 1, prob = c(alks[[y]][,l])),1,sum)
-        } else {
-          res[[y]][,l][] = 0}
-        
+  for (i in seq(dims(object)$iter)) {
+    for (y in seq(dims(object)$year)) {
+      
+      prob <- c(res[, y, , , , i] %/% apply(res[, y, , , , i], 2, sum))
+      
+      if (is.null(u)) {
+        res[, y, , , , i] <- apply(rmultinom(ess, 1, prob = prob), 1, sum)
+      } else {
+        res[, y, , , , i] <- rmultinom_crn(u[, y, i], prob)
       }
     }
   }
+  
+  if (rescale) {
+    res <- quantSums(ref) %*% (res %/% quantSums(res))
+  }
+  
   res
-}  
+}
+
 # }}}
 
-# ALKs() {{{
-#
-#' annual ALK function
-#' @param object FLQuant with numbers at age
-#' @param iALK from iALK() outout
-#' @return FLPars of ALK
-#' @export 
-ALKs <- function(object,iALK){
-  it = dim(object)[6]
-  nyr= dim(object)[2]
-  year = (dimnames(object)$year)
-  alks = FLPars(lapply(year,function(x){
-  alk = propagate(iALK,it)
-  alk[] = object[,ac(x)]
-  for(i in seq(it)){
-  iter(alk,i) = iter(alk,i) *iALK
-  iter(alk,i) =  sweep(iter(alk,i),2,apply(iter(alk,i),2,sum),"/")
-  }
-  
-  return(alk)
-  }))
-  names(alks) = ac(year)
- return(alks)
-}
-# }}}
-
-# applyALK() {{{
-#
-#' applyALK function to length to age
-#' @param lfd *FLQuant* with numbers at length
-#' @param alks *FLPars* annual ALKs
-#' @return FLQuant for numbers at age
-#' @export 
-
-applyALK <- function(lfds,alks){
-  yr = dimnames(lfds)$year
-  year = an(yr)
-  if(class(alks)=="FLPar"){
-   alks = FLPars(lapply(yr,function(x){
-      alks
-    }))
-   names(alks) = yr
-  }
-  age = ac(dimnames(alks[[1]])$age)
-  
-  if(any(dimnames(lfds)$year !=  names(alks)))
-     stop("ALKs list must have the same years as length data")
-  its = dims(lfds)$iter
-  
-  res <- FLQuant(NA, units="1000",
-                 dimnames=list(age=age, year=year,iter=1:its))
-  
-  for(i in seq(its)){
-  for(y in 1:length(year)){
-    mf = (model.frame(iter(alks[[y]],i))[,seq(dim(alks[[y]])[1])])
-    mf = mf/pmax(apply(mf,1,sum),0.01)
-    iter(res,i)[,y] = apply(t(mf[,seq(dim(alks[[y]])[1])])%*%c(iter(lfds[,y],i)),1,sum)
-  }
-  }
-  return(res)
-}
-
-
-# {{{
-# len.sim()
-#
-#' function to generate survey (pulse) and continuous LFDs
-#' @param N_a numbers at age sample
-#' @param params growth parameter, default FLPar(linf,k,t0)
-#' @param model growth model, only option currently vonbert
-#' @param cv variation in L_a
-#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
-#' @param scale if TRUE scaled to N_a input 
-#' @param lmin minimum length
-#' @param lmax maximum upper length specified lmax*linf
-#' @param bin length bin size, dafault 1
-#' @param ess effective sample size
-#' @param timing t0 assumed 1st January, default seq(0,11/12,1/12), but can be single event 0.5
-#' @param unit default is "cm"
-#' @return FLQuant for length
-#' @export
-
-len.sim <- function(N_a, params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
-  gp = c(params) 
-  age = an(dimnames(N_a)$age)
-  lenls = FLQuants(lapply(as.list(timing),function(x){
-  ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
-                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-  N_adj =  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))                 
-  })) 
-  if(length(lenls)>1){
-    out= iterSums(combine(lenls))} else {
-    out = lenls[[1]]
-    }
-  units(out) = unit
-  fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
-  if(scale){
-     out = out%*%fac #*an(units(N_a))/1000
-  }
-  #attr(out,"scaler") <- fac
-  return(out)
-}
-# }}}
-
-
-# {{{
-# lfd.sim()
-#
-#' function to generate survey (pulse) and continuous LFDs
-#' @param object *FLQuant* numbers at age sample
-#' @param stock *FLStock* object 
-#' @param sel selectivity, default catch.sel(stock)
-#' @param params growth parameter, default FLPar(linf,k,t0)
-#' @param model growth model, only option currently vonbert
-#' @param cv variation in L_a
-#' @param reflen evokes fixed sd for L_a at sd = cv*reflen
-#' @param scale if TRUE scaled to N_a input 
-#' @param lmin minimum length
-#' @param lmax maximum upper length specified lmax*linf
-#' @param bin length bin size, dafault 1
-#' @param ess effective sample size
-#' @param timing default constinoues seq(0,11/12,1/12), but can be single event 0.5
-#' @param timeref reference timing of the sample, default 0.5 (e.g. survey or catch.n)
-#' @param unit default is "cm"
-#' @return FLQuant for length
-#' @export
-
-lfd.sim <- function(object, stock, sel=catch.sel(stock),params,model=vonbert,ess=250,timing=seq(0,11/12,1/12),timeref=0.5,unit="cm",scale=TRUE,reflen = NULL,bin=1,cv=0.1,lmin=5,lmax = 1.2){
-  gp = c(params) 
-  age = an(dimnames(object)$age)
-  year = an(dimnames(object)$year)
-  stock = trim(stock,year=year,age=age)
-  
-  lenls = FLQuants(lapply(as.list(timing),function(x){
-    ialk <- iALK(params=c(linf = gp[[1]], k = gp[[2]], t0 = gp[[3]]+x),
-                 model=model, age=age, lmax=lmax,reflen=reflen,bin=bin,lmin=lmin)
-    # Adjust for timing in abundance
-    N_a =  object# * exp(-harvest(stock) * (x-timeref) - m(stock) * (x-timeref))
-    N_adj =  lenSamples(N_a, invALK=ialk, n=round(ess/length(timing)))
-    #return(N_adj)
-  })) 
-  if(length(lenls)>1){
-    out= iterSums(combine(lenls))} else {
-      out = lenls[[1]]
-    }
-  units(out) = unit
-  if(scale){
-    fac = apply(N_a,2:6,sum)/apply(out,2:6,sum)
-    out = out%*%fac #*an(units(N_a))/1000
-  }
-  
-  return(out)
-}
-# }}}
-
-
-# {{{
-# SOP corrections 
-#
-#' scales catch-at-age to total catch with error (optional)
-#' @param object FLQuant catch.n, discard.n, landings.n
-#' @param stock FLStock
-#' @param sigma observation error
-#' @param what type c("catch", "landings", "discards")
-#' @return FLQuant
-sops <- function(object,stock,sigma=0.1,what=c("catch","landings","discards")[1]){
- dmo = dimnames(object) 
- stock = stock[dmo$age,dmo$year]
- if(what=="catch") out = (catch(stock)/quantSums(object*catch.wt(stock)))%*%object
- if(what=="landings") out = (landings(stock)/quantSums(object*landings.wt(stock)))%*%object
- if(what=="landings") out = (discards(stock)/quantSums(object*discards.wt(stock)))%*%object
- 
-devs = rlnorm(dims(object)$iter*dims(object)$year,0,sigma)
-for(i in seq(dims(object)$age)){
-  out[i,] = out[i,]*devs 
-}
- out = out*devs
- #out[out==0] = NA
- return(out)
-}
-
-
-
-
-#' asem2spm()
-#' @param object An *FLBRP*
-#' @param quant choose between vb and ssb 
-#' @param spcurve if TRUE a data.frame is added
-#' @param rel if TRUE ratios are produced for spcurve
-#' @return prior means for r and m *FLPar*
-#' @export
-#' @examples
-#' data(ple4)
-#' sr <- srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=mean(spr0y(ple4)))
-#' brp = FLBRP(ple4,sr)
-#' asem2spm(brp)[1:4]
-#' plotpf(brp)
-#' plotpf(brp,rel=TRUE)
-
-asem2spm <- function(object,quant=c("vb","ssb"),fmsy=NULL,rel=FALSE,spcurve=FALSE){
-  quant = quant[1]
-  pbrp = brp=object
-  
-  if(is.null(fmsy)){
-    fmsy = refpts(brp)["msy","harvest"] 
-  }
-  fbar(brp) = FLQuant(c(0.,fmsy))
-  MSY = an(landings(brp)[,2])
-  if(quant=="vb") bio = vb(brp)
-  if(quant=="ssb") bio = ssb(brp)
- 
-  Fmsy=an(MSY/bio[,2])
-  BmsyK =bio[,2]/bio[,1]
-  mi = seq(0.0001,5,0.0001)
-  m = mi[abs(mi^(-1/(mi-1))-an(BmsyK))==min(abs(mi^(-1/(mi-1))-an(BmsyK)))][1] 
-  r = Fmsy*(m-1)/(1-1/m) 
-  pars= FLPar(r=r,m=m,BmsyK =BmsyK,Fmsy=Fmsy,MSY=MSY ,Bmsy=bio[,2],B0=bio[,1])  
-
-
-   if(spcurve){
-    if(quant=="vb")
-          out = data.frame(Biomass=c(vb(pbrp)),SP=c(landings(pbrp)),quant=quant)
-    if(quant=="ssb") 
-          out =data.frame(Biomass=c(ssb(pbrp)),SP=c(landings(pbrp)),quant=quant)
-   
-     if(rel){
-       out$Biomass = out$Biomass/an(pars["B0"])  
-       out$SP = out$SP/an(pars["MSY"])  
-     }
-  }
-  
-  if(!spcurve)
-    return(pars)
-  
-  if(spcurve)
-    return(list(pars=pars,curve=out))
-  
-} #}}}
-
-#' plotpf()
-#' 
-#' plots production functions 
-#' @param object An *FLBRP*
-#' @param quant choose between vb and ssb or both
-#' @param fmsy default if Fmsy
-#' @param rel if TRUE ratios are produced for spcurve
-#' @return ggplot
-#' @export
-#' @examples
-#' data(ple4)
-#' sr <- srrTMB(as.FLSR(ple4,model=bevholtSV),spr0=mean(spr0y(ple4)))
-#' brp = FLBRP(ple4,sr)
-#' asem2spm(brp)[1:4]
-#' plotpf(brp)
-#' plotpf(brp,rel=TRUE)
-plotpf <- function(object,quant=c("vb","ssb"),fmsy=NULL,rel=FALSE){
-
-pf = function(asem,quant,rel=FALSE){
-  quant = quant[1]
-  bio = asem$curve$Biomass
-  r= c(asem$pars["r"])
-  m= c(asem$pars["m"])
-  k= ifelse(rel,1,c(asem$pars["B0"]))
-  SP = bio*r/(m-1)*(1-(bio/k)^(m-1))
-  if(rel) SP= SP/max(SP,na.rm = T)
-  return(data.frame(Biomass=bio,SP=SP,quant=quant,method="spm"))
-}
-
-asem = asem2spm(object,quant=quant[1],fmsy=fmsy,spcurve = TRUE,rel=rel)
-
-y = an(asem$pars["MSY"])
-x = an(asem$pars["Bmsy"])
-
-if(rel){
- x = an(asem$pars["BmsyK"])
- y =1
-}
-xy = data.frame(x=x,y=y,method="spm",quant=quant[1])
-df = rbind(data.frame(asem$curve,method="asem"),pf(asem,quant[1],rel=rel))
-
-if(length(quant)>1){
-  asem = asem2spm(object,quant=quant[2],fmsy=fmsy,spcurve = TRUE,rel=rel)
-  y = an(asem$pars["MSY"])
-  x = an(asem$pars["Bmsy"])
-  if(rel){
-    y =1
-    x = an(asem$pars["BmsyK"])
-  }
-  xy = rbind(xy,data.frame(x=x,y=y,method="spm",quant=quant[2]))
-  df = rbind(df,data.frame(asem$curve,method="asem"),pf(asem,quant[2],rel=rel)) 
-  
-}
-
-p = ggplot(df,aes(Biomass,SP,linetype=method,col=quant))+
-    geom_line()+
-    geom_segment(data= xy,aes(x =x,y=0,xend = x, yend = y),linetype=2)+
-    theme_bw()+theme(legend.title = element_blank())+
-    ylab("Surplus Production")+
-    xlab(ifelse(!rel,"Biomas",expression(B/B[0])))+
-    scale_x_continuous(expand = expansion(mult = c(0, .05)),labels=human_numbers, limits=c(0, NA))+
-   scale_y_continuous(expand = expansion(mult = c(0, .1)))
-   return(p)
-    
-}
 
 
 #' updsr()
@@ -777,10 +404,11 @@ p = ggplot(df,aes(Biomass,SP,linetype=method,col=quant))+
 
 updsr <- function(object,s=0.7,v=NULL){
   if(is.null(v))
-    v = refpts(object)["virgin","ssb"]
+  v = refpts(object)["virgin","ssb"]
   sr=SRModelName(model(object))
   par=FLPar(s=s,v = v)
   params(object)=FLCore::ab(par[c("s","v")],sr,spr0=spr0(object))[c("a","b")]
+  brp(object)
   return(object)
 }  
 # }}}
@@ -825,7 +453,7 @@ fudc = function(object,fref=0.2,fhi=2.5,flo=0.8,sigmaF=0.2,breaks=c(0.5,0.75)){
   f[,x > y2] = fref*flo
   flq=f*rlnorm(f,0,sigmaF)
   units(flq) ="f"
-  return(flq[,-1])
+  return(flq)
 }
 
 # }}}
@@ -943,3 +571,46 @@ schaefer.sim <- function(k=10000,r=0.3,q=0.5,pe=0.1,oe=0.2,bk=0.9,
   return(stk)
 }       
 # }}}
+
+
+# updCatch.n {{{
+
+#' computes catch.n for a given harvest 
+#' @param object An *FLStock*
+#' @return FLQuant
+#' @export
+
+updCatch.n <- function(stk) {
+  z <- harvest(stk) + m(stk)
+  cn <- stock.n(stk) * harvest(stk) / z * (1 - exp(-z))
+  cn[z == 0] <- 0
+  catch.n(stk) <- cn
+  stk
+}
+
+
+
+# {{{
+# SOP corrections 
+#
+#' scales catch-at-age to total catch with error (optional)
+#' @param object FLQuant catch.n, discard.n, landings.n
+#' @param stock FLStock
+#' @param sigma observation error
+#' @param what type c("catch", "landings", "discards")
+#' @return FLQuant
+sops <- function(object,stock,sigma=0.1,what=c("catch","landings","discards")[1]){
+  dmo = dimnames(object) 
+  stock = stock[dmo$age,dmo$year]
+  if(what=="catch") out = (catch(stock)/quantSums(object*catch.wt(stock)))%*%object
+  if(what=="landings") out = (landings(stock)/quantSums(object*landings.wt(stock)))%*%object
+  if(what=="landings") out = (discards(stock)/quantSums(object*discards.wt(stock)))%*%object
+  
+  devs = rlnorm(dims(object)$iter*dims(object)$year,0,sigma)
+  for(i in seq(dims(object)$age)){
+    out[i,] = out[i,]*devs 
+  }
+  out = out*devs
+  #out[out==0] = NA
+  return(out)
+}

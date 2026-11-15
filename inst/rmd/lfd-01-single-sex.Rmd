@@ -1,0 +1,1452 @@
+---
+title: "Simulating length-frequency data with FLRef: a step-by-step guideline (single-sex stock)"
+author: "Henning Winker<br><span style=\"font-size: 0.8em;\">FAO Fisheries and Aquaculture Division, Assessment and Management Team (NFIFM)<br><a href=\"mailto:henning.winker@fao.org\">henning.winker@fao.org</a></span>"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: readable
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 8, fig.height = 4.5, dpi = 110,
+                      fig.align = "center")
+library(FLCore)
+library(FLBRP)
+library(FLasher)
+library(ggplotFL)
+library(mse)
+library(FLRef)
+library(ggplot2)
+
+# The MSE section is the only slow part. Pre-run results are loaded from
+# rdata/ when present (see inst/scripts/render_docs.R); otherwise the runs
+# are done here if options(FLRef.run_mse = TRUE) (the default).
+rdata   <- getOption("FLRef.rdata", "rdata")
+f_mse_a <- file.path(rdata, "lfd01_mse_annual.rds")
+f_mse_q <- file.path(rdata, "lfd01_mse_quarterly.rds")
+run_mse <- isTRUE(getOption("FLRef.run_mse", TRUE)) ||
+  (file.exists(f_mse_a) && file.exists(f_mse_q))
+```
+
+# Purpose and scope
+
+This guideline documents the FLRef utilities for simulating fishery-dependent
+and survey length-frequency distributions (LFDs) from an age-structured
+`FLStock`, and how they connect to the `mse` package through the observation
+error model `sampling.lfd.oem()`. Every step uses the North Sea plaice example
+in FLCore (`data(ple4)`, `data(ple4.indices)`) so that each function can be run
+and checked in isolation.
+
+* **Part I** builds everything with one **annual** sampling step: one sample
+  per gear and year, at a fixed time of the year.
+* **Part II** moves the survey to **January** (a pulse survey) and samples the
+  fishery **continuously** (quarterly or monthly), with a high length sample
+  size and a moderate age (cluster) sample size, and contrasts the annual and
+  continuous designs. The option `season` keeps the seasonal samples in the
+  season dimension (`season = TRUE`, for a seasonal assessment) or pools them
+  into an annual sample (`season = FALSE`, the default).
+* **Part III** runs both designs inside an MSE with `sampling.lfd.oem()`.
+
+The document is the first of a series:
+
+| Doc | Stock structure | `unit` dimension | Status |
+|-----|-----------------|------------------|--------|
+| **1 (this)** | single sex, single area | `"unique"` | prototype |
+| 2 | sex-structured (`data(ple4sex)`) | `c("F", "M")`, `unit.type = "gender"` | planned |
+| 3 | spatial (areas as units) | area names, `unit.type = "spatial"` | planned, linked to the ICES deep-sea working group report |
+
+The pipeline from the operating model (OM) to the estimator is:
+
+```
+FLStock (N, F, M)  ->  catch_n_gear()  ->  C[g,a,y]        (Baranov by gear)
+                       season_fraction() -> C[g,a,y,s]    (within-year split, Part II)
+                       survey_n_gear()   -> N e^{-Zt} s[a] (surveys)
+lhpar  -> iALK()   ->  P(l|a,t)       ->  build_gear()    (s_g(l), P(l|a,g), design)
+lfd.sim() / lfd.sim.season():  stage 1 age draw (ess_age), stage 2 length draw (ess_len)
+sample_lfd_gears():  all of the above for a set of gears and years
+sampling.lfd.oem():  sample_lfd_gears() for each data year inside mp()  ->  est
+```
+
+# Part I: annual sampling
+
+## The example stock
+
+```{r data}
+data(ple4)
+data(ple4.indices)
+
+ages   <- an(dimnames(ple4)$age)
+maxyr  <- dims(ple4)$maxyear
+fbar_r <- unname(range(ple4)[c("minfbar", "maxfbar")])
+pg     <- unname(range(ple4)["plusgroup"])
+
+c(ages = range(ages), years = range(an(dimnames(ple4)$year)),
+  fbar = fbar_r, plusgroup = pg)
+names(ple4.indices)
+summary(ple4.indices$IBTS_Q1)
+```
+
+`ple4` has a single `unit` (`"unique"`), one season and one area, and one
+iteration. It provides the "true" numbers-at-age, F-at-age and weights; the
+length dimension is added entirely through the growth model.
+
+## Life history: a generic plaice growth curve
+
+The length simulation needs a growth model, \(L(a) = L_\infty[1-e^{-k(a-t_0)}]\),
+and, for raising samples to catch weight, a length-weight relationship
+\(W = aL^b\). We take generic length-weight parameters for plaice and derive
+\(L_\infty\), \(k\) and \(t_0\) so that they are consistent with the weights in
+`ple4`: catch weights-at-age are converted to lengths by inverting \(W=aL^b\)
+and a von Bertalanffy curve is fitted at mid-year (catch weights are
+year-averages), excluding the plus group.
+
+```{r lh-fit}
+a_lw <- 8.9e-06   # generic plaice, W (kg) = a * L (cm)^b
+b_lw <- 3.05
+
+yrs_ref <- ac((maxyr - 9):maxyr)
+w_a     <- c(yearMeans(catch.wt(ple4)[, yrs_ref]))
+l_a     <- (w_a / a_lw)^(1 / b_lw)          # implied mean length in the catch
+fit_age <- ages < pg                         # drop the plus group
+
+vb_nll <- function(p) {
+  pred <- p[1] * (1 - exp(-p[2] * (ages[fit_age] + 0.5 - p[3])))
+  sum((log(l_a[fit_age]) - log(pmax(pred, 1e-3)))^2)
+}
+vb_fit <- optim(c(linf = 1.2 * max(l_a), k = 0.2, t0 = -0.5), vb_nll,
+                method = "L-BFGS-B",
+                lower = c(max(l_a), 0.05, -3), upper = c(2 * max(l_a), 1, 1))
+
+lhpar <- FLPar(linf = vb_fit$par[["linf"]], k = vb_fit$par[["k"]],
+               t0 = vb_fit$par[["t0"]], a = a_lw, b = b_lw)
+lhpar
+```
+
+```{r lh-plot, fig.height = 3.8, fig.cap = "Mean length-at-age implied by ple4 catch weights (points) and the fitted von Bertalanffy curve at mid-year (line). The plus group (open point) is not used in the fit."}
+vb_age <- seq(0, max(ages) + 1, 0.1)
+ggplot() +
+  geom_line(aes(vb_age, c(lhpar["linf"]) *
+                  (1 - exp(-c(lhpar["k"]) * (vb_age + 0.5 - c(lhpar["t0"]))))),
+            colour = "#0b5d8a", linewidth = 0.9) +
+  geom_point(aes(ages, l_a, shape = fit_age), size = 2.2) +
+  scale_shape_manual(values = c(`TRUE` = 16, `FALSE` = 1), guide = "none") +
+  labs(x = "Age", y = "Length (cm)") + theme_bw()
+```
+
+**Check.** With ages 1-9 only, \(L_\infty\) and \(k\) are partly confounded;
+the fit only needs to reproduce lengths over the ages present in the stock.
+If you have published growth parameters for the stock, use them directly in
+`FLPar(linf =, k =, t0 =, a =, b =)` and check them with the plot above.
+
+> **Sex-structured stocks (Doc 2).** `lhpar` will carry a second dimension,
+> `unit = c("F", "M")`, so that `lhpar[, "F"]` lines up with `stk[, , "F"]`.
+> See the last section.
+
+## Inverse age-length key
+
+`iALK()` builds \(P(l \mid a, t)\): normal length-at-age with
+\(\mathrm{sd} = cv \cdot L(a+t)\), on the grid returned by `len_grid()`
+(lower bin limits, last bin a plus group). Within-year time \(t\) enters as
+\(t_0 - t\). Every downstream helper takes the grid from the gear
+(`gear$grid`), so it is defined once here.
+
+```{r ialk}
+grid <- list(lmin = 5, lmax_mult = 1.2, bin = 1, cv = 0.1)
+lens <- len_grid(c(lhpar["linf"]), grid$lmin, grid$lmax_mult, grid$bin)
+
+ialk <- iALK(params = FLPar(linf = c(lhpar["linf"]), k = c(lhpar["k"]),
+                            t0 = c(lhpar["t0"]) - 0.5),
+             age = ages, cv = grid$cv, lmin = grid$lmin, bin = grid$bin,
+             max = max(lens))
+ialk_mat <- matrix(c(ialk), nrow = length(ages),
+                   dimnames = list(age = ages, len = lens))
+dim(ialk_mat)
+```
+
+```{r ialk-checks}
+# rows are probability distributions
+range(rowSums(ialk_mat))
+
+# mean length by age reproduces the growth curve (up to grid truncation)
+len_mid  <- lens + grid$bin / 2
+mean_len <- c(ialk_mat %*% len_mid)
+vb_len   <- c(lhpar["linf"]) * (1 - exp(-c(lhpar["k"]) * (ages + 0.5 - c(lhpar["t0"]))))
+round(cbind(age = ages, iALK = mean_len, vonbert = vb_len), 1)
+```
+
+```{r ialk-plot, fig.height = 3.8, fig.cap = "Inverse age-length key P(l | a) at mid-year."}
+df_ialk <- as.data.frame(as.table(ialk_mat), responseName = "p")
+df_ialk$len <- an(as.character(df_ialk$len))
+ggplot(df_ialk, aes(len, p, colour = age)) + geom_line() +
+  labs(x = "Length (cm)", y = "P(l | a)", colour = "Age") + theme_bw()
+```
+
+## Gears: one commercial fleet and one survey
+
+Selectivity is specified **in length**, \(s_g(l)\), and integrated through the
+inverse key to give selectivity-at-age and the capture-conditioned key:
+
+\[
+s_{g,a}=\sum_l P(l\mid a,t)\,s_g(l),\qquad
+P(l\mid a,g)=\frac{P(l\mid a,t)\,s_g(l)}{s_{g,a}}.
+\]
+
+`build_gear()` returns both, the F partition, and the gear's **sampling
+design**: `obs` (`"fishery"` or `"survey"`), `timing` and `n_seasons`. The
+two gears are:
+
+* **Commercial**: the fleet that takes all the catch (`f_mult = 1`), sampled
+  at mid-year (`timing = 0.5`).
+* **Survey**: the first-quarter International Bottom Trawl Survey
+  (`ple4.indices$IBTS_Q1`). It removes no catch
+  (`obs = "survey"` implies `f_mult = 0`), so the catch split by gear is
+  `c(Commercial = 1, Survey = 0)`, but it has its own length selectivity,
+  timing and sample size.
+
+### Target selectivities-at-age from ple4
+
+The length-selectivity parameters are chosen so that \(s_{g,a}\) reproduces
+the age selectivities in the data: the mean exploitation pattern over the last
+five years for the fleet, and the mean survey selectivity-at-age
+(`sel.pattern(ple4.indices$IBTS_Q1)`) for the survey. Ages outside the survey
+age range are left out of the survey fit.
+
+```{r targets}
+yrs_sel <- ac((maxyr - 4):maxyr)
+sel_com <- yearMeans(harvest(ple4)[, yrs_sel])
+sel_com <- c(sel_com / max(sel_com))
+
+ibts  <- ple4.indices$IBTS_Q1
+srv_t <- mean(range(ibts)[c("startf", "endf")])        # within-year timing (Q1)
+if (!is.finite(srv_t)) srv_t <- 1 / 8
+
+# survey selectivity-at-age as estimated in the assessment (sel.pattern)
+sp      <- sel.pattern(ibts)
+sp_mean <- apply(sp, c(1, 3:6), mean, na.rm = TRUE)
+if (all(!is.finite(sp_mean))) {
+  # fallback: empirical catchability-at-age, index / numbers at survey time
+  yrs_i   <- intersect(dimnames(index(ibts))$year, dimnames(ple4)$year)
+  n_i     <- (stock.n(ple4) * exp(-(harvest(ple4) + m(ple4)) * srv_t))[
+               dimnames(index(ibts))$age, yrs_i]
+  sp_mean <- apply(index(ibts)[, yrs_i] / n_i, c(1, 3:6), mean, na.rm = TRUE)
+}
+ages_i  <- intersect(dimnames(sp_mean)$age, ac(ages))  # survey ages in the stock
+sp_i    <- c(sp_mean[ages_i])
+sel_srv <- setNames(rep(NA_real_, length(ages)), ages)
+sel_srv[ages_i] <- sp_i / max(sp_i, na.rm = TRUE)
+
+round(rbind(Commercial = sel_com, Survey = sel_srv), 2)
+c(survey_timing = srv_t)
+```
+
+### Fitting length selectivity to the age targets
+
+The helper below is written for this guideline; it may become an FLRef
+function (`fit_gear_sel()`). It minimises the squared difference between
+the ALK-integrated \(s_{g,a}\) from `build_gear()` and the target, so the fitted
+length curve is exactly the one the gear object will use.
+
+An unconstrained fit is not enough. Age targets can be matched by
+unrealistic length curves: a dome in age, for instance, is reproduced
+almost as well by a near-vertical "cliff" in length, and a survey that
+catches mostly age 1 by a curve that only declines from the smallest length
+class. A length selectivity should always have an **ascending limb** and a
+**gradually curved descending limb**. The double-normal is therefore fitted
+in a parameterisation that guarantees both:
+
+\[
+\sigma_L = e^{q_2},\qquad
+L_{peak} = l_{min} + 2.5\,\sigma_L + e^{q_1},\qquad
+\sigma_R = \sigma_L\,(1 + e^{q_3}).
+\]
+
+* \(L_{peak} \ge l_{min} + 2.5\sigma_L\) means selectivity in the smallest
+  length class is at most \(e^{-2.5^2/2} \approx 0.04\): the ascending limb
+  is always inside the length grid.
+* \(\sigma_R \ge \sigma_L\) means the descending limb is never steeper than
+  the ascending one, so it is a curved dome and not a cliff; large
+  \(\sigma_R\) approaches asymptotic (logistic-like) selectivity.
+* Bounds keep \(\sigma_L\) between `sd_min` and \(0.3L_\infty\), and
+  \(L_{peak}\) below \(L_\infty\).
+
+```{r fit-sel}
+fit_gear_sel <- function(target, lhpar, age, type = c("dnormal", "logistic"),
+                         timing = 0.5, grid, sd_min = 1) {
+  type <- match.arg(type)
+  ok   <- is.finite(target)
+  linf <- c(lhpar["linf"])
+  l_at <- linf * (1 - exp(-c(lhpar["k"]) * (age + timing - c(lhpar["t0"]))))
+
+  mk <- function(q) switch(type,
+    logistic = list(type = "logistic", L50 = grid$lmin + exp(q[1]),
+                    L95 = grid$lmin + exp(q[1]) + exp(q[2])),
+    dnormal  = {
+      sdl <- exp(q[2])
+      list(type = "dnormal", Lpeak = grid$lmin + 2.5 * sdl + exp(q[1]),
+           sd_left = sdl, sd_right = sdl * (1 + exp(q[3])))
+    })
+
+  sel_a <- function(q) {
+    cfg <- c(mk(q), f_mult = 1, ess_age = 1, ess_len = 1)
+    g <- build_gear(list(G = cfg), lhpar = lhpar, age = age, timing = timing,
+                    lmin = grid$lmin, lmax_mult = grid$lmax_mult,
+                    bin = grid$bin, cv = grid$cv)$G
+    c(g$sel_a)
+  }
+  obj <- function(q) sum((sel_a(q)[ok] - target[ok])^2)
+
+  # start: peak at the length of the age with maximum target selectivity
+  l_pk <- l_at[ok][which.max(target[ok])]
+  if (type == "dnormal") {
+    sdl0  <- max(sd_min, 0.15 * l_pk)
+    q0    <- c(log(max(l_pk - grid$lmin - 2.5 * sdl0, 1)), log(sdl0), 0)
+    lower <- c(log(0.5), log(sd_min), log(0.05))
+    upper <- c(log(linf), log(0.3 * linf), log(20))
+  } else {
+    l50   <- approx(target[ok], l_at[ok], 0.5, ties = mean)$y
+    q0    <- c(log(max(l50 - grid$lmin, 1)), log(5))
+    lower <- c(log(0.5), log(0.5))
+    upper <- c(log(linf), log(0.5 * linf))
+  }
+  q0  <- pmin(pmax(q0, lower), upper)
+  opt <- optim(q0, obj, method = "L-BFGS-B", lower = lower, upper = upper)
+  list(cfg = mk(opt$par), sel_a = sel_a(opt$par), ssq = opt$value,
+       at_bound = any(abs(opt$par - lower) < 1e-6 | abs(opt$par - upper) < 1e-6))
+}
+
+fit_com <- fit_gear_sel(sel_com, lhpar, ages, "dnormal", timing = 0.5, grid = grid)
+fit_srv <- fit_gear_sel(sel_srv, lhpar, ages, "dnormal", timing = srv_t, grid = grid)
+
+fit_tab <- function(...) {
+  fits <- list(...)
+  t(sapply(fits, function(f) c(unlist(f$cfg[-1]), ssq = f$ssq,
+                               at_bound = f$at_bound)))
+}
+round(fit_tab(Commercial = fit_com, Survey = fit_srv), 3)
+```
+
+**Check.** `at_bound = 1` means a parameter sits on a bound: the age target
+asks for a shape the constraints do not allow (typically a very steep dome).
+That is acceptable when the plots below look reasonable, because the
+constraint is deliberate; the fitted selectivity-at-age will then only
+"roughly" match the target at the oldest ages.
+
+### Building the gear objects
+
+Both gears are built in one call. The survey's own `timing` overrides the
+call-level default (mid-year), so its capture-conditioned key is evaluated at
+the time of the survey. Because the survey has `f_mult = 0`, its F share is
+zero and the commercial share is one at every age.
+
+```{r build-gear}
+build_design <- function(cfg)
+  build_gear(cfg, lhpar = lhpar, age = ages, timing = 0.5,
+             lmin = grid$lmin, lmax_mult = grid$lmax_mult,
+             bin = grid$bin, cv = grid$cv, fbar_range = fbar_r)
+
+om_gears <- build_design(list(
+  Commercial = c(fit_com$cfg, f_mult = 1, ess_age = 50, ess_len = 300),
+  Survey     = c(fit_srv$cfg, obs = "survey", ess_age = 30, ess_len = 200,
+                 timing = srv_t)))
+
+data.frame(obs = gear_par(om_gears, "obs"), f_mult = gear_par(om_gears, "f_mult"),
+           timing = sapply(om_gears, function(g) g$grid$timing),
+           n_seasons = gear_par(om_gears, "n_seasons"),
+           ess_age = gear_par(om_gears, "ess_age"),
+           ess_len = gear_par(om_gears, "ess_len"))
+```
+
+```{r gear-checks}
+# capture-conditioned keys: rows sum to one; all components share one grid
+sapply(om_gears, function(gr) c(
+  rowsum_min = min(rowSums(gr$condALK)), rowsum_max = max(rowSums(gr$condALK)),
+  length_bins = ncol(gr$condALK),
+  same_grid = identical(colnames(gr$condALK), dimnames(gr$sel_len)$len)))
+
+# static F shares: the catch split is c(1, 0) at every age
+round(rbind(Commercial = c(om_gears$Commercial$f_share),
+            Survey     = c(om_gears$Survey$f_share)), 3)
+
+# joint selectivity equals the commercial selectivity for a single fishing gear
+round(rbind(joint = c(joint_sel(om_gears)),
+            commercial = c(om_gears$Commercial$sel_a) /
+              max(om_gears$Commercial$sel_a)), 3)
+```
+
+```{r gear-plot-len, fig.height = 3.5, fig.cap = "Fitted selectivity-at-length."}
+df_l <- do.call(rbind, lapply(names(om_gears), function(g)
+  data.frame(gear = g, len = om_gears[[g]]$len_bins$mid,
+             sel = c(om_gears[[g]]$sel_len))))
+ggplot(df_l, aes(len, sel, colour = gear)) + geom_line(linewidth = 0.9) +
+  labs(x = "Length (cm)", y = "s(l)", colour = NULL) + theme_bw()
+```
+
+```{r gear-plot-age, fig.height = 3.5, fig.cap = "ALK-integrated selectivity-at-age from build_gear() (lines) against the ple4 targets (points)."}
+df_a <- do.call(rbind, lapply(names(om_gears), function(g)
+  data.frame(gear = g, age = ages, sel = c(om_gears[[g]]$sel_a),
+             target = if (g == "Commercial") sel_com else sel_srv)))
+ggplot(df_a, aes(age, sel, colour = gear)) + geom_line(linewidth = 0.9) +
+  geom_point(aes(y = target)) +
+  labs(x = "Age", y = "s(a)", colour = NULL) + theme_bw()
+```
+
+```{r condalk-plot, fig.height = 4, fig.cap = "Capture-conditioned key P(l | a, g) for the commercial gear, with mean length-at-age in the population (solid) and in the catch (dashed): young ages are caught at above-average length."}
+plot_condALK(om_gears$Commercial, params = TRUE)
+```
+
+## Partitioning the true catch by gear
+
+`catch_n_gear()` is the single definition of gear catch used by the OM and by
+`sampling.lfd.oem()`:
+
+\[
+C_{g,a,y}=N_{a,y}\,\frac{\phi_{g,a}F_{a,y}}{Z_{a,y}}\left(1-e^{-Z_{a,y}}\right),
+\qquad \sum_g \phi_{g,a}=1 .
+\]
+
+```{r catch-gear}
+yrs <- ac((maxyr - 9):maxyr)            # the "data years" used below
+cn  <- catch_n_gear(ple4, om_gears, years = yrs)
+
+# catch split by gear, as passed to e.g. FLicc (catch_by_gear)
+catch_by_gear(cn, ple4, years = yrs)
+
+# Baranov total vs. catch.n in ple4 (assessment-consistent but not identical)
+rel <- attr(cn, "total") / catch.n(ple4)[, yrs]
+round(range(rel, na.rm = TRUE), 3)
+```
+
+The survey "catch" is not a removal. What the survey samples is numbers at the
+time of the survey, weighted by survey selectivity-at-age,
+\(I_{a,y}=N_{a,y}e^{-Z_{a,y}t_s}s_{\mathrm{srv},a}\) (`survey_n_gear()`).
+
+```{r survey-n}
+in_srv <- survey_n_gear(ple4, om_gears$Survey, years = yrs)
+```
+
+## Single-stage length sampling: `len.sim()`
+
+`len.sim()` projects an at-age composition through the key and draws one
+multinomial length sample of size `ess`. Without a gear it uses the biological
+key \(P(l\mid a)\); with a gear it uses \(P(l\mid a,g)\). The difference matters:
+within an age class the gear selects by length.
+
+```{r len-sim}
+set.seed(1)
+lfd_bio  <- len.sim(cn$Commercial, params = lhpar, ess = 300, timing = 0.5,
+                    bin = grid$bin, cv = grid$cv, lmin = grid$lmin,
+                    lmax = grid$lmax_mult)
+lfd_gear <- len.sim(cn$Commercial, params = lhpar, ess = 300, timing = 0.5,
+                    gear = om_gears$Commercial)
+
+mean_len_lfd <- function(x) c(quantSums(x * an(dimnames(x)$len)) / quantSums(x))
+round(rbind(biological_key = mean_len_lfd(lfd_bio),
+            gear_key       = mean_len_lfd(lfd_gear)), 1)
+```
+
+## Two-stage sampling: `lfd.sim()`
+
+### Rationale
+
+Fish in a length sample are not independent draws from the catch. They are
+collected in clusters (hauls, trips, boxes landed at a market), and fish
+within a cluster are more alike in size and age than fish from different
+clusters, because each haul or trip fishes a particular place, depth and time
+where some cohorts dominate. The information in a length composition is
+therefore governed by the number of clusters more than by the number of fish
+measured, and the effective sample size (ESS) of a length composition is
+usually a small fraction of the number of fish measured. A single-stage
+multinomial with the nominal number of fish makes simulated data far too
+precise, so an assessment fitted to them shows unrealistically narrow
+uncertainty, and an MSE built on them is over-optimistic about length-based
+advice.
+
+`lfd.sim()` generates the clustering from the population structure itself,
+with a hierarchical two-stage design:
+
+1. **Stage 1 (clusters to ages).** A multinomial **age** sample of size
+   \(n_A\) = `ess_age` from the true catch-at-age composition (via
+   `ca.sim()`),
+   \[
+   \mathbf{x}\sim\mathrm{Mult}(n_A,\mathbf{p}),\qquad
+   p_a=\frac{C_{g,a}}{\sum_{a'}C_{g,a'}},\qquad \hat p_a=\frac{x_a}{n_A}.
+   \]
+   \(n_A\) is the number of effectively independent age draws: roughly the
+   number of sampled clusters times the effective number of distinct fish
+   per cluster.
+2. **Stage 2 (fish to lengths).** A multinomial **length** sample of size
+   \(n_L\) = `ess_len` from the sampled age composition projected through the
+   capture-conditioned key \(K_{a,l}=P(l\mid a,g)\),
+   \[
+   \mathbf{y}\sim\mathrm{Mult}(n_L,\hat{\boldsymbol\pi}),\qquad
+   \hat\pi_l=\sum_a\hat p_a K_{a,l},\qquad o_l=\frac{y_l}{n_L}.
+   \]
+
+The sample is unbiased, \(E[o_l]=\pi_l=\sum_a p_aK_{a,l}\), and its variance
+follows from the law of total variance:
+
+\[
+\mathrm{Var}(o_l)=\frac{\pi_l(1-\pi_l)}{n_L}
++\left(1-\frac{1}{n_L}\right)V_l,\qquad
+V_l=\mathrm{Var}(\hat\pi_l)=\frac{1}{n_A}\left(\sum_a p_aK_{a,l}^2-\pi_l^2\right).
+\]
+
+The first term is the ordinary multinomial noise of measuring \(n_L\) fish;
+the second is the extra (between-cluster) noise from the age stage. Summing
+over length bins gives the expected effective sample size,
+
+\[
+ESS=\frac{\sum_l\pi_l(1-\pi_l)}{\sum_l\mathrm{Var}(o_l)} .
+\]
+
+Three limits help to choose the sample sizes:
+
+* \(n_A\to\infty\): \(ESS\to n_L\), the single-stage multinomial.
+* \(n_L\to\infty\): \(ESS\to\sum_l\pi_l(1-\pi_l)/\sum_lV_l\ge n_A\). A
+  length bin mixes several ages, which averages out part of the age-stage
+  noise, so the length composition is somewhat more informative than the age
+  sample it came from.
+* Ages that do not overlap in length: \(ESS\approx(1/n_A+1/n_L)^{-1}\).
+
+In practice `ess_age` is small (tens: the number of hauls or trips) and
+`ess_len` large (hundreds to thousands of fish), and the realised ESS lies
+between \(n_A\) and \(n_L\), closer to \(n_A\) when \(n_L\gg n_A\). Unlike an
+overdispersion parameter (e.g. a Dirichlet-multinomial), the age stage makes
+the ESS respond to the stock and the gear: a catch dominated by one strong
+year class or a gear with narrow selectivity gives a different ESS for the
+same `ess_age`, as real sampling programmes do.
+
+**Within-year sampling (Part II).** Each season is an independent two-stage
+sample with \(n_{A,s}\) and \(n_{L,s}\) summing to the annual totals. For the
+pooled annual composition the seasonal variances add with weights
+\((n_{L,s}/n_L)^2\), so splitting the same totals among seasons leaves the
+annual ESS roughly unchanged. What continuous sampling changes is the
+**target**, the year-round catch composition instead of a snapshot (Part II).
+
+```{r lfd-sim}
+lfd_com <- lfd.sim(cn$Commercial, om_gears$Commercial)        # scaled to catch numbers
+lfd_srv <- lfd.sim(in_srv,        om_gears$Survey)
+```
+
+`sample_lfd_gears()` does the same for a whole gear list in one call, with
+exactly the code that `sampling.lfd.oem()` runs inside the MSE (raw counts,
+not scaled):
+
+```{r sample-gears}
+smp_a <- sample_lfd_gears(ple4, om_gears, years = yrs)
+sapply(smp_a$lfd, function(x) range(c(quantSums(x))))   # = ess_len per year
+```
+
+```{r ridge, fig.height = 7, fig.cap = "Simulated commercial and survey length samples with von Bertalanffy cohort lines."}
+plot_lfd_ridgeline(list(Commercial = lfd_com, Survey = lfd_srv), lhpar = lhpar)
+```
+
+### Check: realised effective sample size
+
+For a multinomial sample the McAllister-Ianelli estimator
+\(\widehat{ESS}=\sum_l p_l(1-p_l)\big/\sum_l(o_l-p_l)^2\) recovers the sample
+size. Replicating one year many times shows that the single-stage sampler
+returns `ess`, while the two-stage sampler returns an effective sample size
+well below `ess_len`, which is the intended behaviour.
+
+```{r ess-check}
+nrep <- 500
+x    <- propagate(cn$Commercial[, ac(maxyr)], nrep)
+gC   <- om_gears$Commercial
+p_true <- c((c(cn$Commercial[, ac(maxyr)]) / sum(cn$Commercial[, ac(maxyr)])) %*%
+              gC$condALK)
+
+ess_mi <- function(lfd, p) {
+  if (dim(lfd)[4] > 1) lfd <- seasonSums(lfd)
+  o <- matrix(c(lfd), ncol = dims(lfd)$iter)
+  o <- sweep(o, 2, colSums(o), "/")
+  sum(p * (1 - p)) / colSums((o - p)^2)
+}
+one <- len.sim(x, params = lhpar, ess = gC$ess_len, timing = 0.5,
+               gear = gC, scale = FALSE)
+two <- lfd.sim(x, gC, scale = FALSE)
+
+c(ess_len = gC$ess_len, ess_age = gC$ess_age,
+  single_stage = median(ess_mi(one, p_true)),
+  two_stage    = median(ess_mi(two, p_true)))
+```
+
+### Check: theory against simulation
+
+The variance formula gives the expected ESS without simulation. It is
+compared here with the simulated ESS (as a ratio of means,
+\(\sum_l\pi_l(1-\pi_l)/\overline{\sum_l(o_l-\pi_l)^2}\), which is the quantity
+the formula predicts) over a range of `ess_age` for `ess_len = 300`.
+
+```{r ess-theory}
+ess_two_stage <- function(p_a, K, n_A, n_L) {
+  p_a <- p_a / sum(p_a)
+  pl  <- c(p_a %*% K)
+  V   <- (c(p_a %*% K^2) - pl^2) / n_A
+  sum(pl * (1 - pl)) / sum(pl * (1 - pl) / n_L + (1 - 1 / n_L) * V)
+}
+ess_rm <- function(lfd, p) {
+  o <- matrix(c(lfd), ncol = dims(lfd)$iter)
+  o <- sweep(o, 2, colSums(o), "/")
+  sum(p * (1 - p)) / mean(colSums((o - p)^2))
+}
+
+p_a0  <- c(cn$Commercial[, ac(maxyr)])
+n_Ag  <- c(10, 25, 50, 100, 250, 1000)
+ess_g <- t(sapply(n_Ag, function(nA) {
+  sim <- lfd.sim(propagate(cn$Commercial[, ac(maxyr)], 300), gC,
+                 ess_age = nA, ess_len = 300, scale = FALSE)
+  c(ess_age = nA, predicted = ess_two_stage(p_a0, gC$condALK, nA, 300),
+    simulated = ess_rm(sim, p_true))
+}))
+round(ess_g)
+```
+
+```{r ess-theory-plot, fig.height = 3.6, fig.cap = "Expected (line) and simulated (points) effective sample size of a two-stage length sample with ess_len = 300 (dotted) as a function of ess_age; the dashed line is the 1:1 line ESS = ess_age."}
+ggplot(as.data.frame(ess_g), aes(ess_age)) +
+  geom_line(aes(y = predicted), colour = "#0b5d8a", linewidth = 0.9) +
+  geom_point(aes(y = simulated), size = 2) +
+  geom_hline(yintercept = 300, linetype = 3) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "ess_age (log scale)", y = "Effective sample size (log scale)") +
+  theme_bw()
+```
+
+### Why the ESS lies above `ess_age`: the growth curve
+
+The age stage adds \(V_l=\mathrm{Var}_{a\sim p}(K_{a,l})/n_A\), the variance
+across ages of the probability that a fish of age \(a\) falls in length class
+\(l\). It is large only when ages put their fish in different length classes.
+If every length class belonged to a single age, an extra fish of age 3 in the
+age sample would show up one-to-one in the length composition and
+\(ESS\approx(1/n_A+1/n_L)^{-1}\), on the 1:1 line. If all ages had the same
+length distribution, age-sampling errors would be invisible in length
+(\(V_l=0\)) and \(ESS=n_L\).
+
+The von Bertalanffy curve decides where a stock lies between these extremes.
+The spacing between consecutive ages shrinks geometrically,
+\(\bar L_{a+1}-\bar L_a=(L_\infty-\bar L_a)(1-e^{-k})\), while the spread
+within an age grows, \(\sigma_a=cv\,\bar L_a\). The separation of neighbouring
+ages, \(d_a=(\bar L_{a+1}-\bar L_a)/\sigma_a\), is therefore large for young
+fish on the steep part of the curve and falls towards zero as
+\(\bar L_a\to L_\infty\). Age-sampling noise among young, well-separated ages
+passes through to the length composition. Among old ages piled up near
+\(L_\infty\) it largely cancels: too many age-8 and too few age-9 fish hardly
+change the length composition. The more of the catch lies on the flat part
+of the curve (slow growth, small \(k\), large CV, a gear that cuts out the
+young ages), the further the ESS rises above `ess_age`. The flip side is the
+backward check below: where ages overlap in length, the length composition
+cannot tell them apart, so ALK errors are largest at the oldest ages.
+
+```{r age-separation}
+K   <- gC$condALK
+ovl <- sapply(seq_len(nrow(K) - 1), function(i) sum(pmin(K[i, ], K[i + 1, ])))
+sep <- data.frame(
+  ages        = paste(ages[-length(ages)], ages[-1], sep = "-"),
+  mean_length = round(mean_len[-length(ages)], 1),
+  spacing     = round(diff(mean_len), 1),                     # cm between ages
+  d           = round(diff(mean_len) / (grid$cv * mean_len[-length(ages)]), 2),
+  overlap     = round(ovl, 2),                                # shared length mass
+  catch_share = round(p_a0[-length(ages)] / sum(p_a0), 2))
+sep
+```
+
+`d` is the separation of neighbouring ages in standard deviations of length,
+`overlap` the probability mass the two capture-conditioned length
+distributions share (0 = separate, 1 = identical), and `catch_share` the
+share of the younger age in the catch. Ages with a large catch share and high
+overlap are the ones that lift the ESS above `ess_age`.
+
+### Check: common random numbers
+
+Inside an MSE each management procedure must see the same sampling noise.
+`rUnif_lfd()` pre-generates the uniforms for both stages and `rmultinom_crn()`
+turns them into multinomial draws. Same deviates give the same sample; a small
+change in the catch moves only a few fish between neighbouring bins.
+
+```{r crn}
+u <- rUnif_lfd(om_gears, years = yrs, nsim = 1, seed = 456)
+s1 <- lfd.sim(cn$Commercial, gC, u_age = u$age$Commercial, u_len = u$len$Commercial,
+              scale = FALSE)
+s2 <- lfd.sim(cn$Commercial, gC, u_age = u$age$Commercial, u_len = u$len$Commercial,
+              scale = FALSE)
+identical(s1, s2)
+
+cn_pert <- cn$Commercial
+cn_pert[1, ] <- cn_pert[1, ] * 1.05          # 5% more age-1 fish
+s3 <- lfd.sim(cn_pert, gC, u_age = u$age$Commercial, u_len = u$len$Commercial,
+              scale = FALSE)
+c(fish_moved_per_year = mean(c(quantSums(abs(s3 - s1)))) / 2,
+  sample_size = gC$ess_len)
+```
+
+## Backward check: from length samples back to catch-at-age
+
+A forward simulator should pass a backward test: if an assessment converts the
+simulated length samples back to ages with an age-length key (ALK), it should
+recover the OM catch-at-age (`catch.n`), apart from sampling error. This also
+shows which part of the error comes from the length sample and which from the
+ALK.
+
+For gear \(g\), year \(y\) and length class \(l\), the ALK is the
+distribution of age given length in the catch,
+
+\[
+P(a\mid l,g)=\frac{C_{g,a}\,P(l\mid a,g)}{\sum_{a'}C_{g,a'}\,P(l\mid a',g)},
+\]
+
+and the catch-at-age estimate from a length sample \(n_l\) is
+\(\hat n_a=\sum_l n_l\,P(a\mid l,g)\), raised to the gear's catch weight by
+sum of products, \(\tilde n_a=\hat n_a\,C^{w}_{g}\big/\sum_{a'}\hat n_{a'}w_{a'}\).
+Two estimates are compared with the true gear catch-at-age \(C_{g,a,y}\)
+(`catch_n_gear()`), all raised in the same way:
+
+| Estimate | Data | Errors included |
+|---|---|---|
+| **True ALK** | two-stage LFD \(\times\) exact \(P(a\mid l,g)\) | length sampling |
+| **Sampled ALK** | two-stage LFD \(\times\) ALK from a length-stratified otolith subsample (`alk.sample()`, at most `nbin` fish per length class) | length sampling + ALK sampling: the realistic case |
+
+The key must be the capture-conditioned one: the gear selects by length
+within an age class, so young ages are caught at above-average length (see
+the capture-conditioned key above), and a key built from the biological
+\(P(l\mid a)\) would assign these fish to older ages.
+
+```{r back-setup}
+as_flpar <- function(m) FLPar(array(m, dim = c(dim(m), 1)),
+                              dimnames = list(age = rownames(m), len = colnames(m),
+                                              iter = 1))
+raise_sop <- function(x, cw, wt) x %*% (cw / quantSums(x * wt))
+col_bc <- c(True = "black", `True ALK` = "#0072B2", `Sampled ALK` = "#CC3311")
+
+cn_true  <- cn$Commercial                              # true gear catch-at-age
+cw_true  <- catch_gear(cn, ple4)$Commercial            # true gear catch weight
+wt_c     <- catch.wt(ple4)[, yrs]
+alk_true <- ALKs(cn_true, as_flpar(gC$condALK))         # P(a | l, g), by year
+
+back_calc <- function(seed, nbin = 20) {
+  set.seed(seed)
+  lfd <- lfd.sim(cn_true, gC, scale = FALSE)            # two-stage length sample
+  alk_obs <- alk.sample(lfd, alk_true, nbin = nbin)     # otolith subsample
+  est <- list(
+    `True ALK`          = applyALK(lfd, alk_true),
+    `Sampled ALK`       = applyALK(lfd, alk_obs))
+  out <- FLQuants(lapply(est, function(x) {
+    x <- FLQuant(c(x), dimnames = dimnames(cn_true))   # common dimnames
+    raise_sop(x, cw_true, wt_c)
+  }))
+  attr(out, "otoliths") <- sum(sapply(alk_obs, sum))
+  out
+}
+
+bc1 <- back_calc(1)
+c(otoliths_per_year = attr(bc1, "otoliths") / length(yrs),
+  fish_measured_per_year = gC$ess_len)
+```
+
+```{r back-years, fig.height = 7, fig.width = 9, fig.cap = "Backward check for one replicate: catch-at-age reconstructed from the simulated commercial length samples, by year, against the true gear catch-at-age (black)."}
+df_bc <- as.data.frame(FLQuants(c(list(True = cn_true), as.list(bc1))))
+df_bc$qname <- factor(df_bc$qname, levels = c("True", names(bc1)))
+ggplot(df_bc, aes(age, data, colour = qname, linewidth = qname == "True")) +
+  geom_line() +
+  scale_linewidth_manual(values = c(`TRUE` = 1.1, `FALSE` = 0.6), guide = "none") +
+  scale_colour_manual(values = col_bc) +
+  facet_wrap(~year, ncol = 5, scales = "free_y") +
+  labs(x = "Age", y = "Catch numbers (thousands)", colour = NULL) +
+  theme_bw() + theme(legend.position = "bottom")
+```
+
+```{r back-ts, fig.height = 6, fig.width = 9, fig.cap = "Backward check for one replicate: time series by age."}
+ggplot(df_bc, aes(year, data, colour = qname)) +
+  geom_line() +
+  scale_colour_manual(values = col_bc) +
+  facet_wrap(~age, scales = "free_y") +
+  labs(x = "Year", y = "Catch numbers (thousands)", colour = NULL) +
+  theme_bw() + theme(legend.position = "bottom")
+```
+
+Replicating the whole sampling chain separates bias (a shifted median) from
+noise (a wide interval):
+
+```{r back-reps}
+nrep_bc <- 50
+bc <- lapply(seq_len(nrep_bc), back_calc)
+
+rel_err <- do.call(rbind, lapply(seq_along(bc), function(r)
+  do.call(rbind, lapply(names(bc[[r]]), function(m) {
+    d <- as.data.frame((bc[[r]][[m]] - cn_true) / cn_true)
+    data.frame(rep = r, method = m, age = d$age, year = d$year, rel = d$data)
+  }))))
+rel_err$method <- factor(rel_err$method, levels = names(bc1))
+
+# median relative error (bias) and median absolute relative error (precision)
+tab_bc <- aggregate(rel ~ method + age, rel_err, function(x)
+  c(bias = median(x), mare = median(abs(x))))
+tab_bc <- do.call(data.frame, tab_bc)
+round(xtabs(rel.bias ~ method + age, tab_bc), 2)
+round(xtabs(rel.mare ~ method + age, tab_bc), 2)
+```
+
+```{r back-reps-plot, fig.height = 4.2, fig.width = 9, fig.cap = "Relative error of the reconstructed catch-at-age over 50 replicates and 10 years: median (point) and 5-95% range (bar). A median away from zero is bias; the bar width is sampling noise."}
+q_bc <- aggregate(rel ~ method + age, rel_err, quantile, probs = c(0.05, 0.5, 0.95))
+q_bc <- do.call(data.frame, q_bc)
+names(q_bc)[3:5] <- c("lo", "med", "hi")
+ggplot(q_bc, aes(factor(age), med, colour = method)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_pointrange(aes(ymin = lo, ymax = hi), position = position_dodge(0.6),
+                  size = 0.3) +
+  scale_colour_manual(values = col_bc[-1]) +
+  coord_cartesian(ylim = c(-1, 1.5)) +
+  labs(x = "Age", y = "Relative error", colour = NULL) +
+  theme_bw() + theme(legend.position = "bottom")
+```
+
+What to look for:
+
+* **True ALK** should be unbiased at all ages; its noise is the length-sample
+  noise, i.e. the two-stage ESS, propagated to ages.
+* **Sampled ALK** adds noise mainly at the oldest ages, where few large fish
+  are available for otoliths, and some bias where length classes receive one
+  or no otoliths (those fish are dropped before raising).
+
+`ALKs()` is used with one iteration here; for several iterations see the
+developer notes.
+
+## Raising length samples to catch weight
+
+`lfd_sop()` is the length analogue of `sops()`: it scales each sample so that
+its sum of products with weight-at-length, \(W(l)=a\bar l^{\,b}\), equals the
+catch weight.
+
+```{r sop}
+cw         <- catch_gear(cn, ple4)$Commercial
+lfd_raised <- lfd_sop(lfd_com, gC, cw)
+
+w <- lfd_raised
+w[] <- gC$wt_len[dimnames(lfd_raised)$len]
+# by construction, the raised SOP equals the catch weight
+round(c(quantSums(lfd_raised * w) / cw), 6)
+# diagnostic: raised numbers / true catch numbers. Departures from one
+#     measure the mismatch between W(l), the growth curve and catch.wt
+round(c(quantSums(lfd_raised) / quantSums(cn$Commercial)), 3)
+```
+
+# Part II: within-year sampling, pulse survey and continuous fishery sampling
+
+## Why the sampling time matters
+
+Part I measured all commercial fish at one moment, mid-year. Fishery sampling
+programmes do not work like that: market and on-board samples are taken
+throughout the year, and the annual length composition is the pool of many
+small samples. Two things change within the year and are lost in a single
+mid-year sample:
+
+1. **Growth.** Each cohort grows during the year, so a cohort sampled in
+   January is shorter than the same cohort in December. Pooling samples over
+   the year smears each cohort mode over its within-year growth increment.
+2. **Depletion.** Under constant F and M, more of the annual catch is taken
+   early in the year, when numbers are highest, and the age composition of
+   the catch shifts towards younger fish as older cohorts are fished down.
+
+A survey, in contrast, is a **pulse**: all fish are measured within a few
+weeks. Placed in January, it samples every cohort at nearly the same point of
+its growth curve, before the growing season, so the cohort modes of young
+ages are sharp. Combining a pulse survey with continuous fishery sampling is a
+common data situation, and a seasonal assessment (e.g. FLicc with seasonal
+transitions) can only exploit it if the samples keep their timing.
+
+The annual OM in FLRef does not need seasons for this. The observation model
+splits the annual gear catch-at-age into \(S\) equal seasons (next section)
+and draws an independent two-stage sample in each season, with the
+conditional key at the season mid-point \((s-0.5)/S\). The annual `ess_age`
+and `ess_len` are split among seasons, so
+a monthly design with `ess_age = 200`, `ess_len = 1000` measures about 83
+fish a month from about 17 independent clusters: high length sample size, moderate
+age (cluster) sample size.
+
+## How the annual stock is seasonalised
+
+The operating model stays annual: `stock.n`, `harvest` and `m` are annual and
+the annual catch is the Baranov catch. Seasons exist only on the observation
+side, which is why any annual `FLom` can be sampled monthly.
+
+### Within-year dynamics
+
+Within year \(y\), let \(t\in[0,1)\) be the time since 1 January, with ages
+incremented on 1 January (the "birthday") and recruitment entering at
+\(t=0\). With constant instantaneous rates \(F_{a}\) and \(M_{a}\) during the
+year, \(Z_a=F_a+M_a\) (year index dropped),
+
+\[
+N_a(t)=N_a(0)\,e^{-Z_a t},\qquad
+\frac{dC_{g,a}}{dt}=F_{g,a}\,N_a(t),\qquad F_{g,a}=\phi_{g,a}F_a .
+\]
+
+The catch of gear \(g\) between \(t_1\) and \(t_2\) is
+
+\[
+C_{g,a}(t_1,t_2)=\frac{F_{g,a}}{Z_a}\,N_a(0)\left(e^{-Z_at_1}-e^{-Z_at_2}\right),
+\]
+
+which for \((t_1,t_2)=(0,1)\) is the annual Baranov catch of `catch_n_gear()`.
+For \(S\) equal seasons, season \(s\) is \([(s-1)/S,\,s/S)\) and
+
+\[
+C_{g,a,s}=C_{g,a}\,\pi_{a,s},\qquad
+\pi_{a,s}=\frac{e^{-Z_a(s-1)/S}\left(1-e^{-Z_a/S}\right)}{1-e^{-Z_a}},
+\qquad \sum_{s=1}^{S}\pi_{a,s}=1
+\]
+
+(\(\pi_{a,s}=1/S\) when \(Z_a=0\)). This is `season_fraction()`. Because
+the gear shares \(\phi_{g,a}\) are constant within the year, \(\pi\) is the
+same for every gear, and the seasonal catches sum exactly to the annual
+catch. Older, heavily fished ages (high \(Z\)) have their catch concentrated
+early in the year.
+
+### Within-year growth and the seasonal key
+
+Fish caught in season \(s\) are assigned the length distribution at the
+season mid-point \(t_s=(s-0.5)/S\):
+
+\[
+\bar L_a(t_s)=L_\infty\left(1-e^{-k(a+t_s-t_0)}\right),\qquad
+P(l\mid a,t_s)=\text{iALK with } t_0\to t_0-t_s,
+\]
+
+and conditioned on the (time-invariant) length selectivity of the gear,
+\(K_{a,l}(t_s)=P(l\mid a,t_s)s_g(l)\big/\sum_{l'}P(l'\mid a,t_s)s_g(l')\). The
+expected length composition of the season-\(s\) catch and of the year-round
+catch are
+
+\[
+\pi_{l,s}=\frac{\sum_aC_{g,a,s}K_{a,l}(t_s)}{\sum_aC_{g,a,s}},\qquad
+\pi_l^{\text{year}}=\frac{\sum_s\sum_aC_{g,a,s}K_{a,l}(t_s)}{\sum_aC_{g,a}}
+\;\xrightarrow{S\to\infty}\;
+\frac{\int_0^1\sum_a\frac{dC_{g,a}}{dt}K_{a,l}(t)\,dt}{\sum_aC_{g,a}} .
+\]
+
+A single annual sample at \(t=0.5\) targets \(\sum_aC_{g,a}K_{a,l}(0.5)\)
+instead, which differs from \(\pi_l^{\text{year}}\) through both growth (\(K\)
+changes with \(t\)) and depletion (\(C\) is front-loaded).
+
+### Assumptions and their limits
+
+* Constant F and M within the year: no seasonal fishing pattern. A seasonal
+  effort profile would replace \(F_a\) by \(F_ae_s\) with \(\sum_se_s/S=1\);
+  this is not implemented yet.
+* Growth is evaluated at the season mid-point; within-season growth is
+  ignored (about one month of growth for monthly sampling).
+* Birthday and recruitment on 1 January, consistent with the annual OM.
+* The plus group is treated like any other age (its length distribution is
+  that of the plus-group age).
+
+### FLRef functions for seasonalisation
+
+| Function | What it does |
+|---|---|
+| `season_fraction(stock, n_seasons)` | \(\pi_{a,y,s}\); multiply annual gear catch-at-age to get seasonal catch-at-age (observation side) |
+| `seasonalize_catch_n_gear(stock, f_age_gear, n_seasons)` | the same seasonal catches computed directly from gear F-at-age |
+| `pop_n_season(stock, n_seasons)` | numbers-at-age at the start of each season, \(N_a(0)e^{-Z_a(s-1)/S}\) |
+| `survey_n_gear(stock, gear, timing)` | survey numbers-at-age at any time \(t\), \(N_a(0)e^{-Z_at}s_{g,a}\) |
+| `lfd.sim.season()` | independent two-stage sample per season, key at \(t_s\) |
+| `sel_a_seasonal_avg()`, `wt_a_seasonal()`, `plot_sel_a_seasonal()` | selectivity- and weight-at-age implied by within-year growth, by season and averaged |
+
+### Seasonal catch-at-age
+
+```{r season-fraction}
+fr12 <- season_fraction(ple4[, yrs], 12)
+range(seasonSums(fr12))                                 # fractions sum to one
+
+cn_m <- cn$Commercial %*% fr12                          # monthly catch-at-age
+range(seasonSums(cn_m) / cn$Commercial, na.rm = TRUE)   # = annual catch
+
+# same result from gear F-at-age with seasonalize_catch_n_gear()
+F_g <- harvest(ple4)[, yrs]
+phi <- F_g; phi[] <- c(gC$f_share)
+cn_m2 <- seasonalize_catch_n_gear(ple4[, yrs], list(Commercial = F_g * phi),
+                                  n_seasons = 12)$Commercial
+range(cn_m2 / cn_m, na.rm = TRUE)
+```
+
+```{r season-fraction-plot, fig.height = 3.6, fig.cap = "Fraction of the annual catch taken in each month by age in the last year: ages with high total mortality are caught earlier in the year."}
+df_fr <- as.data.frame(fr12[, ac(maxyr)])
+df_fr$season <- as.numeric(as.character(df_fr$season))
+ggplot(df_fr, aes(season, data, colour = factor(age))) + geom_line(linewidth = 0.8) +
+  geom_hline(yintercept = 1 / 12, linetype = 2) +
+  scale_colour_viridis_d(name = "Age") +
+  scale_x_continuous(breaks = 1:12) +
+  labs(x = "Month", y = expression(pi[a*","*s])) + theme_bw()
+```
+
+```{r season-catch-plot, fig.height = 3.8, fig.cap = "Age composition of the commercial catch by month in the last year: older fish are taken early in the year, before they are fished down."}
+df_m <- as.data.frame(cn_m[, ac(maxyr)])
+df_m$season <- factor(as.numeric(as.character(df_m$season)))
+ggplot(df_m, aes(season, data, fill = factor(age))) +
+  geom_col(position = "fill") +
+  scale_fill_viridis_d(name = "Age") +
+  labs(x = "Month", y = "Proportion of monthly catch") + theme_bw()
+```
+
+## Three sampling designs
+
+The fleet and its length selectivity are the same in all designs; only the
+sampling resolution `n_seasons` changes. The total sample sizes are the same
+(`ess_age = 200`, `ess_len = 1000` per year), so differences between designs
+come from **when** fish are measured, not how many. The IBTS-Q1 survey is
+treated as a pulse in mid-January (\(t = 1/24\)) instead of the mid-point of
+its Q1 window; its length selectivity is refitted at that timing so that it
+keeps the same selectivity-at-age.
+
+```{r designs}
+srv_jan  <- 1 / 24
+fit_srvJ <- fit_gear_sel(sel_srv, lhpar, ages, "dnormal", timing = srv_jan,
+                         grid = grid)
+
+design <- function(n_seasons, ess_age = 200, ess_len = 1000)
+  build_design(list(
+    Commercial = c(fit_com$cfg, f_mult = 1, ess_age = ess_age,
+                   ess_len = ess_len, n_seasons = n_seasons),
+    Survey     = c(fit_srvJ$cfg, obs = "survey", ess_age = 250, ess_len = 350,
+                   timing = srv_jan)))
+
+designs <- list(Annual = design(1), Quarterly = design(4), Monthly = design(12))
+
+# per-season sample sizes of the commercial gear
+lapply(designs, function(d) with(d$Commercial,
+  rbind(ess_age = split_ess(ess_age, n_seasons),
+        ess_len = split_ess(ess_len, n_seasons))))
+```
+
+## Expected annual length composition of the catch
+
+Before sampling, compare the **expected** length composition each design
+targets. The year-round catch composition is computed with a fine (weekly)
+split; the annual design targets the mid-year snapshot instead.
+
+```{r expected}
+sel_vec <- function(g) setNames(c(g$sel_len), dimnames(g$sel_len)$len)
+expected_lfd <- function(cn_y, stk_y, gear, S) {
+  xs <- cn_y %*% season_fraction(stk_y, S)
+  p <- 0
+  for (s in seq_len(S)) {
+    K <- condition_alk(gear_ialk(gear, timing = (s - 0.5) / S), sel_vec(gear))
+    p <- p + c(c(xs[, , , s]) %*% K)
+  }
+  setNames(p / sum(p), colnames(gear$condALK))
+}
+
+yr <- ac(maxyr)
+gM <- designs$Monthly$Commercial
+p_exp <- lapply(c(Annual = 1, Quarterly = 4, Monthly = 12, `Year-round` = 52),
+                function(S) expected_lfd(cn$Commercial[, yr], ple4[, yr], gM, S))
+len_mid_g <- an(names(p_exp[[1]])) + grid$bin / 2
+round(sapply(p_exp, function(p) c(mean_length = sum(p * len_mid_g),
+                                  sd_length = sqrt(sum(p * len_mid_g^2) -
+                                                   sum(p * len_mid_g)^2))), 2)
+```
+
+```{r expected-plot, fig.height = 3.8, fig.cap = "Expected annual length composition of the commercial catch: mid-year snapshot (annual design) against the year-round composition. The year-round composition is broader because each cohort grows during the year."}
+df_e <- do.call(rbind, lapply(c("Annual", "Year-round"), function(d)
+  data.frame(design = d, len = an(names(p_exp[[d]])), p = p_exp[[d]])))
+ggplot(df_e, aes(len, p, colour = design)) + geom_line(linewidth = 0.9) +
+  labs(x = "Length (cm)", y = "Expected proportion", colour = NULL) + theme_bw()
+```
+
+## Simulating the designs: `season = FALSE` and `season = TRUE`
+
+`sample_lfd_gears()` reads the design from each gear. With
+`season = FALSE` (default) the seasonal samples are pooled into one annual
+sample with `seasonSums()`; with `season = TRUE` they stay in the season
+dimension. With the same common random numbers, the two are the same sample:
+
+```{r sim-designs}
+sim_y <- ac((maxyr - 4):maxyr)
+u_des <- lapply(designs, rUnif_lfd, years = sim_y, nsim = 1, seed = 99)
+
+s_F <- Map(function(d, u) sample_lfd_gears(ple4, d, sim_y, u_lfd = u),
+           designs, u_des)
+s_T <- sample_lfd_gears(ple4, designs$Monthly, sim_y, u_lfd = u_des$Monthly,
+                        season = TRUE)
+
+dim(s_F$Monthly$lfd$Commercial)   # pooled: one season
+dim(s_T$lfd$Commercial)           # 12 months
+identical(c(seasonSums(s_T$lfd$Commercial)), c(s_F$Monthly$lfd$Commercial))
+# fish measured per month (ess_len split among months)
+c(seasonSums(quantSums(s_T$lfd$Commercial))[, yr]) ; c(quantSums(s_T$lfd$Commercial)[, yr])
+```
+
+```{r ridge-monthly, fig.height = 7, fig.cap = "Monthly commercial length samples (season = TRUE) over the last five years, with von Bertalanffy cohort lines: the cohort modes move up the length axis through the year."}
+plot_lfd_ridgeline(list(`Commercial, monthly` = s_T$lfd$Commercial), lhpar = lhpar)
+```
+
+With twelve ridges a year the monthly panel is dense. The quarterly design
+shows the same within-year progression more clearly: within each year the
+cohort modes move up from quarter 1 to quarter 4, and the next year's first
+quarter starts again from the lower lengths of the following age.
+
+```{r sim-quarterly}
+s_Q <- sample_lfd_gears(ple4, designs$Quarterly, sim_y, u_lfd = u_des$Quarterly,
+                        season = TRUE)
+dim(s_Q$lfd$Commercial)           # 4 quarters
+```
+
+```{r ridge-quarterly, fig.height = 7, fig.cap = "Quarterly commercial length samples (season = TRUE) over the last five years, with von Bertalanffy cohort lines."}
+plot_lfd_ridgeline(list(`Commercial, quarterly` = s_Q$lfd$Commercial), lhpar = lhpar)
+```
+
+```{r ridge-survey, fig.height = 5, fig.cap = "January survey samples: each cohort is measured at the same point of its growth curve, giving sharp modes for the young ages."}
+plot_lfd_ridgeline(list(`Survey, January` = s_T$lfd$Survey), lhpar = lhpar)
+```
+
+```{r season-lines, fig.height = 4, fig.cap = "Monthly commercial samples in the last year (season = TRUE)."}
+plot_lfd_season(list(Commercial = s_T$lfd$Commercial), year = maxyr)
+```
+
+## Contrasting annual and continuous sampling
+
+The pooled annual samples of the three designs, against the year-round
+expected composition:
+
+```{r designs-plot, fig.height = 4, fig.cap = "Annual commercial length samples under the three designs (same total sample size) and the expected year-round composition (dashed)."}
+plot_lfd_designs(lapply(s_F, function(s) s$lfd$Commercial), year = maxyr,
+                 expected = p_exp$`Year-round`)
+```
+
+The replicated effective sample size makes the contrast quantitative. Each
+design is evaluated against two targets: its **own** expectation (precision)
+and the **year-round** composition (what the fishery actually caught). A
+sample that is precise for the wrong target has a high ESS against its own
+expectation but a lower one against the year-round composition, because the
+systematic difference does not shrink with sample size.
+
+```{r ess-designs}
+nrep    <- 200
+stk_rep <- propagate(ple4[, yr], nrep)
+ess_tab <- sapply(names(designs), function(d) {
+  S <- designs[[d]]$Commercial$n_seasons
+  x <- sample_lfd_gears(stk_rep, designs[[d]], yr)$lfd$Commercial
+  c(own_expectation = median(ess_mi(x, p_exp[[d]])),
+    year_round      = median(ess_mi(x, p_exp$`Year-round`)))
+})
+round(ess_tab)
+```
+
+Reading the table:
+
+* All designs measure the same number of fish, and the age (cluster) stage
+  limits the effective sample size well below `ess_len` in every design.
+* The **annual** design is evaluated against the mid-year snapshot. Against
+  the year-round composition its ESS drops, by how much depends on how much
+  the stock grows within the year relative to the length-at-age spread.
+* The **monthly** design targets (almost) the year-round composition by
+  construction; quarterly lies in between.
+* For an assessment that treats the year as one time step, the pooled monthly
+  sample (`season = FALSE`) is the appropriate input. For a seasonal
+  assessment, `season = TRUE` passes each month with its own timing, and the
+  January survey adds a sharp snapshot at the start of the growing season.
+
+# Part III: length sampling inside an MSE with `sampling.lfd.oem()`
+
+`sampling.lfd.oem()` is an `FLoem` method with the same structure as
+`mse::sampling.oem()`. For each data year it calls `sample_lfd_gears()` on
+the OM stock (by unit) and reports catch weight by fishery gear. The samples
+reach the estimator as attributes of the observed stock, `attr(stk, "lfd")`
+and `attr(stk, "catch_gear")`, because `mp()` passes only `stk` and `idx` to
+the `est` module. The design (annual, quarterly, monthly; survey timing) comes
+from the gears, and `season` decides whether seasonal samples are pooled.
+
+## Operating model
+
+```{r om, eval = run_mse}
+nsim <- 20
+iy   <- maxyr
+fy   <- iy + 15
+y0   <- iy - 9                               # first year of the LFD series
+
+sr  <- FLSRTMB::srrTMB(as.FLSR(ple4, model = bevholtSV), spr0 = mean(spr0y(ple4)))
+brp <- computeFbrp(ple4, sr, proxy = "msy", blim = 0.25, type = "btgt", verbose = FALSE)
+fmsy <- c(refpts(brp)["msy", "harvest"])
+bmsy <- c(refpts(brp)["msy", "ssb"])
+
+om <- FLom(stock = propagate(ple4, nsim), sr = sr, refpts = refpts(brp),
+           projection = mseCtrl(method = fwd.om),
+           deviances = rlnormar1(n = nsim, sdlog = 0.4, rho = 0.3, years = iy:fy))
+om <- fwdWindow(om, end = fy)
+```
+
+## Observation error model
+
+`lfd_obs_init()` builds `observations$lfd` and `observations$catch_gear` from
+`y0` to `fy` and fills the historical years with `sample_lfd_gears()`, using
+the same common random numbers as the OEM. `deviances$lfd` holds the common
+random numbers for every year, so each deviate is used once.
+
+```{r oem-fun, eval = run_mse}
+make_oem <- function(gears, season = FALSE, seed = 123) {
+  u_lfd <- rUnif_lfd(gears, years = y0:fy, nsim = nsim, seed = seed)
+  init  <- lfd_obs_init(stock(om), gears, years = y0:fy, hist_years = y0:iy,
+                        u_lfd = u_lfd, season = season)
+  cg_dev <- FLQuants(lapply(init$catch_gear, function(x)    # ~10% CV
+    rlnorm(nsim, FLQuant(0, dimnames = list(year = y0:fy)), 0.1)))
+  FLoem(method = sampling.lfd.oem,
+        observations = list(stk = stock(om), lfd = init$lfd,
+                            catch_gear = init$catch_gear),
+        deviances    = list(lfd = u_lfd, catch_gear = cg_dev),
+        args         = list(om_gears = gears, season = season))
+}
+oem_a <- make_oem(designs$Annual)                    # annual design
+oem_q <- make_oem(designs$Quarterly, season = TRUE)  # quarterly, kept by quarter
+```
+
+## Management procedure
+
+The estimator here is a placeholder that checks the LFD channel and then acts
+as a perfect assessment; in the FLicc MSE it is replaced by `flicc.sa()`.
+
+```{r ctrl, eval = run_mse}
+lfd.check.sa <- function(stk, idx, args, tracking, ...) {
+  lfd <- attr(stk, "lfd")
+  dy  <- args$dy
+  track(tracking, "lfd.n.Commercial", ac(args$ay)) <-
+    quantSums(seasonSums(window(lfd$Commercial, start = dy, end = dy)))
+  perfect.sa(stk, idx, args, tracking)
+}
+
+ctrl <- mpCtrl(list(
+  est  = mseCtrl(method = lfd.check.sa),
+  hcr  = mseCtrl(method = hockeystick.hcr,
+                 args = list(lim = 0, trigger = 0.5 * bmsy, target = fmsy,
+                             min = 0, metric = "ssb", output = "fbar")),
+  isys = mseCtrl(method = tac.is, args = list(recyrs = -2, fmin = 0))))
+
+mseargs <- list(iy = iy, fy = fy, y0 = y0, data_lag = 1, management_lag = 1,
+                frq = 1, it = nsim)
+```
+
+`parallel = FALSE` is required for now: when `mp()` splits iterations across
+workers it subsets only `FLQuant` deviances, while the common random numbers
+from `rUnif_lfd()` are plain arrays (see the developer notes).
+
+```{r run, eval = run_mse}
+# the cache stores the settings it was built with; any change in the
+# sampling design, nsim or years triggers a re-run instead of a stale load
+run_or_load <- function(file, oem, gears) {
+  sig <- list(design = lapply(gears, `[`, c("obs", "ess_age", "ess_len", "n_seasons")),
+              timing = sapply(gears, function(g) g$grid$timing),
+              season = args(oem)$season, nsim = nsim, years = c(y0, iy, fy))
+  if (file.exists(file)) {
+    cached <- readRDS(file)
+    if (is.list(cached) && identical(cached$sig, sig)) return(cached$run)
+    message("Cached MSE in ", basename(file), " was built with other settings: re-running.")
+  }
+  run <- mp(om, oem = oem, ctrl = ctrl, args = mseargs, parallel = FALSE,
+            verbose = FALSE)
+  dir.create(dirname(file), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(list(run = run, sig = sig), file)
+  run
+}
+run_a <- run_or_load(f_mse_a, oem_a, designs$Annual)
+run_q <- run_or_load(f_mse_q, oem_q, designs$Quarterly)
+```
+
+## Checks on the MSE output
+
+```{r mse-checks, eval = run_mse}
+check_run <- function(run, oem0, gears) {
+  lfd_run <- observations(oem(run))$lfd
+  lfd_ini <- observations(oem0)$lfd
+  cg_run  <- observations(oem(run))$catch_gear
+  hy <- ac(y0:iy)
+
+  # years sampled by the OEM: mp() samples dy = ay - data_lag for each
+  # management year ay (iy - 1 up to fy - 3 with these settings)
+  yrs_run <- dimnames(lfd_run$Commercial)$year
+  n_mat   <- matrix(c(quantSums(seasonSums(lfd_run$Commercial))),
+                    nrow = length(yrs_run))
+  proj    <- setdiff(yrs_run[rowSums(n_mat > 0) == nsim], hy)
+
+  by_gear <- t(sapply(names(gears), function(g) c(
+    ess_len = gears[[g]]$ess_len,
+    # fish per sampled projection year and iteration (should equal ess_len)
+    fish_min = min(quantSums(seasonSums(lfd_run[[g]][, proj]))),
+    fish_max = max(quantSums(seasonSums(lfd_run[[g]][, proj]))),
+    # common random numbers: the OEM re-samples the last historical year
+    # with the same deviates and catch, so the seed is reproduced
+    history_reproduced = identical(c(lfd_run[[g]][, hy]), c(lfd_ini[[g]][, hy])))))
+  list(projection_years = range(an(proj)),
+       by_gear = by_gear,
+       seasons = sapply(lfd_run, function(x) dim(x)[4]),
+       # (3) reported/true catch: the reporting error (~10% CV)
+       catch_ratio = summary(c(cg_run$Commercial[, proj] /
+                               catch(run@om@stock)[, proj])))
+}
+check_run(run_a, oem_a, designs$Annual)
+check_run(run_q, oem_q, designs$Quarterly)
+```
+
+```{r mse-plot, eval = run_mse, fig.height = 6, fig.cap = "Historical OM and MP projections with the annual and the quarterly sampling design (the placeholder estimator is a perfect assessment, so the two MPs differ only through implementation)."}
+rp_plot <- FLPar(Fmsy = fmsy, Bmsy = bmsy, Btrigger = 0.5 * bmsy)
+plotAdvice(FLStocks(OM = window(stock(om), end = iy),
+                    Annual = window(run_a@om@stock, start = iy),
+                    Quarterly = window(run_q@om@stock, start = iy)),
+           rpts = rp_plot)
+```
+
+```{r mse-lfd-plot, eval = run_mse, fig.height = 7, fig.cap = "Quarterly commercial samples for iteration 1 as passed to est with season = TRUE: the last historical years and the first projection years."}
+lfd_q <- observations(oem(run_q))$lfd$Commercial
+yrs_q <- dimnames(lfd_q)$year[c(quantSums(seasonSums(iter(lfd_q, 1)))) > 0]
+yrs_q <- head(yrs_q[an(yrs_q) >= iy - 3], 8)
+# time runs along the (flipped) y aesthetic: dashed line = start of projection
+plot_lfd_ridgeline(list(`Commercial, quarterly` = iter(lfd_q[, yrs_q], 1)), lhpar = lhpar) +
+  geom_hline(yintercept = iy + 1, linetype = 2)
+```
+
+```{r mse-lfd-season, eval = run_mse, fig.height = 4, fig.cap = "Quarterly commercial samples in the first sampled projection year (iteration 1), one line per quarter."}
+plot_lfd_season(list(Commercial = iter(lfd_q, 1)), year = yrs_q[an(yrs_q) > iy][1])
+```
+
+# Towards sex-structured and spatial stocks
+
+The single-sex machinery extends to stocks with a populated `unit` dimension,
+but `unit` means two different things, and the sampling design differs:
+
+| | `unit.type = "gender"` (Doc 2) | `unit.type = "spatial"` (Doc 3) |
+|---|---|---|
+| units | `"F"`, `"M"` | areas |
+| growth | sex-specific `lhpar[, u]` | usually shared |
+| gear selectivity-at-length | shared \(s_g(l)\); \(s_{g,a,u}\) differs through growth | area-specific gear sets possible |
+| sampling event | **one** sample per gear from the combined catch; sexes are labels on fish | **independent** samples per area |
+| ESS | `ess_age`, `ess_len` shared across sexes | per area |
+| CRN streams | one per gear | one per area and gear |
+| pooling for `est` | sum over units (no raising needed: sampling is proportional to catch) | raise to catch by area (`lfd.raising = TRUE`) and pool |
+| length grid | must be common across sexes | common |
+| within-year design | as Part II, per gear (`n_seasons`, survey `timing`) | as Part II, per area and gear |
+
+Two choices follow for `sampling.lfd.oem()`:
+
+* a new argument `unit.type = c("gender", "spatial")`, with the current
+  behaviour as `"spatial"`; and
+* for `"gender"`, the joint draw over (sex, age) and then (sex, length) can
+  reuse `lfd.sim()` unchanged by stacking the sexes into one block-diagonal
+  conditional key, season by season with `season_fraction()` computed per sex.
+
+For the life-history parameters, an `FLPar` with a `unit` dimension
+(`params x unit x iter`) is preferable to `FLPars`: subsetting `lhpar[, "F"]`
+mirrors `stk[, , "F"]`, iterations propagate in one object, and a single
+argument passes through `build_gear()`. The developer notes give the details.
+
+# Appendix A: length-based utilities in FLRef
+
+All functions are exported unless marked *internal*. Arguments in *italics*
+default to the gear's settings (`gear$grid`, `gear$lhpar`).
+
+## A.1 Growth, length grid and keys
+
+| Function | Purpose | Key arguments | Returns |
+|---|---|---|---|
+| `iALK()` | inverse age-length key \(P(l\mid a,t)\), normal length-at-age around a growth curve | `params`, `model`, `age`, `cv`, `lmin`, `lmax`, `bin`, `max`, `reflen` | `FLPar` age x len |
+| `len_grid()` | the single length grid (lower bin limits; last bin a plus group) | `linf`, `lmin`, `lmax_mult`, `bin` | numeric |
+| `gear_ialk()` | \(P(l\mid a,t)\) on a gear's own grid, at any `timing` | `gear`, `age`, `timing`, `params` | matrix age x len |
+| `condition_alk()` | capture-conditioned key \(P(l\mid a,g)\) from \(P(l\mid a)\) and \(s_g(l)\) | `ialk_mat`, `sel_len_vec` | matrix age x len |
+| `ALK()` | age-length key \(P(a\mid l)\) for one sampling event | `N_a`, `iALK` | `FLPar` |
+| `ALKs()` | annual keys \(P(a\mid l)\) from at-age numbers and a (conditioned) inverse key | `object`, `iALK` | `FLPars` by year |
+
+## A.2 Selectivity and gears
+
+| Function | Purpose | Key arguments | Returns |
+|---|---|---|---|
+| `sel_logistic_len()`, `sel_normal_len()`, `sel_dnormal_len()` | selectivity-at-length shapes | `L`, shape parameters | numeric |
+| `sel_la()` | stand-alone selectivity-at-length and ALK-integrated selectivity-at-age | `lhpar`, `type`, shape parameters | list |
+| `combine_sel_age()` | joint selectivity-at-age weighted by relative apical F | `object`, `fapic_rel` | `FLQuant` |
+| `build_gear()` | gear objects: \(s_g(l)\), \(s_{g,a}\), \(P(l\mid a,g)\), F shares, weight-at-length and sampling design (`obs`, `timing`, `n_seasons`, `ess_age`, `ess_len`) | `gear_cfg`, `lhpar`, `age`, `timing`, `fbar_range`, grid | list of gears |
+| `gear_par()` | one scalar entry across gears | `om_gears`, `what` | named vector |
+| `joint_sel()` | selectivity of total F implied by the gears (Fbar scale) | `om_gears` | `FLQuant` |
+| `f_age_gear()` | gear F-at-age from gear Fbar trajectories | `stock`, `om_gears`, `fbar_gear` | `FLQuants` |
+| `f_share_gear()` | time-varying share of total F-at-age by gear | `f_age` | `FLQuants` |
+| `sel_a_seasonal_avg()` | selectivity-at-age averaged over within-year growth | `lhpar`, `sel_len`, `age`, `n_seasons` | numeric |
+| `wt_a_seasonal()` | weight-at-age averaged over seasons, weighted by seasonal numbers | `n_season`, `params`, *`gear`*, `n_seasons` | `FLQuant` |
+
+## A.3 Catch partition and within-year allocation
+
+| Function | Purpose | Key arguments | Returns |
+|---|---|---|---|
+| `catch_n_gear()` | partial Baranov catch-at-age by gear (sums to the total) | `stock`, `shares`, `years` | `FLQuants` (+ `attr(, "total")`) |
+| `catch_gear()` | annual catch (weight or numbers) by gear | `catch_n`, `wt`, `type` | `FLQuants` |
+| `catch_by_gear()` | relative catch by gear over a window (FLicc input) | `catch_n`, `wt`, `years`, `iter` | vector / matrix |
+| `season_fraction()` | share \(\pi_{a,y,s}\) of the annual catch taken in each season | `stock`, `n_seasons` | `FLQuant` with seasons |
+| `seasonalize_catch_n_gear()` | seasonal gear catch-at-age from gear F-at-age | `stock`, `f_age_gear`, `n_seasons` | `FLQuants` |
+| `pop_n_season()` | numbers-at-age at the start of each season | `stock`, `n_seasons` | `FLQuant` |
+| `survey_n_gear()` | survey numbers-at-age at the survey timing | `stock`, `gear`, `years`, *`timing`* | `FLQuant` |
+
+## A.4 Sampling
+
+| Function | Purpose | Key arguments | Returns |
+|---|---|---|---|
+| `ca.sim()` | multinomial catch-at-age sample (stage 1) | `object`, `ess`, `u` | `FLQuant` |
+| `len.sim()` | single-stage length sample, optional gear key, several timings | `N_a`, `params`, `ess`, `timing`, `gear`, `u` | `FLQuant` |
+| `lfd.sim()` | two-stage length sample (age, then length) | `object`, `gear`, *`ess_age`*, *`ess_len`*, `timing`, `u_age`, `u_len`, `scale` | `FLQuant` |
+| `lfd.sim.season()` | independent two-stage sample per season, key at mid-season | `object` (seasonal), `gear`, `n_seasons`, `u_age`, `u_len`, `season` | `FLQuant` |
+| `sample_lfd_gears()` | all gears of one unit: fishery (annual or within-year) and surveys; the OEM's sampling step | `stock`, `om_gears`, `years`, `u_lfd`, `f_share`, `season` | list(`lfd`, `catch_n`) |
+| `split_ess()` | exact split of a sample size among seasons | `n`, `S` | integer |
+| `rmultinom_crn()` | multinomial draw from pre-generated uniforms (common random numbers) | `u`, `p` | integer counts |
+| `rUnif_len()`, `rUnif_lfd()` | common random numbers for `len.sim()` / `lfd.sim()` (seasonal streams for `n_seasons > 1`) | `gear(s)`, `years`, `nsim`, `seed` | list of arrays |
+| `idx.sim()` | age-based survey index with observation error | `object`, `sel`, `ess`, `sigma`, `q` | `FLIndex` |
+
+## A.5 From lengths to ages and raising
+
+| Function | Purpose | Key arguments | Returns |
+|---|---|---|---|
+| `alk.sample()` | length-stratified otolith subsample of annual ALKs (at most `nbin` per length class) | `lfds`, `alks`, `nbin`, `n.sample` | `FLPars` (counts) |
+| `applyALK()` | numbers-at-age from a length sample and annual ALKs | `lfds`, `alks` | `FLQuant` |
+| `lfd_sop()` | raise a length sample to catch weight by sum of products with \(W(l)\) (seasonal samples: one factor per year) | `lfd`, `wt_len`, `catch` | `FLQuant` |
+| `sops()` | raise catch-at-age to the stock's catch weight (optional error) | `object`, `stock`, `sigma` | `FLQuant` |
+| `pgquant()` | set a plus group on an at-age `FLQuant` | `object`, `pg` | `FLQuant` |
+
+## A.6 MSE observation model
+
+| Function | Purpose | Key arguments | Returns |
+|---|---|---|---|
+| `sampling.lfd.oem()` | `FLoem` method: length samples and reported catch by gear for each data year | `om_gears`, `f_share`, `season`, `lfd.raising`, `lfd.scale` | list(`stk`, `idx`, `observations`, `tracking`) |
+| `lfd_obs_init()` | builds `observations$lfd` / `$catch_gear` and seeds the historical years with the OEM's own code and random numbers | `stock`, `om_gears`, `years`, `hist_years`, `u_lfd`, `season` | list |
+| `lfd_template()` | empty length-sample `FLQuant` for a gear, with the right season dimension | `gear`, `years`, `nsim`, `units`, `season` | `FLQuant` |
+| `.lfd_gears_by_unit()`, `.lfd_crn_by_unit()`, `.lfd_flat_gears()` | *internal*: normalise gear and random-number lists by unit | | |
+
+## A.7 Plots
+
+| Function | Shows |
+|---|---|
+| `plot_sel_la()` | selectivity-at-length and -at-age side by side |
+| `plot_sel_age()` | one or more selectivity-at-age curves |
+| `plot_condALK()` | \(P(l\mid a,g)\) heat map, optionally with biological vs. conditioned mean length-at-age |
+| `plot_condALK_bias()` | mean length-at-age in the population and in the catch, all gears |
+| `plot_sel_a_seasonal()` | selectivity-at-age by season implied by within-year growth |
+| `plot_lfd_ridgeline()` | length samples as ridgelines along time (annual or seasonal), with cohort growth lines |
+| `plot_lfd_season()` | seasonal length samples for one year, by gear |
+| `plot_lfd_designs()` | pooled annual composition of several sampling designs, with an expected composition |
+
+# Appendix B: notation
+
+| Symbol | Meaning | In code |
+|---|---|---|
+| \(a, l, y, s, g\) | age, length class (lower limit), year, season, gear | dimnames `age`, `len`, `year`, `season`; gear names |
+| \(N_{a,y}\), \(F_{a,y}\), \(M_{a,y}\), \(Z_{a,y}\) | numbers at 1 January, fishing, natural and total mortality | `stock.n`, `harvest`, `m` |
+| \(\phi_{g,a}\) | share of total F-at-age taken by gear \(g\) | `gear$f_share`, `f_share_gear()` |
+| \(C_{g,a,y}\), \(C_{g,a,y,s}\) | gear catch-at-age, annual and by season | `catch_n_gear()`, `season_fraction()` |
+| \(\pi_{a,y,s}\) | share of the annual catch taken in season \(s\) | `season_fraction()` |
+| \(P(l\mid a,t)\) | biological inverse key at within-year time \(t\) | `iALK()`, `gear_ialk()` |
+| \(s_g(l)\), \(s_{g,a}\) | selectivity-at-length, ALK-integrated selectivity-at-age | `gear$sel_len`, `gear$sel_a` |
+| \(K_{a,l}=P(l\mid a,g)\) | capture-conditioned key | `gear$condALK`, `condition_alk()` |
+| \(P(a\mid l,g)\) | age-length key of the catch | `ALKs()` with `gear$condALK` |
+| \(n_A\), \(n_L\) | stage-1 (age) and stage-2 (length) sample sizes | `ess_age`, `ess_len` |
+| \(W(l)=a\bar l^{\,b}\) | weight at length (bin mid-point) | `gear$wt_len` |
+
+# Session information
+
+```{r session}
+sessionInfo()
+```
