@@ -48,7 +48,7 @@ buildNV: README.md
 
 install: ../$(PKGNAME)_$(PKGVERS).tar.gz
 	cd ..;\
-	R --vanilla CMD INSTALL $(PKGNAME)_$(PKGVERS).tar.gz
+	R --vanilla CMD INSTALL --strip $(PKGNAME)_$(PKGVERS).tar.gz
 
 checkCRAN: ../$(PKGNAME)_$(PKGVERS).tar.gz
 	cd ..;\

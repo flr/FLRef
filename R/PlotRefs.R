@@ -475,8 +475,7 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
   
   names(fls)[names(fls)=="F"] =  paste0("F(",paste0(range(stock, c("minfbar", "maxfbar")),
          collapse="-"),")")
-  
-  p = ggplotFL::plot(fls)+ ylim(c(0, NA))+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
+  p = ggplotFL::plot(fls)+ expand_limits(y = 0)+ theme_bw()+xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)  
   }
   
   
@@ -493,8 +492,8 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
     if(!type=="spm"){
    
     p = ggplotFL::plot(stks,
-                   metrics=list(Recruitment=function(x)apply(rec(x)[,,,recQ],c(2,6),sum),SSB=function(x)apply(ssb(x)[,,,ssbQ],c(2,6),sum),F=function(x)apply(fbar(x),c(2,6),mean),Landings=function(x)apply(landings(x),c(2,6),sum),Catches=function(x)apply(catch(x),c(2,6),sum))[c(1:3,(4+what))])+                                                
-         ylim(c(0, NA))+ theme_bw()+leg+
+                   metrics=list(Recruitment=function(x)apply(rec(x)[,,,recQ],c(2,6),sum),SSB=function(x)apply(ssb(x)[,,,ssbQ],c(2,6),sum),F=function(x)apply(fbar(x),c(2,6),mean),Landings=function(x)apply(landings(x),c(2,6),sum),Catches=function(x)apply(catch(x),c(2,6),sum))[c(1:3,(4+what))])+ 
+        expand_limits(y = 0)+  theme_bw()+leg+
       xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
     
     if(osa){
@@ -514,8 +513,8 @@ plotAdvice <- function(object,rpts="missing",type=NULL,yield=c("catch","landings
       
       
       p = ggplotFL::plot(stks,
-                         metrics=list(Biomass=function(x)apply(ssb(x)[,,,ssbQ],c(2,6),sum),F=function(x)apply(fbar(x),c(2,6),mean),Landings=function(x)apply(landings(x),c(2,6),sum),Catches=function(x)apply(catch(x),c(2,6),mean))[c(1:2,(3+what))])+                                                
-        ylim(c(0, NA))+ theme_bw()+leg+
+                         metrics=list(Biomass=function(x)apply(ssb(x)[,,,ssbQ],c(2,6),sum),F=function(x)apply(fbar(x),c(2,6),mean),Landings=function(x)apply(landings(x),c(2,6),sum),Catches=function(x)apply(catch(x),c(2,6),mean))[c(1:2,(3+what))])+       
+        expand_limits(y = 0)+ theme_bw()+leg+
         xlab("Year")+ facet_wrap(~qname, scales="free",ncol=ncol)                                                                                                                                                                                  
       if(osa){
         p$data[p$data$year==max(p$data$year)& p$data$qname%in%c("F","Catches","Landings"),"data"] = NA
